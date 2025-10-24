@@ -19,6 +19,8 @@ import 'package:flutter_application_1/features/records/presentation/records_deta
 import 'package:flutter_application_1/features/records/presentation/records_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_detail_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_screen.dart';
+import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
+import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:go_router/go_router.dart';
 
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -105,6 +107,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 name: 'workout-detail',
                 builder: (context, state) => WorkoutDetailScreen(
                   workoutId: state.pathParameters['id']!,
+                ),
+              ),
+              GoRoute(
+                path: 'create-routine',
+                name: 'create-routine',
+                builder: (context, state) => CreateRoutineScreen(
+                  editingRoutine: state.extra as WorkoutRoutine?,
                 ),
               ),
             ],
