@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/features/auth/presentation/sign_up_screen.dart';
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
+import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -69,7 +70,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('로그인 성공!'),
-          backgroundColor: Color(0xFF9ACD32),
+          backgroundColor: mainButtonColor,
         ),
       );
       return;
@@ -102,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const Icon(
                   Icons.fitness_center,
                   size: 80,
-                  color: Color(0xFF9ACD32),
+                  color: mainButtonColor,
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -111,7 +112,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A6741),
+                    color: mainButtonColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -120,7 +121,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF6B8B6B),
+                    color: subTextColor,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -179,11 +180,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 OutlinedButton(
                   onPressed: _goToSignUp,
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF9ACD32)),
-                    foregroundColor: const Color(0xFF9ACD32),
+                    side: const BorderSide(color: mainButtonColor),
+                    foregroundColor: mainButtonColor,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: const Text(
@@ -199,7 +200,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   '또는',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xFF6B8B6B),
+                    color: subTextColor,
                     fontSize: 14,
                   ),
                 ),
@@ -209,15 +210,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('구글 로그인 기능은 추후 구현됩니다'),
-                        backgroundColor: Color(0xFF9ACD32),
+                        backgroundColor: mainButtonColor,
                       ),
                     );
                   },
                   icon: const Icon(Icons.login),
                   label: const Text('Google로 계속하기'),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFB8D4B8)),
-                    foregroundColor: const Color(0xFF6B8B6B),
+                    side: const BorderSide(color: borderColor),
+                    foregroundColor: subTextColor,
                   ),
                 ),
               ],

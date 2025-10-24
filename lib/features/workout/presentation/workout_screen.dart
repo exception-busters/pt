@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 
 class WorkoutScreen extends StatelessWidget {
@@ -9,8 +10,8 @@ class WorkoutScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('운동'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
       ),
       body: SafeArea(
         child: Padding(
@@ -22,11 +23,7 @@ class WorkoutScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: mainButtonColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Column(
@@ -64,7 +61,7 @@ class WorkoutScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -75,28 +72,28 @@ class WorkoutScreen extends StatelessWidget {
                       title: '웜업',
                       duration: '5분',
                       icon: Icons.accessibility_new,
-                      color: const Color(0xFFFF9800),
+                      color: secondaryButtonColor,
                       onTap: () => context.go('/app/workout/detail/warmup'),
                     ),
                     _WorkoutCard(
                       title: '유산소',
                       duration: '20분',
                       icon: Icons.directions_run,
-                      color: const Color(0xFF4CAF50),
+                      color: mainButtonColor,
                       onTap: () => context.go('/app/workout/detail/cardio'),
                     ),
                     _WorkoutCard(
                       title: '근력운동',
                       duration: '15분',
                       icon: Icons.fitness_center,
-                      color: const Color(0xFF2196F3),
+                      color: secondaryButtonColor,
                       onTap: () => context.go('/app/workout/detail/strength'),
                     ),
                     _WorkoutCard(
                       title: '쿨다운',
                       duration: '5분',
                       icon: Icons.self_improvement,
-                      color: const Color(0xFF9C27B0),
+                      color: mainButtonColor,
                       onTap: () => context.go('/app/workout/detail/cooldown'),
                     ),
                   ],
@@ -134,16 +131,9 @@ class _WorkoutCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           children: [
@@ -162,7 +152,7 @@ class _WorkoutCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
             ),

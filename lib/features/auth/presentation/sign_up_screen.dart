@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 import '../application/auth_providers.dart'; // AuthController import
 
@@ -77,7 +78,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('회원가입이 완료되었습니다!'),
-          backgroundColor: Color(0xFF9ACD32),
+          backgroundColor: mainButtonColor,
         ),
       );
       context.pop(); // 회원가입 후 이전 화면으로
@@ -96,8 +97,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('회원가입'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -114,7 +115,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A6741),
+                    color: mainButtonColor,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -123,7 +124,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF6B8B6B),
+                    color: subTextColor,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -193,7 +194,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       value: _agreeToTerms,
                       onChanged: (value) =>
                           setState(() => _agreeToTerms = value ?? false),
-                      activeColor: const Color(0xFF9ACD32),
+                      activeColor: mainButtonColor,
                     ),
                     Expanded(
                       child: GestureDetector(
@@ -203,7 +204,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           '이용약관 및 개인정보처리방침에 동의합니다',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF6B8B6B),
+                            color: subTextColor,
                           ),
                         ),
                       ),
@@ -229,7 +230,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   child: const Text(
                     '이미 계정이 있으신가요? 로그인하기',
                     style: TextStyle(
-                      color: Color(0xFF6B8B6B),
+                      color: subTextColor,
                       fontSize: 14,
                     ),
                   ),

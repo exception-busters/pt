@@ -37,6 +37,8 @@ dependencies:
   go_router: ^14.0.0
   flutter_riverpod: ^2.5.1
   supabase_flutter: ^2.5.6
+  image_picker: ^1.0.7
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
