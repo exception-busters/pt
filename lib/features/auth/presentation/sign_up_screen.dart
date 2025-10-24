@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../application/auth_providers.dart'; // AuthController import
 
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -17,6 +19,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _agreeToTerms = false;
+  bool _isLoading = false; // 로딩 상태
 
   @override
   void dispose() {
@@ -28,9 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return '이메일을 입력해주세요';
-    }
+    if (value == null || value.isEmpty) return '이메일을 입력해주세요';
     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
       return '올바른 이메일 형식을 입력해주세요';
     }
@@ -38,45 +39,55 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return '비밀번호를 입력해주세요';
-    }
-    if (value.length < 6) {
-      return '비밀번호는 최소 6자 이상이어야 합니다';
-    }
+    if (value == null || value.isEmpty) return '비밀번호를 입력해주세요';
+    if (value.length < 6) return '비밀번호는 최소 6자 이상이어야 합니다';
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return '비밀번호 확인을 입력해주세요';
-    }
-    if (value != _passwordController.text) {
-      return '비밀번호가 일치하지 않습니다';
-    }
+    if (value == null || value.isEmpty) return '비밀번호 확인을 입력해주세요';
+    if (value != _passwordController.text) return '비밀번호가 일치하지 않습니다';
     return null;
   }
 
-  void _signUp() {
-    if (_formKey.currentState!.validate()) {
-      if (!_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('약관에 동의해주세요'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('약관에 동의해주세요'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
+    setState(() => _isLoading = true);
+
+    final authController = ref.read(authControllerProvider.notifier);
+    final success = await authController.signUp(
+      _emailController.text,
+      _passwordController.text,
+      name: _nameController.text,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('회원가입이 완료되었습니다!'),
           backgroundColor: Color(0xFF9ACD32),
         ),
       );
-
-      context.pop();
+      context.pop(); // 회원가입 후 이전 화면으로
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('회원가입에 실패했습니다.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -123,12 +134,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     hintText: '이름을 입력하세요',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '이름을 입력해주세요';
-                    }
-                    return null;
-                  },
+                  validator: (value) =>
+                  value == null || value.isEmpty ? '이름을 입력해주세요' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -153,11 +160,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       icon: Icon(
                         _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
+                      onPressed: () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible),
                     ),
                   ),
                   validator: _validatePassword,
@@ -172,13 +176,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        _isConfirmPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                        });
-                      },
+                      onPressed: () => setState(() =>
+                      _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
                     ),
                   ),
                   validator: _validateConfirmPassword,
@@ -188,20 +191,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   children: [
                     Checkbox(
                       value: _agreeToTerms,
-                      onChanged: (value) {
-                        setState(() {
-                          _agreeToTerms = value ?? false;
-                        });
-                      },
+                      onChanged: (value) =>
+                          setState(() => _agreeToTerms = value ?? false),
                       activeColor: const Color(0xFF9ACD32),
                     ),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _agreeToTerms = !_agreeToTerms;
-                          });
-                        },
+                        onTap: () =>
+                            setState(() => _agreeToTerms = !_agreeToTerms),
                         child: const Text(
                           '이용약관 및 개인정보처리방침에 동의합니다',
                           style: TextStyle(
@@ -214,7 +211,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                ElevatedButton(
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
                   onPressed: _signUp,
                   child: const Text(
                     '회원가입',

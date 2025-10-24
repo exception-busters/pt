@@ -116,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '당신의 건강한 라이프스타일을 시작하세요',
+                  '당신의 건강한 라이프스타일을 시작하세요!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
