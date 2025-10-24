@@ -115,18 +115,6 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
         title: Text(widget.editingRoutine != null ? '루틴 수정' : '새 루틴 추가'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
-        actions: [
-          TextButton(
-            onPressed: _saveRoutine,
-            child: const Text(
-              '저장',
-              style: TextStyle(
-                color: mainButtonColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -210,22 +198,38 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: borderColor),
                                 ),
-                                child: ListTile(
-                                  title: Text(
-                                    exercise.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      color: mainButtonColor,
+                                child: Column(
+                                  children: [
+                                    ListTile(
+                                      title: Text(
+                                        exercise.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          color: mainButtonColor,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
+                                        style: const TextStyle(color: subTextColor),
+                                      ),
                                     ),
-                                  ),
-                                  subtitle: Text(
-                                    '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
-                                    style: const TextStyle(color: subTextColor),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.add, color: mainButtonColor),
-                                    onPressed: () => _addExercise(exercise),
-                                  ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _addExercise(exercise),
+                                          icon: const Icon(Icons.add, size: 16),
+                                          label: const Text('추가'),
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: mainButtonColor),
+                                            foregroundColor: mainButtonColor,
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },
@@ -297,35 +301,46 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(color: mainButtonColor.withOpacity(0.2)),
                                       ),
-                                      child: ListTile(
-                                        leading: Text(
-                                          '${index + 1}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: mainButtonColor,
-                                          ),
-                                        ),
-                                        title: Text(
-                                          exercise.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            color: mainButtonColor,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          '${exercise.duration}초',
-                                          style: const TextStyle(color: subTextColor),
-                                        ),
-                                        trailing: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.drag_handle, color: subTextColor),
-                                            IconButton(
-                                              icon: const Icon(Icons.remove, color: Colors.red),
-                                              onPressed: () => _removeExercise(index),
+                                      child: Column(
+                                        children: [
+                                          ListTile(
+                                            leading: Text(
+                                              '${index + 1}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: mainButtonColor,
+                                              ),
                                             ),
-                                          ],
-                                        ),
+                                            title: Text(
+                                              exercise.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: mainButtonColor,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              '${exercise.duration}초',
+                                              style: const TextStyle(color: subTextColor),
+                                            ),
+                                            trailing: const Icon(Icons.drag_handle, color: subTextColor, size: 16),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton.icon(
+                                                onPressed: () => _removeExercise(index),
+                                                icon: const Icon(Icons.remove, size: 16),
+                                                label: const Text('제거'),
+                                                style: OutlinedButton.styleFrom(
+                                                  side: const BorderSide(color: Colors.red),
+                                                  foregroundColor: Colors.red,
+                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   },
