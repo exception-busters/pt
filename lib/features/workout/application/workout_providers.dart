@@ -223,3 +223,86 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
 final workoutRoutineControllerProvider = StateNotifierProvider<WorkoutRoutineController, List<WorkoutRoutine>>(
   (ref) => WorkoutRoutineController(),
 );
+
+// AI 추천 루틴 생성기
+class AIRecommendedRoutines {
+  static List<WorkoutRoutine> getRecommendedRoutines() {
+    final now = DateTime.now();
+    
+    return [
+      // 초보자용 루틴
+      WorkoutRoutine(
+        id: 'ai_beginner',
+        name: '🤖 AI 추천: 초보자 전신 운동',
+        exercises: [
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'jumping_jack'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'pushup'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
+        ],
+        createdAt: now,
+      ),
+      
+      // 코어 집중 루틴
+      WorkoutRoutine(
+        id: 'ai_core',
+        name: '🤖 AI 추천: 코어 강화 집중',
+        exercises: [
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'crunches'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'mountain_climber'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
+        ],
+        createdAt: now,
+      ),
+      
+      // 하체 집중 루틴
+      WorkoutRoutine(
+        id: 'ai_lower',
+        name: '🤖 AI 추천: 하체 근력 강화',
+        exercises: [
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'lunge'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'wall_sit'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
+        ],
+        createdAt: now,
+      ),
+      
+      // 고강도 루틴
+      WorkoutRoutine(
+        id: 'ai_hiit',
+        name: '🤖 AI 추천: 고강도 인터벌',
+        exercises: [
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'burpee'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'mountain_climber'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'jumping_jack'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'high_knees'),
+          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'burpee'),
+        ],
+        createdAt: now,
+      ),
+    ];
+  }
+  
+  // 사용자 레벨에 따른 추천 루틴 (추후 프로필 연동 가능)
+  static List<WorkoutRoutine> getPersonalizedRoutines(String userLevel) {
+    final allRoutines = getRecommendedRoutines();
+    
+    switch (userLevel.toLowerCase()) {
+      case '초급':
+        return [allRoutines[0], allRoutines[1]]; // 초보자, 코어
+      case '중급':
+        return [allRoutines[1], allRoutines[2]]; // 코어, 하체
+      case '고급':
+        return [allRoutines[2], allRoutines[3]]; // 하체, 고강도
+      default:
+        return allRoutines.take(2).toList(); // 기본적으로 처음 2개
+    }
+  }
+}
+
+final aiRecommendedRoutinesProvider = Provider<List<WorkoutRoutine>>((ref) {
+  // 추후 사용자 프로필과 연동하여 개인화된 추천 가능
+  return AIRecommendedRoutines.getRecommendedRoutines();
+});
