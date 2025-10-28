@@ -3,6 +3,7 @@ import mediapipe as mp
 import json
 import threading
 import time
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -13,10 +14,10 @@ CORS(app)
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(
     static_image_mode=False,
-    model_complexity=1,
+    model_complexity=2,  # 더 정확한 모델 사용 (0, 1, 2 중 선택)
     enable_segmentation=False,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
+    min_detection_confidence=0.3,  # 감지 임계값 낮춤
+    min_tracking_confidence=0.3   # 추적 임계값 낮춤
 )
 
 # 전역 변수
@@ -35,62 +36,104 @@ def initialize_camera():
                 ret, frame = test_cap.read()
                 if ret:
                     camera = test_cap
-                    print(f"카메라 {i}번을 사용합니다.")
+                    print(f"[OK] 카메라 {i}번을 사용합니다.")
+                    print(f"[INFO] 카메라 해상도: {frame.shape[1]}x{frame.shape[0]}")
+                    # 첫 프레임의 밝기 확인
+                    avg_brightness = np.mean(frame)
+                    print(f"[INFO] 평균 밝기: {avg_brightness:.2f}")
                     return True
                 else:
                     test_cap.release()
+                    print(f"[ERROR] 카메라 {i}번에서 프레임을 읽을 수 없습니다.")
+            else:
+                print(f"[ERROR] 카메라 {i}번을 열 수 없습니다.")
+        
+        print("[ERROR] 사용 가능한 카메라를 찾을 수 없습니다.")
         return False
     except Exception as e:
-        print(f"카메라 초기화 오류: {e}")
+        print(f"[ERROR] 카메라 초기화 중 오류 발생: {e}")
         return False
 
 def process_pose_detection():
     """실시간 포즈 감지 처리"""
-    global latest_pose_data, is_running
+    global latest_pose_data, is_running, camera
+    
+    if camera is None:
+        print("[ERROR] process_pose_detection: 카메라가 초기화되지 않았습니다.")
+        return
+
+    print("[START] 포즈 감지 스레드 시작")
+    frame_count = 0
     
     while is_running:
         try:
-            if camera is not None:
-                ret, frame = camera.read()
-                if ret:
-                    # BGR에서 RGB로 변환
-                    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    
-                    # 포즈 감지
-                    results = pose.process(image_rgb)
-                    
-                    # 결과 처리
-                    pose_data = {
-                        "landmarks": [],
-                        "connections": []
-                    }
-                    
-                    if results.pose_landmarks:
-                        # 랜드마크 추출
-                        for landmark in results.pose_landmarks.landmark:
-                            pose_data["landmarks"].append({
-                                "x": landmark.x,
-                                "y": landmark.y,
-                                "z": landmark.z,
-                                "visibility": landmark.visibility
-                            })
-                        
-                        # 연결선 정보
-                        connections = mp_pose.POSE_CONNECTIONS
-                        for connection in connections:
-                            pose_data["connections"].append({
-                                "start": connection[0],
-                                "end": connection[1]
-                            })
-                    
-                    latest_pose_data = pose_data
-                else:
-                    time.sleep(0.1)
-            else:
+            success, image = camera.read()
+            if not success:
+                print("[ERROR] 프레임을 읽을 수 없습니다. 카메라 연결을 확인하세요.")
                 time.sleep(0.1)
+                continue
+
+            frame_count += 1
+            
+            # 이미지 밝기 확인 (평균 픽셀 값)
+            avg_brightness = np.mean(image)
+            
+            # 10프레임마다 상태 출력
+            if frame_count % 10 == 0:
+                print(f"[INFO] 프레임 {frame_count}: 평균 밝기 {avg_brightness:.2f}")
+                
+                if avg_brightness < 30:
+                    print("[WARNING] 이미지가 너무 어둡습니다! 조명을 확인해주세요.")
+                elif avg_brightness > 200:
+                    print("[WARNING] 이미지가 너무 밝습니다! 과노출을 확인해주세요.")
+                else:
+                    print("[OK] 이미지 밝기가 적절합니다.")
+
+            # BGR에서 RGB로 변환
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # 포즈 감지
+            results = pose.process(image_rgb)
+            
+            # 결과 처리
+            pose_data = {
+                "landmarks": [],
+                "connections": []
+            }
+            
+            if results.pose_landmarks:
+                # 랜드마크 추출
+                for landmark in results.pose_landmarks.landmark:
+                    pose_data["landmarks"].append({
+                        "x": landmark.x,
+                        "y": landmark.y,
+                        "z": landmark.z,
+                        "visibility": landmark.visibility
+                    })
+                
+                # 연결선 정보
+                connections = mp_pose.POSE_CONNECTIONS
+                for connection in connections:
+                    pose_data["connections"].append({
+                        "start": connection[0],
+                        "end": connection[1]
+                    })
+                
+                if frame_count % 30 == 0:  # 30프레임마다 성공 메시지
+                    print(f"[SUCCESS] 포즈 감지 성공: {len(pose_data['landmarks'])}개 랜드마크 감지됨")
+            else:
+                if frame_count % 30 == 0:  # 30프레임마다 실패 메시지
+                    print("[FAIL] 포즈 감지 실패: 랜드마크 없음")
+            
+            latest_pose_data = pose_data
+            time.sleep(0.05)  # 감지 빈도 조절 (약 20 FPS)
+            
         except Exception as e:
-            print(f"포즈 감지 오류: {e}")
+            print(f"[ERROR] 포즈 감지 처리 중 오류 발생: {e}")
+            latest_pose_data = {"landmarks": [], "connections": []}
             time.sleep(0.1)
+    
+    print("[STOP] 포즈 감지 스레드 종료")
 
 @app.route('/start', methods=['POST'])
 def start_detection():
