@@ -10,14 +10,14 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# MediaPipe Pose 모델 불러오기
+# MediaPipe Pose 모델 불러오기 (모바일 최적화)
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(
     static_image_mode=False,
-    model_complexity=2,  # 더 정확한 모델 사용 (0, 1, 2 중 선택)
+    model_complexity=0,  # 가장 가벼운 모델 (0: 가벼움, 1: 중간, 2: 무거움)
     enable_segmentation=False,
-    min_detection_confidence=0.3,  # 감지 임계값 낮춤
-    min_tracking_confidence=0.3   # 추적 임계값 낮춤
+    min_detection_confidence=0.5,  # 임계값 높여서 불필요한 처리 줄임
+    min_tracking_confidence=0.5
 )
 
 # 전역 변수
@@ -126,7 +126,7 @@ def process_pose_detection():
                     print("[FAIL] 포즈 감지 실패: 랜드마크 없음")
             
             latest_pose_data = pose_data
-            time.sleep(0.05)  # 감지 빈도 조절 (약 20 FPS)
+            time.sleep(0.1)  # 감지 빈도 조절 (약 10 FPS로 줄임 - 메모리 절약)
             
         except Exception as e:
             print(f"[ERROR] 포즈 감지 처리 중 오류 발생: {e}")

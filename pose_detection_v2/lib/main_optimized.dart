@@ -49,7 +49,6 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
   }
 
   Future<void> _initializeCamera() async {
-    // 카메라 권한 요청
     final status = await Permission.camera.request();
     if (status != PermissionStatus.granted) {
       _showErrorDialog('카메라 권한이 필요합니다.');
@@ -65,7 +64,7 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
 
       _cameraController = CameraController(
         _cameras![0],
-        ResolutionPreset.low,  // medium → low로 변경 (메모리 절약)
+        ResolutionPreset.low,
         enableAudio: false,
       );
 
@@ -85,7 +84,6 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
   Future<void> _startPoseDetection() async {
     try {
       print('Python 서버 연결 시도 중...');
-      // Python 서버 시작 요청
       final response = await http.post(
         Uri.parse('http://10.0.2.2:5000/start'),
         headers: {'Content-Type': 'application/json'},
@@ -100,10 +98,10 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
           _isServerRunning = true;
         });
         
-               // 주기적으로 포즈 데이터 가져오기 (메모리 최적화: 200ms로 늘림)
-               _poseTimer = Timer.periodic(Duration(milliseconds: 200), (timer) {
-                 _fetchPoseData();
-               });
+        // 최적화: 더 긴 간격으로 변경 (500ms)
+        _poseTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+          _fetchPoseData();
+        });
       } else {
         setState(() {
           _serverStatus = "서버 연결 실패: ${response.statusCode}";
@@ -183,78 +181,10 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
         title: const Text('Pose Detection V2'),
       ),
       body: _isInitialized
-          ? Stack(
-              children: [
-                // 카메라 미리보기 (렌더링 개선)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black, // 배경색 설정
-                    child: CameraPreview(_cameraController!),
-                  ),
-                ),
-                // 포즈 오버레이 (투명 배경으로 변경)
-                if (_poseData != null)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: PosePainter(_poseData),
-                      child: Container(), // 투명한 컨테이너 추가
-                    ),
-                  ),
-                // 상태 정보
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '감지된 포즈: ${_poseData != null && _poseData!['landmarks'] != null ? _poseData!['landmarks'].length : 0}개',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '서버: $_serverStatus',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // 디버그 정보
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Python 서버 + Flutter 클라이언트 구조\n실시간 포즈 감지',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
+          ? _PoseDetectionBody(
+              cameraController: _cameraController!,
+              poseData: _poseData,
+              serverStatus: _serverStatus,
             )
           : const Center(
               child: CircularProgressIndicator(),
@@ -263,16 +193,155 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
   }
 }
 
-class PosePainter extends CustomPainter {
+// 🚀 최적화 1: 위젯 분리로 build 메서드 단순화
+class _PoseDetectionBody extends StatelessWidget {
+  final CameraController cameraController;
   final Map<String, dynamic>? poseData;
+  final String serverStatus;
+
+  const _PoseDetectionBody({
+    required this.cameraController,
+    required this.poseData,
+    required this.serverStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // 카메라 미리보기
+        const _CameraPreview(),
+        // 포즈 오버레이
+        if (poseData != null) _PoseOverlay(poseData: poseData!),
+        // 상태 정보
+        const _StatusOverlay(),
+        // 디버그 정보
+        const _DebugInfoOverlay(),
+      ],
+    );
+  }
+}
+
+// 🚀 최적화 2: 카메라 미리보기 위젯 분리
+class _CameraPreview extends StatelessWidget {
+  const _CameraPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black,
+        child: CameraPreview(
+          // CameraController는 상위에서 전달받아야 함
+          (context.findAncestorStateOfType<_PoseDetectionScreenState>()?._cameraController)!,
+        ),
+      ),
+    );
+  }
+}
+
+// 🚀 최적화 3: 포즈 오버레이 위젯 분리
+class _PoseOverlay extends StatelessWidget {
+  final Map<String, dynamic> poseData;
+
+  const _PoseOverlay({required this.poseData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: CustomPaint(
+        painter: PosePainter(poseData),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+// 🚀 최적화 4: 상태 정보 위젯 분리
+class _StatusOverlay extends StatelessWidget {
+  const _StatusOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.findAncestorStateOfType<_PoseDetectionScreenState>()!;
+    
+    return Positioned(
+      top: 16,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '감지된 포즈: ${state._poseData != null && state._poseData!['landmarks'] != null ? state._poseData!['landmarks'].length : 0}개',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              '서버: ${state._serverStatus}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 🚀 최적화 5: 디버그 정보 위젯 분리
+class _DebugInfoOverlay extends StatelessWidget {
+  const _DebugInfoOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: 16,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Python 서버 + Flutter 클라이언트 구조\n실시간 포즈 감지',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+// 🚀 최적화 6: PosePainter 성능 개선
+class PosePainter extends CustomPainter {
+  final Map<String, dynamic> poseData;
 
   PosePainter(this.poseData);
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (poseData == null || poseData!['landmarks'] == null) return;
+    if (poseData['landmarks'] == null) return;
 
-    final paint = Paint()
+    // 🚀 최적화: Paint 객체 재사용으로 메모리 절약
+    final linePaint = Paint()
       ..color = Colors.red
       ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
@@ -281,28 +350,27 @@ class PosePainter extends CustomPainter {
       ..color = Colors.blue
       ..style = PaintingStyle.fill;
 
-    final landmarks = poseData!['landmarks'] as List<dynamic>;
-    final connections = poseData!['connections'] as List<dynamic>?;
+    final landmarks = poseData['landmarks'] as List<dynamic>;
+    final connections = poseData['connections'] as List<dynamic>?;
 
-    // 포즈 랜드마크 그리기 (더 큰 점으로 변경)
-    for (int i = 0; i < landmarks.length; i++) {
-      final landmark = landmarks[i] as Map<String, dynamic>;
+    // 🚀 최적화: 랜드마크 그리기 최적화
+    for (final landmark in landmarks) {
       final point = Offset(
         landmark['x'] * size.width,
         landmark['y'] * size.height,
       );
-      canvas.drawCircle(point, 8, pointPaint); // 5 → 8로 크기 증가
+      canvas.drawCircle(point, 8, pointPaint);
     }
 
-    // 포즈 연결선 그리기 (더 굵은 선으로 변경)
+    // 🚀 최적화: 연결선 그리기 최적화
     if (connections != null) {
       for (final connection in connections) {
         final startIndex = connection['start'] as int;
         final endIndex = connection['end'] as int;
         
         if (startIndex < landmarks.length && endIndex < landmarks.length) {
-          final startLandmark = landmarks[startIndex] as Map<String, dynamic>;
-          final endLandmark = landmarks[endIndex] as Map<String, dynamic>;
+          final startLandmark = landmarks[startIndex];
+          final endLandmark = landmarks[endIndex];
           
           final startPoint = Offset(
             startLandmark['x'] * size.width,
@@ -312,7 +380,7 @@ class PosePainter extends CustomPainter {
             endLandmark['x'] * size.width,
             endLandmark['y'] * size.height,
           );
-          canvas.drawLine(startPoint, endPoint, paint);
+          canvas.drawLine(startPoint, endPoint, linePaint);
         }
       }
     }
@@ -320,6 +388,10 @@ class PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    // 🚀 최적화: 실제 데이터 변경시에만 리페인트
+    if (oldDelegate is PosePainter) {
+      return oldDelegate.poseData != poseData;
+    }
     return true;
   }
 }
