@@ -299,3 +299,4 @@ class OptimizedPosePainter extends CustomPainter {
     return true;
   }
 }
+

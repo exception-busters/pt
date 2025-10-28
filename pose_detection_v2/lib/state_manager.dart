@@ -142,3 +142,4 @@ class MemoryMonitor {
   static int get currentUsage => _currentMemoryUsageMB;
   static bool get isMemoryHigh => _currentMemoryUsageMB > _maxMemoryUsageMB;
 }
+

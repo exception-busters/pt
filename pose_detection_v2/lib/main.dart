@@ -128,7 +128,7 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
         final data = json.decode(response.body);
         print('포즈 데이터 수신: ${data.toString()}');
         if (mounted) {
-          setState(() {
+    setState(() {
             _poseData = Map<String, dynamic>.from(data);
           });
         }
@@ -208,7 +208,7 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Column(
+        child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -219,16 +219,16 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
+            Text(
                           '서버: $_serverStatus',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+            ),
+          ],
+        ),
+      ),
                 ),
                 // 디버그 정보
                 Positioned(

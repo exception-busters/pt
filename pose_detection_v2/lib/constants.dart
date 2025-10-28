@@ -71,3 +71,4 @@ class AppConstants {
     borderRadius: BorderRadius.all(Radius.circular(8)),
   );
 }
+

@@ -105,3 +105,4 @@ class FrameProcessor {
     _lastProcessedTime = null;
   }
 }
+
