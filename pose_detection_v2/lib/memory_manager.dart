@@ -173,3 +173,4 @@ class PerformanceMetric {
 
   PerformanceMetric(this.name, this.duration, this.timestamp);
 }
+
