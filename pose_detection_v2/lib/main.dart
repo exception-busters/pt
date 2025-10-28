@@ -178,6 +178,7 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent, // 배경을 투명하게 설정
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Pose Detection V2'),
@@ -185,19 +186,15 @@ class _PoseDetectionScreenState extends State<PoseDetectionScreen> {
       body: _isInitialized
           ? Stack(
               children: [
-                // 카메라 미리보기 (렌더링 개선)
+                // 카메라 미리보기 (투명 배경으로 수정)
                 Positioned.fill(
-                  child: Container(
-                    color: Colors.black, // 배경색 설정
-                    child: CameraPreview(_cameraController!),
-                  ),
+                  child: CameraPreview(_cameraController!),
                 ),
-                // 포즈 오버레이 (투명 배경으로 변경)
+                // 포즈 오버레이 (완전 투명)
                 if (_poseData != null)
                   Positioned.fill(
                     child: CustomPaint(
                       painter: PosePainter(_poseData),
-                      child: Container(), // 투명한 컨테이너 추가
                     ),
                   ),
                 // 상태 정보
