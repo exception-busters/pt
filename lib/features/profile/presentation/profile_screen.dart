@@ -5,6 +5,7 @@ import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -12,6 +13,8 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileImagePath = ref.watch(profileImageControllerProvider);
+    final user = Supabase.instance.client.auth.currentUser;
+    final displayName = user?.userMetadata?['display_name'] ?? '사용자';
     return Scaffold(
       appBar: AppBar(
         title: const Text('프로필'),
@@ -60,9 +63,9 @@ class ProfileScreen extends ConsumerWidget {
                           : null,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      '홍길동',
-                      style: TextStyle(
+                    Text(
+                      displayName,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

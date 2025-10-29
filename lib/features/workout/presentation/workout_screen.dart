@@ -38,9 +38,41 @@ class WorkoutScreen extends ConsumerWidget {
     );
   }
 
+  void _showSupabaseDeleteDialog(BuildContext context, WidgetRef ref, routine) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supabase 루틴 삭제'),
+        content: Text('${routine.title} 루틴을 데이터베이스에서 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final success = await ref.read(supabaseRoutineNotifierProvider.notifier).deleteRoutine(routine.routineId);
+              if (context.mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success ? 'Supabase 루틴이 삭제되었습니다' : '루틴 삭제에 실패했습니다'),
+                    backgroundColor: success ? Colors.blue : Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customRoutines = ref.watch(workoutRoutineControllerProvider);
+    final supabaseRoutines = ref.watch(supabaseRoutineNotifierProvider);
     final aiRecommendedRoutines = ref.watch(aiRecommendedRoutinesProvider);
     return Scaffold(
       appBar: AppBar(
@@ -120,12 +152,84 @@ class WorkoutScreen extends ConsumerWidget {
               Expanded(
                 child: ListView(
                   children: [
-                    // 내 루틴 섹션
+                    // Supabase 루틴 섹션
+                    supabaseRoutines.when(
+                      data: (routines) {
+                        if (routines.isNotEmpty) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  const Icon(Icons.cloud, color: Colors.blue, size: 20),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Supabase 루틴',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'DB 연동',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              ...routines.map((routine) => _SupabaseRoutineCard(
+                                routine: routine,
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${routine.title} 루틴을 시작합니다 (Supabase)'),
+                                      backgroundColor: Colors.blue,
+                                    ),
+                                  );
+                                },
+                                onDelete: () => _showSupabaseDeleteDialog(context, ref, routine),
+                              )),
+                            ],
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (error, stack) => Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'Supabase 루틴 로드 실패: $error',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ),
+
+                    // 내 루틴 섹션 (로컬)
                     if (customRoutines.isNotEmpty) ...[
                       const SizedBox(height: 16),
+                      const Divider(),
                       const SizedBox(height: 8),
                       const Text(
-                        '내 루틴',
+                        '로컬 루틴',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -401,7 +505,110 @@ class _CustomRoutineCard extends StatelessWidget {
       ),
     );
   }
-}class _AIRecoRoutCard extends StatelessWidget {
+}class _SupabaseRoutineCard extends StatelessWidget {
+  const _SupabaseRoutineCard({
+    required this.routine,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final routine; // SupabaseWorkoutRoutine
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cloud, color: Colors.blue),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        routine.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        routine.description ?? '설명 없음',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: subTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'ID: ${routine.routineId}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: subTextColor,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.play_arrow,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      onPressed: onDelete,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AIRecoRoutCard extends StatelessWidget {
   const _AIRecoRoutCard({
     required this.routine,
     required this.onTap,

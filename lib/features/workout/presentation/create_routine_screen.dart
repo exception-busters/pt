@@ -6,11 +6,12 @@ import 'package:go_router/go_router.dart';
 
 class CreateRoutineScreen extends ConsumerStatefulWidget {
   final WorkoutRoutine? editingRoutine;
-  
+
   const CreateRoutineScreen({super.key, this.editingRoutine});
 
   @override
-  ConsumerState<CreateRoutineScreen> createState() => _CreateRoutineScreenState();
+  ConsumerState<CreateRoutineScreen> createState() =>
+      _CreateRoutineScreenState();
 }
 
 class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
@@ -47,11 +48,23 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
 
   void _moveExercise(int oldIndex, int newIndex) {
     setState(() {
+      // 드래그 제한: 리스트 범위를 벗어나지 않도록 제한
+      if (newIndex > _selectedExercises.length) {
+        newIndex = _selectedExercises.length;
+      }
+      if (newIndex < 0) {
+        newIndex = 0;
+      }
+      
       if (newIndex > oldIndex) {
         newIndex -= 1;
       }
-      final exercise = _selectedExercises.removeAt(oldIndex);
-      _selectedExercises.insert(newIndex, exercise);
+      
+      // 실제 이동 가능한 범위 내에서만 이동
+      if (newIndex >= 0 && newIndex < _selectedExercises.length) {
+        final exercise = _selectedExercises.removeAt(oldIndex);
+        _selectedExercises.insert(newIndex, exercise);
+      }
     });
   }
 
@@ -67,46 +80,89 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
       return;
     }
 
-    final routine = WorkoutRoutine(
-      id: widget.editingRoutine?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text,
-      exercises: _selectedExercises,
-      createdAt: widget.editingRoutine?.createdAt ?? DateTime.now(),
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
     );
 
-    if (widget.editingRoutine != null) {
-      await ref.read(workoutRoutineControllerProvider.notifier).updateRoutine(
-        widget.editingRoutine!.id,
-        routine,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('루틴이 수정되었습니다'),
-            backgroundColor: mainButtonColor,
-          ),
+    try {
+      if (widget.editingRoutine != null) {
+        // 기존 로컬 저장 방식 (수정 기능)
+        final routine = WorkoutRoutine(
+          id: widget.editingRoutine!.id,
+          name: _nameController.text,
+          exercises: _selectedExercises,
+          createdAt: widget.editingRoutine!.createdAt,
         );
-      }
-    } else {
-      await ref.read(workoutRoutineControllerProvider.notifier).addRoutine(routine);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('새 루틴이 저장되었습니다'),
-            backgroundColor: mainButtonColor,
-          ),
-        );
-      }
-    }
 
-    if (mounted) {
-      context.pop();
+        await ref
+            .read(workoutRoutineControllerProvider.notifier)
+            .updateRoutine(widget.editingRoutine!.id, routine);
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('루틴이 수정되었습니다'),
+              backgroundColor: mainButtonColor,
+            ),
+          );
+        }
+      } else {
+        // 새 루틴 생성 - Supabase에 저장
+        final success = await ref
+            .read(supabaseRoutineNotifierProvider.notifier)
+            .createRoutine(
+              _nameController.text,
+              '사용자가 생성한 커스텀 루틴', // 기본 설명
+              _selectedExercises,
+            );
+
+        if (mounted) {
+          Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+          
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('새 루틴이 Supabase에 저장되었습니다! 🎉'),
+                backgroundColor: mainButtonColor,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('루틴 저장에 실패했습니다. 다시 시도해주세요.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return; // 실패 시 화면을 닫지 않음
+          }
+        }
+      }
+
+      if (mounted) context.pop();
+      
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final totalDuration = _selectedExercises.fold(0, (sum, exercise) => sum + exercise.duration);
+    final totalDuration =
+    _selectedExercises.fold(0, (sum, e) => sum + e.duration);
     final minutes = totalDuration ~/ 60;
     final seconds = totalDuration % 60;
 
@@ -132,7 +188,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                     prefixIcon: Icon(Icons.fitness_center),
                   ),
                   validator: (value) =>
-                      value == null || value.isEmpty ? '루틴 이름을 입력해주세요' : null,
+                  value == null || value.isEmpty ? '루틴 이름을 입력해주세요' : null,
                 ),
               ),
             ),
@@ -167,7 +223,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
             Expanded(
               child: Row(
                 children: [
-                  // 운동 목록 (왼쪽)
+                  // 왼쪽: 운동 목록
                   Expanded(
                     flex: 1,
                     child: Column(
@@ -188,9 +244,11 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                         Expanded(
                           child: ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: WorkoutRoutineController.availableExercises.length,
+                            itemCount:
+                            WorkoutRoutineController.availableExercises.length,
                             itemBuilder: (context, index) {
-                              final exercise = WorkoutRoutineController.availableExercises[index];
+                              final exercise =
+                              WorkoutRoutineController.availableExercises[index];
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
@@ -210,21 +268,26 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                       ),
                                       subtitle: Text(
                                         '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
-                                        style: const TextStyle(color: subTextColor),
+                                        style:
+                                        const TextStyle(color: subTextColor),
                                       ),
                                     ),
                                     Padding(
-                                      padding: const EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16.0, vertical: 8),
                                       child: SizedBox(
                                         width: double.infinity,
                                         child: OutlinedButton.icon(
                                           onPressed: () => _addExercise(exercise),
-                                          icon: const Icon(Icons.add, size: 16),
+                                          icon:
+                                          const Icon(Icons.add, size: 16),
                                           label: const Text('추가'),
                                           style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: mainButtonColor),
+                                            side: const BorderSide(
+                                                color: mainButtonColor),
                                             foregroundColor: mainButtonColor,
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
                                           ),
                                         ),
                                       ),
@@ -246,14 +309,15 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                     margin: const EdgeInsets.symmetric(vertical: 16),
                   ),
 
-                  // 선택된 운동 목록 (오른쪽)
+                  // 오른쪽: 선택된 운동 (ReorderableList)
                   Expanded(
                     flex: 1,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding:
+                          const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
                             children: [
                               const Text(
@@ -279,71 +343,143 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                         Expanded(
                           child: _selectedExercises.isEmpty
                               ? const Center(
-                                  child: Text(
-                                    '운동을 선택해주세요',
-                                    style: TextStyle(
-                                      color: subTextColor,
-                                      fontStyle: FontStyle.italic,
-                                    ),
+                            child: Text(
+                              '운동을 선택해주세요',
+                              style: TextStyle(
+                                color: subTextColor,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          )
+                              : Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: borderColor.withOpacity(0.3)),
                                   ),
-                                )
-                              : ReorderableListView.builder(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  itemCount: _selectedExercises.length,
-                                  onReorder: _moveExercise,
-                                  itemBuilder: (context, index) {
-                                    final exercise = _selectedExercises[index];
-                                    return Container(
-                                      key: ValueKey(exercise.id + index.toString()),
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      decoration: BoxDecoration(
-                                        color: mainButtonColor.withOpacity(0.05),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: mainButtonColor.withOpacity(0.2)),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          ListTile(
-                                            leading: Text(
-                                              '${index + 1}',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: mainButtonColor,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: ReorderableListView.builder(
+                                      padding: const EdgeInsets.all(8),
+                                      itemCount: _selectedExercises.length,
+                                      onReorder: _moveExercise,
+                                      buildDefaultDragHandles: false,
+                                      proxyDecorator: (child, index, animation) {
+                                        return Material(
+                                          color: Colors.transparent,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: mainButtonColor.withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: mainButtonColor.withOpacity(0.5),
+                                                width: 2,
                                               ),
                                             ),
-                                            title: Text(
-                                              exercise.name,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                color: mainButtonColor,
-                                              ),
-                                            ),
-                                            subtitle: Text(
-                                              '${exercise.duration}초',
-                                              style: const TextStyle(color: subTextColor),
-                                            ),
-                                            trailing: const Icon(Icons.drag_handle, color: subTextColor, size: 16),
+                                            child: child,
                                           ),
-                                          Padding(
-                                            padding: const EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
-                                            child: SizedBox(
-                                              width: double.infinity,
-                                              child: OutlinedButton.icon(
-                                                onPressed: () => _removeExercise(index),
-                                                icon: const Icon(Icons.remove, size: 16),
-                                                label: const Text('제거'),
-                                                style: OutlinedButton.styleFrom(
-                                                  side: const BorderSide(color: Colors.red),
-                                                  foregroundColor: Colors.red,
-                                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                        );
+                                      },
+                                      itemBuilder: (context, index) {
+                                        final exercise = _selectedExercises[index];
+                                        return Container(
+                                          key: ValueKey(exercise.id + index.toString()),
+                                          margin: const EdgeInsets.only(bottom: 8),
+                                          decoration: BoxDecoration(
+                                            color: mainButtonColor.withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: mainButtonColor.withOpacity(0.2)),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(12),
+                                                child: Row(
+                                                  children: [
+                                                    // 순서 번호
+                                                    Container(
+                                                      width: 24,
+                                                      height: 24,
+                                                      decoration: BoxDecoration(
+                                                        color: mainButtonColor,
+                                                        borderRadius: BorderRadius.circular(12),
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: const TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            color: backgroundColor,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    
+                                                    // 운동 정보
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            exercise.name,
+                                                            style: const TextStyle(
+                                                              fontWeight: FontWeight.w500,
+                                                              color: mainButtonColor,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            '${exercise.duration}초',
+                                                            style: const TextStyle(
+                                                              color: subTextColor,
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    
+                                                    // 드래그 핸들
+                                                    ReorderableDragStartListener(
+                                                      index: index,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(8),
+                                                        child: const Icon(
+                                                          Icons.drag_handle,
+                                                          color: subTextColor,
+                                                          size: 24,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                            ),
+                                              // 제거 버튼을 아래로 이동
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
+                                                child: SizedBox(
+                                                  width: double.infinity,
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () => _removeExercise(index),
+                                                    icon: const Icon(Icons.remove, size: 16),
+                                                    label: const Text('제거'),
+                                                    style: OutlinedButton.styleFrom(
+                                                      side: const BorderSide(color: Colors.red),
+                                                      foregroundColor: Colors.red,
+                                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
                         ),
                       ],
@@ -361,7 +497,9 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                 child: ElevatedButton(
                   onPressed: _saveRoutine,
                   child: Text(
-                    widget.editingRoutine != null ? '루틴 수정하기' : '루틴 저장하기',
+                    widget.editingRoutine != null
+                        ? '루틴 수정하기'
+                        : '루틴 저장하기',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

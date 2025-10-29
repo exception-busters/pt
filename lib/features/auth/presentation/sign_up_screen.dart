@@ -131,12 +131,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: '이름',
-                    hintText: '이름을 입력하세요',
+                    labelText: '닉네임',
+                    hintText: '닉네임을 입력하세요 (2-20자)',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) =>
-                  value == null || value.isEmpty ? '이름을 입력해주세요' : null,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return '닉네임을 입력해주세요';
+                    if (value.length < 2) return '닉네임은 최소 2자 이상이어야 합니다';
+                    if (value.length > 20) return '닉네임은 최대 20자까지 가능합니다';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

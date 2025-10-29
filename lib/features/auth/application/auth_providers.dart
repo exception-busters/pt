@@ -26,7 +26,7 @@ class AuthController extends StateNotifier<bool> {
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {'name': name},
+        data: {'display_name': name},
       );
       if (response.user != null) {
         print('회원가입 완료, user: ${response.user}');

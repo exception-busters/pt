@@ -1,6 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
+import '../data/supabase_workout_service.dart';
+import '../domain/models/supabase_exercise.dart';
+import '../domain/models/supabase_workout_routine.dart';
+import '../domain/models/supabase_routine_exercise.dart';
 
 class Exercise {
   final String id;
@@ -305,4 +310,125 @@ class AIRecommendedRoutines {
 final aiRecommendedRoutinesProvider = Provider<List<WorkoutRoutine>>((ref) {
   // 추후 사용자 프로필과 연동하여 개인화된 추천 가능
   return AIRecommendedRoutines.getRecommendedRoutines();
+});
+
+// Supabase 연동 프로바이더들
+final supabaseWorkoutServiceProvider = Provider<SupabaseWorkoutService>((ref) => SupabaseWorkoutService());
+
+// Supabase 루틴 관리 NotifierProvider
+class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWorkoutRoutine>>> {
+  SupabaseRoutineNotifier(this._service) : super(const AsyncValue.loading()) {
+    loadRoutines();
+  }
+
+  final SupabaseWorkoutService _service;
+
+  Future<void> loadRoutines() async {
+    try {
+      state = const AsyncValue.loading();
+      final routines = await _service.getUserRoutines();
+      state = AsyncValue.data(routines);
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+    }
+  }
+
+  Future<bool> createRoutine(String title, String? description, List<Exercise> exercises) async {
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🚀 루틴 생성 시작: $title');
+      
+      // 1. 먼저 운동들을 Supabase에 저장 (중복 체크)
+      final List<SupabaseExercise> supabaseExercises = [];
+      for (final exercise in exercises) {
+        // 기존 운동이 있는지 확인
+        final existingExercise = await _service.getExerciseByName(exercise.name);
+        if (existingExercise != null) {
+          supabaseExercises.add(existingExercise);
+          print('✅ 기존 운동 사용: ${existingExercise.name} (ID: ${existingExercise.exerciseId})');
+        } else {
+          // 새 운동 생성
+          final newExercise = SupabaseExercise(
+            name: exercise.name,
+            bodyPart: exercise.category,
+            description: exercise.description,
+            difficulty: '초급', // 기본값
+          );
+          
+          final insertedExercise = await _service.insertExercise(newExercise);
+          if (insertedExercise != null) {
+            supabaseExercises.add(insertedExercise);
+            print('✅ 새 운동 생성: ${insertedExercise.name} (ID: ${insertedExercise.exerciseId})');
+          } else {
+            throw Exception('운동 생성 실패: ${exercise.name}');
+          }
+        }
+      }
+
+      // 2. 루틴 생성
+      final routine = SupabaseWorkoutRoutine(
+        userId: currentUser.id,
+        title: title,
+        description: description,
+      );
+
+      final insertedRoutine = await _service.insertWorkoutRoutine(routine);
+      if (insertedRoutine == null) {
+        throw Exception('루틴 생성 실패');
+      }
+      
+      print('✅ 루틴 생성 성공: ${insertedRoutine.title} (ID: ${insertedRoutine.routineId})');
+
+      // 3. 루틴에 운동들 추가
+      for (int i = 0; i < supabaseExercises.length; i++) {
+        final exercise = supabaseExercises[i];
+        final originalExercise = exercises[i];
+        
+        final routineExercise = SupabaseRoutineExercise(
+          routineId: insertedRoutine.routineId!,
+          exerciseId: exercise.exerciseId!,
+          sets: 3, // 기본값
+          reps: originalExercise.duration ~/ 5, // duration을 기반으로 reps 계산
+          restTimeSec: 60, // 기본값
+        );
+
+        final insertedRoutineExercise = await _service.insertRoutineExercise(routineExercise);
+        if (insertedRoutineExercise != null) {
+          print('✅ 루틴 운동 추가: ${exercise.name} - ${insertedRoutineExercise.sets}세트 x ${insertedRoutineExercise.reps}회');
+        } else {
+          print('⚠️ 루틴 운동 추가 실패: ${exercise.name}');
+        }
+      }
+
+      // 4. 루틴 목록 새로고침
+      await loadRoutines();
+      
+      print('🎉 루틴 생성 완료!');
+      return true;
+      
+    } catch (e) {
+      print('❌ 루틴 생성 실패: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteRoutine(int routineId) async {
+    try {
+      await _service.deleteRoutine(routineId);
+      await loadRoutines();
+      return true;
+    } catch (e) {
+      print('❌ 루틴 삭제 실패: $e');
+      return false;
+    }
+  }
+}
+
+final supabaseRoutineNotifierProvider = StateNotifierProvider<SupabaseRoutineNotifier, AsyncValue<List<SupabaseWorkoutRoutine>>>((ref) {
+  final service = ref.read(supabaseWorkoutServiceProvider);
+  return SupabaseRoutineNotifier(service);
 });
