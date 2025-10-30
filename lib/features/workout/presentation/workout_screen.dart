@@ -1,16 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_application_1/color.dart';
+import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:go_router/go_router.dart';
 
-class WorkoutScreen extends StatelessWidget {
+class WorkoutScreen extends ConsumerWidget {
   const WorkoutScreen({super.key});
 
+  void _showDeleteDialog(BuildContext context, WidgetRef ref, WorkoutRoutine routine) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('루틴 삭제'),
+        content: Text('${routine.name} 루틴을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await ref.read(workoutRoutineControllerProvider.notifier).deleteRoutine(routine.id);
+              if (context.mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('루틴이 삭제되었습니다'),
+                    backgroundColor: mainButtonColor,
+                  ),
+                );
+              }
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSupabaseDeleteDialog(BuildContext context, WidgetRef ref, routine) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supabase 루틴 삭제'),
+        content: Text('${routine.title} 루틴을 데이터베이스에서 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final success = await ref.read(supabaseRoutineNotifierProvider.notifier).deleteRoutine(routine.routineId);
+              if (context.mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success ? 'Supabase 루틴이 삭제되었습니다' : '루틴 삭제에 실패했습니다'),
+                    backgroundColor: success ? Colors.blue : Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final customRoutines = ref.watch(workoutRoutineControllerProvider);
+    final supabaseRoutines = ref.watch(supabaseRoutineNotifierProvider);
+    final aiRecommendedRoutines = ref.watch(aiRecommendedRoutinesProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('운동'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
       ),
       body: SafeArea(
         child: Padding(
@@ -22,11 +90,7 @@ class WorkoutScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: mainButtonColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Column(
@@ -59,46 +123,185 @@ class WorkoutScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                '운동 루틴',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '운동 루틴',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.push('/app/workout/create-routine'),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('새 루틴 추가'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: mainButtonColor),
+                      foregroundColor: mainButtonColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView(
                   children: [
-                    _WorkoutCard(
-                      title: '웜업',
-                      duration: '5분',
-                      icon: Icons.accessibility_new,
-                      color: const Color(0xFFFF9800),
-                      onTap: () => context.go('/app/workout/detail/warmup'),
+                    // Supabase 루틴 섹션
+                    supabaseRoutines.when(
+                      data: (routines) {
+                        if (routines.isNotEmpty) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  const Icon(Icons.cloud, color: Colors.blue, size: 20),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Supabase 루틴',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'DB 연동',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              ...routines.map((routine) => _SupabaseRoutineCard(
+                                routine: routine,
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${routine.title} 루틴을 시작합니다 (Supabase)'),
+                                      backgroundColor: Colors.blue,
+                                    ),
+                                  );
+                                },
+                                onDelete: () => _showSupabaseDeleteDialog(context, ref, routine),
+                              )),
+                            ],
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (error, stack) => Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'Supabase 루틴 로드 실패: $error',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
                     ),
-                    _WorkoutCard(
-                      title: '유산소',
-                      duration: '20분',
-                      icon: Icons.directions_run,
-                      color: const Color(0xFF4CAF50),
-                      onTap: () => context.go('/app/workout/detail/cardio'),
+
+                    // 내 루틴 섹션 (로컬)
+                    if (customRoutines.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '로컬 루틴',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: subTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // 커스텀 루틴 목록
+                      ...customRoutines.map((routine) => _CustomRoutineCard(
+                        routine: routine,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${routine.name} 루틴을 시작합니다'),
+                              backgroundColor: mainButtonColor,
+                            ),
+                          );
+                        },
+                        onEdit: () => context.push('/app/workout/create-routine', extra: routine),
+                        onDelete: () => _showDeleteDialog(context, ref, routine),
+                      )),
+                    ],
+                    
+                    // AI 추천 루틴 섹션
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.auto_awesome, color: mainButtonColor, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'AI 추천 루틴',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: mainButtonColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Beta',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: mainButtonColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    _WorkoutCard(
-                      title: '근력운동',
-                      duration: '15분',
-                      icon: Icons.fitness_center,
-                      color: const Color(0xFF2196F3),
-                      onTap: () => context.go('/app/workout/detail/strength'),
-                    ),
-                    _WorkoutCard(
-                      title: '쿨다운',
-                      duration: '5분',
-                      icon: Icons.self_improvement,
-                      color: const Color(0xFF9C27B0),
-                      onTap: () => context.go('/app/workout/detail/cooldown'),
-                    ),
+                    const SizedBox(height: 12),
+                    
+                    // AI 추천 루틴 목록
+                    ...aiRecommendedRoutines.map((routine) => _AIRecoRoutCard(
+                      routine: routine,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${routine.name} 루틴을 시작합니다'),
+                            backgroundColor: mainButtonColor,
+                          ),
+                        );
+                      },
+                    )),
                   ],
                 ),
               ),
@@ -134,16 +337,9 @@ class _WorkoutCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           children: [
@@ -162,7 +358,7 @@ class _WorkoutCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
             ),
@@ -174,6 +370,360 @@ class _WorkoutCard extends StatelessWidget {
                 color: color,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomRoutineCard extends StatelessWidget {
+  const _CustomRoutineCard({
+    required this.routine,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final WorkoutRoutine routine;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: mainButtonColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.playlist_play, color: mainButtonColor),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        routine.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: mainButtonColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${routine.exercises.length}개 운동 • ${routine.formattedDuration}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: subTextColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: mainButtonColor, size: 20),
+                      onPressed: onEdit,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      onPressed: onDelete,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            if (routine.exercises.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: routine.exercises.take(3).map((exercise) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: subTextColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      exercise.name,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: subTextColor,
+                      ),
+                    ),
+                  );
+                }).toList()
+                  ..addAll(routine.exercises.length > 3
+                      ? [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: subTextColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '+${routine.exercises.length - 3}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: subTextColor,
+                              ),
+                            ),
+                          ),
+                        ]
+                      : []),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}class _SupabaseRoutineCard extends StatelessWidget {
+  const _SupabaseRoutineCard({
+    required this.routine,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final routine; // SupabaseWorkoutRoutine
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cloud, color: Colors.blue),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        routine.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        routine.description ?? '설명 없음',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: subTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'ID: ${routine.routineId}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: subTextColor,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.play_arrow,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      onPressed: onDelete,
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AIRecoRoutCard extends StatelessWidget {
+  const _AIRecoRoutCard({
+    required this.routine,
+    required this.onTap,
+  });
+
+  final WorkoutRoutine routine;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: mainButtonColor.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: mainButtonColor.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: mainButtonColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: mainButtonColor),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        routine.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: mainButtonColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${routine.exercises.length}개 운동 • ${routine.formattedDuration}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: subTextColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.play_arrow,
+                  color: mainButtonColor,
+                  size: 24,
+                ),
+              ],
+            ),
+            if (routine.exercises.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: routine.exercises.take(4).map((exercise) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: mainButtonColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      exercise.name,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: mainButtonColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList()
+                  ..addAll(routine.exercises.length > 4
+                      ? [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: mainButtonColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '+${routine.exercises.length - 4}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: mainButtonColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ]
+                      : []),
+              ),
+            ],
           ],
         ),
       ),

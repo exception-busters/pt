@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -9,8 +10,8 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('홈'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -18,7 +19,7 @@ class HomeScreen extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('알림 기능은 추후 구현됩니다'),
-                  backgroundColor: Color(0xFF9ACD32),
+                  backgroundColor: mainButtonColor,
                 ),
               );
             },
@@ -35,11 +36,7 @@ class HomeScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF9ACD32), Color(0xFF7CB342)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: mainButtonColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Column(
@@ -70,7 +67,7 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -81,7 +78,7 @@ class HomeScreen extends StatelessWidget {
                       '운동',
                       '30분',
                       Icons.fitness_center,
-                      const Color(0xFF4CAF50),
+                      mainButtonColor,
                       '60%',
                     ),
                   ),
@@ -91,7 +88,7 @@ class HomeScreen extends StatelessWidget {
                       '칼로리',
                       '1,200kcal',
                       Icons.local_fire_department,
-                      const Color(0xFFFF9800),
+                      secondaryButtonColor,
                       '80%',
                     ),
                   ),
@@ -103,7 +100,7 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -113,7 +110,7 @@ class HomeScreen extends StatelessWidget {
                     child: _buildQuickActionCard(
                       title: '운동 시작',
                       icon: Icons.play_arrow,
-                      color: const Color(0xFF4CAF50),
+                      color: mainButtonColor,
                       onTap: () => context.go('/app/workout'),
                     ),
                   ),
@@ -122,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                     child: _buildQuickActionCard(
                       title: '식단 기록',
                       icon: Icons.restaurant,
-                      color: const Color(0xFF2196F3),
+                      color: secondaryButtonColor,
                       onTap: () => context.go('/app/diet'),
                     ),
                   ),
@@ -139,16 +136,9 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +152,7 @@ class HomeScreen extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
             ],
@@ -181,7 +171,7 @@ class HomeScreen extends StatelessWidget {
             '진행률: $progress',
             style: const TextStyle(
               fontSize: 12,
-              color: Color(0xFF6B8B6B),
+              color: subTextColor,
             ),
           ),
         ],
@@ -200,9 +190,9 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: borderColor),
         ),
         child: Column(
           children: [

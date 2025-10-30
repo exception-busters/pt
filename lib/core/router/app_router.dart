@@ -10,10 +10,17 @@ import 'package:flutter_application_1/features/dashboard/presentation/main_dashb
 import 'package:flutter_application_1/features/diet/presentation/diet_screen.dart';
 import 'package:flutter_application_1/features/home/presentation/home_screen.dart';
 import 'package:flutter_application_1/features/profile/presentation/profile_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/edit_profile_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/workout_goal_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/diet_goal_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/notification_settings_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/help_screen.dart';
 import 'package:flutter_application_1/features/records/presentation/records_detail_screen.dart';
 import 'package:flutter_application_1/features/records/presentation/records_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_detail_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_screen.dart';
+import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
+import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:go_router/go_router.dart';
 
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -102,6 +109,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   workoutId: state.pathParameters['id']!,
                 ),
               ),
+              GoRoute(
+                path: 'create-routine',
+                name: 'create-routine',
+                builder: (context, state) => CreateRoutineScreen(
+                  editingRoutine: state.extra as WorkoutRoutine?,
+                ),
+              ),
             ],
           ),
           GoRoute(
@@ -122,6 +136,33 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/app/profile',
             name: 'profile',
             builder: (context, state) => const ProfileScreen(),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                name: 'edit-profile',
+                builder: (context, state) => const EditProfileScreen(),
+              ),
+              GoRoute(
+                path: 'workout-goal',
+                name: 'workout-goal',
+                builder: (context, state) => const WorkoutGoalScreen(),
+              ),
+              GoRoute(
+                path: 'diet-goal',
+                name: 'diet-goal',
+                builder: (context, state) => const DietGoalScreen(),
+              ),
+              GoRoute(
+                path: 'notifications',
+                name: 'notifications',
+                builder: (context, state) => const NotificationSettingsScreen(),
+              ),
+              GoRoute(
+                path: 'help',
+                name: 'help',
+                builder: (context, state) => const HelpScreen(),
+              ),
+            ],
           ),
         ],
       ),

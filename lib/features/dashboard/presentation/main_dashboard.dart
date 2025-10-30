@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 
 class MainDashboard extends StatelessWidget {
@@ -34,9 +34,9 @@ class MainDashboard extends StatelessWidget {
           if (index == currentIndex) return;
           context.go(_tabs[index].path);
         },
-        backgroundColor: const Color(0xFFE8F5E8),
-        selectedItemColor: const Color(0xFF9ACD32),
-        unselectedItemColor: const Color(0xFF6B8B6B),
+        backgroundColor: backgroundColor,
+        selectedItemColor: mainButtonColor,
+        unselectedItemColor: subTextColor,
         selectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 12,

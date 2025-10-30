@@ -1,15 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_application_1/color.dart';
+import '../application/diet_providers.dart';
 
-class DietScreen extends StatelessWidget {
+class DietScreen extends ConsumerStatefulWidget {
   const DietScreen({super.key});
 
   @override
+  ConsumerState<DietScreen> createState() => _DietScreenState();
+}
+
+class _DietScreenState extends ConsumerState<DietScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 화면 진입 시 날짜 체크
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(dietControllerProvider.notifier).checkAndResetIfNewDay();
+    });
+  }
+
+  void _showMealDialog(String mealType) {
+    final dietController = ref.read(dietControllerProvider.notifier);
+    final currentMeal = dietController.getMealData(mealType);
+    
+    final foodController = TextEditingController(text: currentMeal?.food ?? '');
+    final caloriesController = TextEditingController(text: currentMeal?.calories.replaceAll('kcal', '') ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$mealType 식단 ${currentMeal != null ? '수정' : '추가'}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: foodController,
+              decoration: const InputDecoration(
+                labelText: '음식명',
+                hintText: '예: 계란후라이, 토스트',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: caloriesController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '칼로리',
+                hintText: '예: 350',
+                suffixText: 'kcal',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (foodController.text.isNotEmpty && caloriesController.text.isNotEmpty) {
+                dietController.updateMeal(
+                  mealType,
+                  foodController.text,
+                  '${caloriesController.text}kcal',
+                );
+                Navigator.of(context).pop();
+              }
+            },
+            child: Text(currentMeal != null ? '수정' : '추가'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dietData = ref.watch(dietControllerProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('식단'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -17,7 +92,7 @@ class DietScreen extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('식단 추가 기능은 추후 구현됩니다'),
-                  backgroundColor: Color(0xFF9ACD32),
+                  backgroundColor: mainButtonColor,
                 ),
               );
             },
@@ -34,35 +109,31 @@ class DietScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: mainButtonColor,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Text(
+                    const Text(
                       '오늘의 칼로리',
                       style: TextStyle(
                         fontSize: 18,
                         color: Colors.white70,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      '1,200 / 1,800 kcal',
-                      style: TextStyle(
+                      '${dietData.totalCalories} / 1,800 kcal',
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      '목표까지 600kcal 남음',
-                      style: TextStyle(
+                      '목표까지 ${1800 - dietData.totalCalories}kcal 남음',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Colors.white70,
                       ),
@@ -76,16 +147,31 @@ class DietScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView(
-                  children: const [
-                    _MealCard('아침', '계란후라이, 토스트', '350kcal', Icons.wb_sunny),
-                    _MealCard('점심', '닭가슴살 샐러드', '450kcal', Icons.wb_sunny_outlined),
-                    _MealCard('저녁', '연어 구이, 현미밥', '400kcal', Icons.nightlight_round),
+                  children: [
+                    _MealCard(
+                      meal: '아침',
+                      mealData: dietData.breakfast,
+                      icon: Icons.wb_sunny,
+                      onButtonPressed: () => _showMealDialog('아침'),
+                    ),
+                    _MealCard(
+                      meal: '점심',
+                      mealData: dietData.lunch,
+                      icon: Icons.wb_sunny_outlined,
+                      onButtonPressed: () => _showMealDialog('점심'),
+                    ),
+                    _MealCard(
+                      meal: '저녁',
+                      mealData: dietData.dinner,
+                      icon: Icons.nightlight_round,
+                      onButtonPressed: () => _showMealDialog('저녁'),
+                    ),
                   ],
                 ),
               ),
@@ -99,37 +185,38 @@ class DietScreen extends StatelessWidget {
 
 class _MealCard extends StatelessWidget {
   final String meal;
-  final String food;
-  final String calories;
+  final MealData? mealData;
   final IconData icon;
-  const _MealCard(this.meal, this.food, this.calories, this.icon);
+  final VoidCallback onButtonPressed;
+  
+  const _MealCard({
+    required this.meal,
+    required this.mealData,
+    required this.icon,
+    required this.onButtonPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasData = mealData != null;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF2196F3).withOpacity(0.1),
+              color: mainButtonColor.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: const Color(0xFF2196F3)),
+            child: Icon(icon, color: mainButtonColor),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -141,26 +228,44 @@ class _MealCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A6741),
+                    color: mainButtonColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  food,
-                  style: const TextStyle(
+                  hasData ? mealData!.food : '식단을 추가해주세요',
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF6B8B6B),
+                    color: hasData ? subTextColor : subTextColor.withOpacity(0.6),
+                    fontStyle: hasData ? FontStyle.normal : FontStyle.italic,
                   ),
                 ),
               ],
             ),
           ),
-          Text(
-            calories,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2196F3),
+          if (hasData) ...[
+            Text(
+              mealData!.calories,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: mainButtonColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          OutlinedButton(
+            onPressed: onButtonPressed,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: mainButtonColor),
+              foregroundColor: mainButtonColor,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 0),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              hasData ? '수정' : '추가',
+              style: const TextStyle(fontSize: 12),
             ),
           ),
         ],
