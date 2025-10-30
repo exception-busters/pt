@@ -7,6 +7,15 @@ class MealData {
   MealData({required this.food, required this.calories});
 }
 
+class DietRecommendationException implements Exception {
+  const DietRecommendationException([this.message]);
+
+  final String? message;
+
+  @override
+  String toString() => message ?? 'DietRecommendationException';
+}
+
 class DietData {
   final String date;
   final MealData? breakfast;
@@ -100,3 +109,21 @@ class DietController extends StateNotifier<DietData> {
 final dietControllerProvider = StateNotifierProvider<DietController, DietData>(
   (ref) => DietController(),
 );
+
+final dietRecommendationProvider = Provider<String>((ref) {
+  final dietData = ref.watch(dietControllerProvider);
+  final total = dietData.totalCalories;
+  const goal = 1800;
+  final remaining = goal - total;
+
+  if (total == 0) {
+    return '첫 식단을 기록해보세요!';
+  }
+  if (remaining > 0) {
+    return '목표까지 ${remaining}kcal 남았습니다. 균형 잡힌 식사를 이어가세요.';
+  }
+  if (remaining.abs() <= 100) {
+    return '거의 목표를 달성했어요! 가벼운 간식으로 마무리해도 좋아요.';
+  }
+  throw const DietRecommendationException('칼로리가 목표보다 많이 초과했어요. 내일은 조금 조절해 볼까요?');
+});

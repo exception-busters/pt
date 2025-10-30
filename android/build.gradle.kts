@@ -12,15 +12,13 @@ allprojects {
     }
 }
 
-val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
-rootProject.layout.buildDirectory.value(newBuildDir)
+// Place all build outputs in ../../build to keep android/ clean
+val rootBuildDirProvider = rootProject.layout.buildDirectory.dir("../../build")
+rootProject.layout.buildDirectory.set(rootBuildDirProvider)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    // Each subproject builds under the shared root build dir
+    layout.buildDirectory.set(rootProject.layout.buildDirectory.dir(project.name))
 }
 
 subprojects {
