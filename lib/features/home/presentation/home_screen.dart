@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/color.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/widgets/onboarding_debug_widget.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -125,6 +126,10 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              
+              // 개발 중에만 표시되는 디버그 위젯
+              const SizedBox(height: 24),
+              const OnboardingDebugWidget(),
             ],
           ),
         ),
