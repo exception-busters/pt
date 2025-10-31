@@ -231,8 +231,17 @@ final workoutRoutineControllerProvider = StateNotifierProvider<WorkoutRoutineCon
 
 // AI 추천 루틴 생성기
 class AIRecommendedRoutines {
-  static List<WorkoutRoutine> getRecommendedRoutines() {
+  static List<WorkoutRoutine> getRecommendedRoutines(List<Exercise> availableExercises) {
     final now = DateTime.now();
+    
+    // 운동 이름으로 찾는 헬퍼 함수
+    Exercise? findExerciseByName(String name) {
+      try {
+        return availableExercises.firstWhere((e) => e.name.contains(name));
+      } catch (e) {
+        return null;
+      }
+    }
     
     return [
       // 초보자용 루틴
@@ -240,11 +249,10 @@ class AIRecommendedRoutines {
         id: 'ai_beginner',
         name: '🤖 AI 추천: 초보자 전신 운동',
         exercises: [
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'jumping_jack'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'pushup'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
-        ],
+          findExerciseByName('스쿼트'),
+          findExerciseByName('푸쉬업'),
+          findExerciseByName('플랭크'),
+        ].where((e) => e != null).cast<Exercise>().toList(),
         createdAt: now,
       ),
       
@@ -253,11 +261,9 @@ class AIRecommendedRoutines {
         id: 'ai_core',
         name: '🤖 AI 추천: 코어 강화 집중',
         exercises: [
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'crunches'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'mountain_climber'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'plank'),
-        ],
+          findExerciseByName('플랭크'),
+          findExerciseByName('데드리프트'),
+        ].where((e) => e != null).cast<Exercise>().toList(),
         createdAt: now,
       ),
       
@@ -266,11 +272,10 @@ class AIRecommendedRoutines {
         id: 'ai_lower',
         name: '🤖 AI 추천: 하체 근력 강화',
         exercises: [
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'lunge'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'wall_sit'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'squat'),
-        ],
+          findExerciseByName('스쿼트'),
+          findExerciseByName('런지'),
+          findExerciseByName('데드리프트'),
+        ].where((e) => e != null).cast<Exercise>().toList(),
         createdAt: now,
       ),
       
@@ -278,21 +283,15 @@ class AIRecommendedRoutines {
       WorkoutRoutine(
         id: 'ai_hiit',
         name: '🤖 AI 추천: 고강도 인터벌',
-        exercises: [
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'burpee'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'mountain_climber'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'jumping_jack'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'high_knees'),
-          WorkoutRoutineController.availableExercises.firstWhere((e) => e.id == 'burpee'),
-        ],
+        exercises: availableExercises.take(3).toList(), // 처음 3개 운동 사용
         createdAt: now,
       ),
     ];
   }
   
   // 사용자 레벨에 따른 추천 루틴 (추후 프로필 연동 가능)
-  static List<WorkoutRoutine> getPersonalizedRoutines(String userLevel) {
-    final allRoutines = getRecommendedRoutines();
+  static List<WorkoutRoutine> getPersonalizedRoutines(String userLevel, List<Exercise> availableExercises) {
+    final allRoutines = getRecommendedRoutines(availableExercises);
     
     switch (userLevel.toLowerCase()) {
       case '초급':
@@ -307,13 +306,76 @@ class AIRecommendedRoutines {
   }
 }
 
-final aiRecommendedRoutinesProvider = Provider<List<WorkoutRoutine>>((ref) {
-  // 추후 사용자 프로필과 연동하여 개인화된 추천 가능
-  return AIRecommendedRoutines.getRecommendedRoutines();
+final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref) async {
+  final exercisesAsync = await ref.watch(databaseExercisesProvider.future);
+  return AIRecommendedRoutines.getRecommendedRoutines(exercisesAsync);
 });
 
 // Supabase 연동 프로바이더들
 final supabaseWorkoutServiceProvider = Provider<SupabaseWorkoutService>((ref) => SupabaseWorkoutService());
+
+// 데이터베이스에서 운동 목록을 가져오는 프로바이더
+final databaseExercisesProvider = FutureProvider<List<Exercise>>((ref) async {
+  final service = ref.read(supabaseWorkoutServiceProvider);
+  try {
+    final supabaseExercises = await service.getAllExercises();
+    return supabaseExercises.map((supabaseExercise) => Exercise(
+      id: supabaseExercise.exerciseId.toString(),
+      name: supabaseExercise.name,
+      description: supabaseExercise.description ?? '운동 설명이 없습니다.',
+      duration: _getDurationByDifficulty(supabaseExercise.difficulty ?? '초급'),
+      category: supabaseExercise.bodyPart,
+    )).toList();
+  } catch (e) {
+    print('데이터베이스에서 운동 목록 가져오기 실패: $e');
+    // 실패 시 하드코딩된 운동 목록 반환
+    return WorkoutRoutineController.availableExercises;
+  }
+});
+
+// 난이도에 따른 기본 운동 시간 설정
+int _getDurationByDifficulty(String difficulty) {
+  switch (difficulty) {
+    case '초급':
+      return 30;
+    case '중급':
+    case '중간':
+      return 45;
+    case '고급':
+      return 60;
+    default:
+      return 45;
+  }
+}
+
+// 루틴 생성 상태를 관리하는 클래스
+class RoutineCreationState {
+  final bool isCreating;
+  final String? currentStep;
+  final double progress;
+  final String? error;
+
+  const RoutineCreationState({
+    this.isCreating = false,
+    this.currentStep,
+    this.progress = 0.0,
+    this.error,
+  });
+
+  RoutineCreationState copyWith({
+    bool? isCreating,
+    String? currentStep,
+    double? progress,
+    String? error,
+  }) {
+    return RoutineCreationState(
+      isCreating: isCreating ?? this.isCreating,
+      currentStep: currentStep ?? this.currentStep,
+      progress: progress ?? this.progress,
+      error: error ?? this.error,
+    );
+  }
+}
 
 // Supabase 루틴 관리 NotifierProvider
 class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWorkoutRoutine>>> {
@@ -340,17 +402,19 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
         throw Exception('사용자가 로그인되지 않았습니다.');
       }
 
-      print('🚀 루틴 생성 시작: $title');
+      print('🚀 루틴 생성 시작: $title (운동 ${exercises.length}개)');
       
-      // 1. 먼저 운동들을 Supabase에 저장 (중복 체크)
-      final List<SupabaseExercise> supabaseExercises = [];
-      for (final exercise in exercises) {
+      // 1. 운동 ID 매핑 (기존 운동 확인 및 새 운동 생성)
+      final List<Map<String, dynamic>> exerciseData = [];
+      
+      for (int i = 0; i < exercises.length; i++) {
+        final exercise = exercises[i];
+        print('📝 운동 처리 중 (${i + 1}/${exercises.length}): ${exercise.name}');
+        
         // 기존 운동이 있는지 확인
-        final existingExercise = await _service.getExerciseByName(exercise.name);
-        if (existingExercise != null) {
-          supabaseExercises.add(existingExercise);
-          print('✅ 기존 운동 사용: ${existingExercise.name} (ID: ${existingExercise.exerciseId})');
-        } else {
+        SupabaseExercise? supabaseExercise = await _service.getExerciseByName(exercise.name);
+        
+        if (supabaseExercise == null) {
           // 새 운동 생성
           final newExercise = SupabaseExercise(
             name: exercise.name,
@@ -359,59 +423,117 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
             difficulty: '초급', // 기본값
           );
           
-          final insertedExercise = await _service.insertExercise(newExercise);
-          if (insertedExercise != null) {
-            supabaseExercises.add(insertedExercise);
-            print('✅ 새 운동 생성: ${insertedExercise.name} (ID: ${insertedExercise.exerciseId})');
-          } else {
+          supabaseExercise = await _service.insertExercise(newExercise);
+          if (supabaseExercise == null) {
             throw Exception('운동 생성 실패: ${exercise.name}');
           }
+          print('✅ 새 운동 생성: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
+        } else {
+          print('✅ 기존 운동 사용: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
         }
+        
+        // 운동 데이터 추가
+        exerciseData.add({
+          'exercise_id': supabaseExercise.exerciseId!,
+          'sets': 3, // 기본값
+          'reps': (exercise.duration ~/ 5).clamp(5, 20), // duration 기반 reps 계산 (5-20 범위)
+          'rest_time_sec': 60, // 기본값
+        });
       }
 
-      // 2. 루틴 생성
-      final routine = SupabaseWorkoutRoutine(
-        userId: currentUser.id,
+      print('📊 운동 데이터 준비 완료: ${exerciseData.length}개');
+
+      // 2. 단순 INSERT를 사용한 루틴 생성
+      final insertedRoutine = await _service.createCompleteRoutine(
         title: title,
-        description: description,
+        description: description ?? '사용자가 생성한 운동 루틴',
+        exercises: exerciseData,
       );
 
-      final insertedRoutine = await _service.insertWorkoutRoutine(routine);
-      if (insertedRoutine == null) {
+      if (insertedRoutine != null) {
+        print('🎉 루틴 생성 완료: ${insertedRoutine.title} (ID: ${insertedRoutine.routineId})');
+        
+        // 3. 루틴 목록 새로고침
+        await loadRoutines();
+        return true;
+      } else {
         throw Exception('루틴 생성 실패');
       }
       
-      print('✅ 루틴 생성 성공: ${insertedRoutine.title} (ID: ${insertedRoutine.routineId})');
-
-      // 3. 루틴에 운동들 추가
-      for (int i = 0; i < supabaseExercises.length; i++) {
-        final exercise = supabaseExercises[i];
-        final originalExercise = exercises[i];
-        
-        final routineExercise = SupabaseRoutineExercise(
-          routineId: insertedRoutine.routineId!,
-          exerciseId: exercise.exerciseId!,
-          sets: 3, // 기본값
-          reps: originalExercise.duration ~/ 5, // duration을 기반으로 reps 계산
-          restTimeSec: 60, // 기본값
-        );
-
-        final insertedRoutineExercise = await _service.insertRoutineExercise(routineExercise);
-        if (insertedRoutineExercise != null) {
-          print('✅ 루틴 운동 추가: ${exercise.name} - ${insertedRoutineExercise.sets}세트 x ${insertedRoutineExercise.reps}회');
-        } else {
-          print('⚠️ 루틴 운동 추가 실패: ${exercise.name}');
-        }
-      }
-
-      // 4. 루틴 목록 새로고침
-      await loadRoutines();
-      
-      print('🎉 루틴 생성 완료!');
-      return true;
-      
     } catch (e) {
       print('❌ 루틴 생성 실패: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateRoutine(int routineId, String title, String? description, List<Exercise> exercises) async {
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🔄 루틴 업데이트 시작: $title (운동 ${exercises.length}개)');
+      
+      // 1. 운동 ID 매핑 (기존 운동 확인 및 새 운동 생성)
+      final List<Map<String, dynamic>> exerciseData = [];
+      
+      for (int i = 0; i < exercises.length; i++) {
+        final exercise = exercises[i];
+        print('📝 운동 처리 중 (${i + 1}/${exercises.length}): ${exercise.name}');
+        
+        // 기존 운동이 있는지 확인
+        SupabaseExercise? supabaseExercise = await _service.getExerciseByName(exercise.name);
+        
+        if (supabaseExercise == null) {
+          // 새 운동 생성
+          final newExercise = SupabaseExercise(
+            name: exercise.name,
+            bodyPart: exercise.category,
+            description: exercise.description,
+            difficulty: '초급', // 기본값
+          );
+          
+          supabaseExercise = await _service.insertExercise(newExercise);
+          if (supabaseExercise == null) {
+            throw Exception('운동 생성 실패: ${exercise.name}');
+          }
+          print('✅ 새 운동 생성: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
+        } else {
+          print('✅ 기존 운동 사용: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
+        }
+        
+        // 운동 데이터 추가
+        exerciseData.add({
+          'exercise_id': supabaseExercise.exerciseId!,
+          'sets': 3, // 기본값
+          'reps': (exercise.duration ~/ 5).clamp(5, 20), // duration 기반 reps 계산 (5-20 범위)
+          'rest_time_sec': 60, // 기본값
+        });
+      }
+
+      print('📊 운동 데이터 준비 완료: ${exerciseData.length}개');
+
+      // 2. 루틴 업데이트
+      final success = await _service.updateRoutine(
+        routineId: routineId,
+        title: title,
+        description: description ?? '사용자가 수정한 운동 루틴',
+        exercises: exerciseData,
+      );
+
+      if (success) {
+        print('🎉 루틴 업데이트 완료: $title (ID: $routineId)');
+        
+        // 3. 루틴 목록 새로고침
+        await loadRoutines();
+        return true;
+      } else {
+        throw Exception('루틴 업데이트 실패');
+      }
+      
+    } catch (e) {
+      print('❌ 루틴 업데이트 실패: $e');
       return false;
     }
   }
@@ -431,4 +553,56 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
 final supabaseRoutineNotifierProvider = StateNotifierProvider<SupabaseRoutineNotifier, AsyncValue<List<SupabaseWorkoutRoutine>>>((ref) {
   final service = ref.read(supabaseWorkoutServiceProvider);
   return SupabaseRoutineNotifier(service);
+});
+
+// 루틴 생성 상태 관리 프로바이더
+class RoutineCreationNotifier extends StateNotifier<RoutineCreationState> {
+  RoutineCreationNotifier() : super(const RoutineCreationState());
+
+  void startCreation() {
+    state = state.copyWith(
+      isCreating: true,
+      currentStep: '루틴 생성 준비 중...',
+      progress: 0.1,
+      error: null,
+    );
+  }
+
+  void updateProgress(String step, double progress) {
+    state = state.copyWith(
+      currentStep: step,
+      progress: progress,
+    );
+  }
+
+  void completeCreation() {
+    state = state.copyWith(
+      isCreating: false,
+      currentStep: '루틴 생성 완료!',
+      progress: 1.0,
+    );
+    
+    // 2초 후 상태 초기화
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        state = const RoutineCreationState();
+      }
+    });
+  }
+
+  void setError(String error) {
+    state = state.copyWith(
+      isCreating: false,
+      error: error,
+      progress: 0.0,
+    );
+  }
+
+  void reset() {
+    state = const RoutineCreationState();
+  }
+}
+
+final routineCreationNotifierProvider = StateNotifierProvider<RoutineCreationNotifier, RoutineCreationState>((ref) {
+  return RoutineCreationNotifier();
 });

@@ -4,6 +4,7 @@ class SupabaseWorkoutRoutine {
   final String title;
   final String? description;
   final DateTime? createdAt;
+  final List<dynamic>? routineExercises; // 조인된 운동 데이터
 
   const SupabaseWorkoutRoutine({
     this.routineId,
@@ -11,6 +12,7 @@ class SupabaseWorkoutRoutine {
     required this.title,
     this.description,
     this.createdAt,
+    this.routineExercises,
   });
 
   factory SupabaseWorkoutRoutine.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,7 @@ class SupabaseWorkoutRoutine {
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'] as String)
           : null,
+      routineExercises: json['routineexercise'] as List<dynamic>?,
     );
   }
 
@@ -46,6 +49,6 @@ class SupabaseWorkoutRoutine {
 
   @override
   String toString() {
-    return 'SupabaseWorkoutRoutine(routineId: $routineId, title: $title, userId: $userId)';
+    return 'SupabaseWorkoutRoutine(routineId: $routineId, title: $title, userId: $userId, exercises: ${routineExercises?.length ?? 0})';
   }
 }
