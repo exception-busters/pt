@@ -1,0 +1,168 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2025-10-31",
+  "exercises": [
+    {
+      "exercise_id": "001",
+      "exercise_code": "001-1-1-01",
+      "exercise_name": "스탠딩 사이드 크런치",
+      "category": "맨몸운동",
+      "posture": "서기",
+      "difficulty": "초급",
+      "description": "서서 좌우로 몸을 기울여 옆구리 근육을 강화하는 운동",
+      "key_joints": [
+        "Left Shoulder",
+        "Right Shoulder",
+        "Left Hip",
+        "Right Hip",
+        "Left Elbow",
+        "Right Elbow",
+        "Left Knee",
+        "Right Knee"
+      ],
+      "key_angles": {
+        "left_body_tilt": {
+          "name": "좌측 상체 기울기",
+          "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+          "ideal_mean": 160.0,
+          "ideal_range": [140.0, 170.0],
+          "tolerance": 10.0,
+          "weight": 1.2
+        },
+        "right_body_tilt": {
+          "name": "우측 상체 기울기",
+          "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+          "ideal_mean": 160.0,
+          "ideal_range": [140.0, 170.0],
+          "tolerance": 10.0,
+          "weight": 1.2
+        },
+        "left_elbow_angle": {
+          "name": "좌측 팔꿈치 각도",
+          "points": ["Left Shoulder", "Left Elbow", "Left Wrist"],
+          "ideal_mean": 165.0,
+          "ideal_range": [150.0, 180.0],
+          "tolerance": 12.0,
+          "weight": 0.5
+        },
+        "right_elbow_angle": {
+          "name": "우측 팔꿈치 각도",
+          "points": ["Right Shoulder", "Right Elbow", "Right Wrist"],
+          "ideal_mean": 165.0,
+          "ideal_range": [150.0, 180.0],
+          "tolerance": 12.0,
+          "weight": 0.5
+        },
+        "left_knee_angle": {
+          "name": "좌측 무릎 각도",
+          "points": ["Left Hip", "Left Knee", "Left Ankle"],
+          "ideal_mean": 173.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 8.0,
+          "weight": 0.6
+        },
+        "right_knee_angle": {
+          "name": "우측 무릎 각도",
+          "points": ["Right Hip", "Right Knee", "Right Ankle"],
+          "ideal_mean": 173.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 8.0,
+          "weight": 0.6
+        }
+      },
+      "motion_phases": [
+        {
+          "phase_id": 1,
+          "phase_name": "시작 자세",
+          "description": "양발을 어깨 너비로 벌리고 서서 상체를 곧게 펴세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "상체를 자연스럽게 곧게 펴기 (165도 이상)",
+            "좌우 균형 유지 (차이 10도 이내)",
+            "무릎은 자연스럽게 펴기"
+          ]
+        },
+        {
+          "phase_id": 2,
+          "phase_name": "좌측 굽히기",
+          "description": "왼쪽 팔을 머리 위로 올리고 좌측으로 천천히 기울이세요",
+          "duration_sec": 2.5,
+          "key_checks": [
+            "좌측 상체 기울기 140~170도",
+            "우측 상체는 비교적 직선 유지 (165도 이상)",
+            "좌우 기울기 차이 최소 8도 이상"
+          ]
+        },
+        {
+          "phase_id": 3,
+          "phase_name": "중앙 복귀",
+          "description": "천천히 시작 자세로 돌아오세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "상체를 자연스럽게 곧게 펴기",
+            "좌우 균형 유지"
+          ]
+        },
+        {
+          "phase_id": 4,
+          "phase_name": "우측 굽히기",
+          "description": "오른쪽 팔을 머리 위로 올리고 우측으로 천천히 기울이세요",
+          "duration_sec": 2.5,
+          "key_checks": [
+            "우측 상체 기울기 140~170도",
+            "좌측 상체는 비교적 직선 유지 (165도 이상)",
+            "좌우 기울기 차이 최소 8도 이상"
+          ]
+        },
+        {
+          "phase_id": 5,
+          "phase_name": "운동 완료",
+          "description": "마지막으로 시작 자세로 돌아와 운동을 마무리하세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "시작 자세로 복귀",
+            "호흡 정리"
+          ]
+        }
+      ],
+      "feedback_rules": [
+        {
+          "condition": "left_body_tilt > 170",
+          "feedback": "좌측으로 더 기울이세요",
+          "severity": "info"
+        },
+        {
+          "condition": "left_body_tilt < 140",
+          "feedback": "너무 많이 기울였습니다",
+          "severity": "warning"
+        },
+        {
+          "condition": "right_body_tilt > 170",
+          "feedback": "우측으로 더 기울이세요",
+          "severity": "info"
+        },
+        {
+          "condition": "right_body_tilt < 140",
+          "feedback": "너무 많이 기울였습니다",
+          "severity": "warning"
+        },
+        {
+          "condition": "left_knee_angle < 165",
+          "feedback": "왼쪽 무릎을 펴세요",
+          "severity": "warning"
+        },
+        {
+          "condition": "right_knee_angle < 165",
+          "feedback": "오른쪽 무릎을 펴세요",
+          "severity": "warning"
+        }
+      ],
+      "common_mistakes": [
+        "골반이 함께 기울어지는 경우",
+        "무릎을 구부리는 경우",
+        "너무 빠르게 동작하는 경우",
+        "호흡을 멈추는 경우"
+      ]
+    }
+  ]
+}
