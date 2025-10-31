@@ -14,7 +14,7 @@ class SupabaseWorkoutService {
       print('🏋️ Exercise 삽입 시작: ${exercise.name} (${exercise.bodyPart})');
       
       final response = await _supabase
-          .from('Exercise')
+          .from('exercise')
           .insert(exercise.toInsertJson())
           .select()
           .single();
@@ -43,7 +43,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('WorkoutRoutine')
+          .from('workoutroutine')
           .insert(routine.toInsertJson())
           .select()
           .single();
@@ -84,7 +84,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('RoutineExercise')
+          .from('routineexercise')
           .insert(routineExercise.toInsertJson())
           .select()
           .single();
@@ -122,7 +122,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('WorkoutSession')
+          .from('workoutsession')
           .insert(session.toInsertJson())
           .select()
           .single();
@@ -163,7 +163,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('WorkoutRecords')
+          .from('workoutrecords')
           .insert(record.toInsertJson())
           .select()
           .single();
@@ -307,23 +307,62 @@ class SupabaseWorkoutService {
     return result;
   }
 
-  // 사용자 루틴 조회
+  // 사용자 루틴 조회 (운동 정보 포함) - 현재 로그인한 사용자만
   Future<List<SupabaseWorkoutRoutine>> getUserRoutines() async {
     try {
       final currentUser = _supabase.auth.currentUser;
-      if (currentUser == null) throw Exception('사용자가 로그인되지 않았습니다.');
+      if (currentUser == null) {
+        print('❌ 사용자가 로그인되지 않았습니다.');
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
 
+      print('🔍 사용자 루틴 조회 시작: ${currentUser.id}');
+
+      // 현재 로그인한 사용자의 루틴만 조회
       final response = await _supabase
-          .from('WorkoutRoutine')
-          .select()
-          .eq('user_id', currentUser.id)
+          .from('workoutroutine')
+          .select('''
+            *,
+            routineexercise (
+              *,
+              exercise (
+                *
+              )
+            )
+          ''')
+          .eq('user_id', currentUser.id) // 현재 사용자 ID로 필터링
           .order('created_at', ascending: false);
       
-      return (response as List)
+      print('✅ 루틴 조회 성공: ${response.length}개 루틴 발견 (사용자: ${currentUser.id})');
+      
+      // 추가 보안: 응답 데이터에서도 사용자 ID 확인
+      final filteredRoutines = (response as List)
+          .where((json) => json['user_id'] == currentUser.id)
           .map((json) => SupabaseWorkoutRoutine.fromJson(json))
           .toList();
+      
+      print('🔒 보안 필터링 완료: ${filteredRoutines.length}개 루틴 반환');
+      
+      return filteredRoutines;
     } catch (e) {
       print('❌ 사용자 루틴 조회 실패: $e');
+      return [];
+    }
+  }
+
+  // 모든 운동 조회
+  Future<List<SupabaseExercise>> getAllExercises() async {
+    try {
+      final response = await _supabase
+          .from('exercise')
+          .select()
+          .order('exercise_id', ascending: true);
+      
+      return (response as List)
+          .map((json) => SupabaseExercise.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('❌ 모든 운동 조회 실패: $e');
       return [];
     }
   }
@@ -332,7 +371,7 @@ class SupabaseWorkoutService {
   Future<SupabaseExercise?> getExerciseByName(String name) async {
     try {
       final response = await _supabase
-          .from('Exercise')
+          .from('exercise')
           .select()
           .eq('name', name)
           .maybeSingle();
@@ -347,17 +386,355 @@ class SupabaseWorkoutService {
     }
   }
 
-  // 루틴 삭제
-  Future<void> deleteRoutine(int routineId) async {
+  // 단순 INSERT를 사용한 루틴 생성 메서드
+  Future<SupabaseWorkoutRoutine?> createCompleteRoutine({
+    required String title,
+    String? description,
+    required List<Map<String, dynamic>> exercises, // {exercise_id, sets, reps, rest_time_sec}
+  }) async {
     try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🚀 루틴 생성 시작: $title');
+      print('👤 사용자 ID: ${currentUser.id}');
+      print('📋 운동 데이터: $exercises');
+
+      // 1단계: WorkoutRoutine 테이블에 INSERT하고 routine_id 가져오기
+      final routineData = {
+        'user_id': currentUser.id,
+        'title': title,
+        'description': description ?? '',
+      };
+
+      print('📝 루틴 데이터 삽입 중...');
+      final routineResponse = await _supabase
+          .from('workoutroutine')
+          .insert(routineData)
+          .select()
+          .single();
+
+      print('✅ 루틴 삽입 성공: $routineResponse');
+      
+      final insertedRoutine = SupabaseWorkoutRoutine.fromJson(routineResponse);
+      final routineId = insertedRoutine.routineId!;
+      
+      print('🎯 생성된 routine_id: $routineId');
+
+      // 2단계: RoutineExercise 테이블에 각 운동 INSERT
+      print('📋 운동 데이터 삽입 시작 (${exercises.length}개)...');
+      
+      for (int i = 0; i < exercises.length; i++) {
+        final exercise = exercises[i];
+        
+        final routineExerciseData = {
+          'routine_id': routineId,
+          'exercise_id': exercise['exercise_id'],
+          'sets': exercise['sets'],
+          'reps': exercise['reps'],
+          'rest_time_sec': exercise['rest_time_sec'] ?? 60,
+        };
+
+        print('📝 운동 ${i + 1}/${exercises.length} 삽입 중: $routineExerciseData');
+        
+        final exerciseResponse = await _supabase
+            .from('routineexercise')
+            .insert(routineExerciseData)
+            .select()
+            .single();
+            
+        print('✅ 운동 삽입 성공: $exerciseResponse');
+      }
+
+      print('🎉 루틴 생성 완료: ${insertedRoutine.title} (ID: $routineId)');
+      return insertedRoutine;
+
+    } catch (e) {
+      print('❌ 루틴 생성 실패: $e');
+      
+      // 에러 타입별 상세 로깅
+      if (e.toString().contains('duplicate key')) {
+        print('💡 중복 키 에러 - 이미 존재하는 데이터');
+      } else if (e.toString().contains('foreign key')) {
+        print('💡 외래키 제약 위반 - 참조하는 데이터가 존재하지 않음');
+      } else if (e.toString().contains('not-null')) {
+        print('💡 필수 필드 누락');
+      } else if (e.toString().contains('permission')) {
+        print('💡 권한 부족 - RLS 정책 확인 필요');
+      }
+      
+      return null;
+    }
+  }
+
+  // 단순한 루틴 생성 메서드 (개별 INSERT 방식)
+  Future<SupabaseWorkoutRoutine?> createRoutineSimple({
+    required String title,
+    String? description,
+    required List<Map<String, dynamic>> exercises,
+  }) async {
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🔄 단순 INSERT 방식으로 루틴 생성: $title');
+
+      // 1단계: WorkoutRoutine INSERT
+      final routineData = {
+        'user_id': currentUser.id,
+        'title': title,
+        'description': description ?? '',
+      };
+
+      final routineResponse = await _supabase
+          .from('workoutroutine')
+          .insert(routineData)
+          .select()
+          .single();
+
+      final insertedRoutine = SupabaseWorkoutRoutine.fromJson(routineResponse);
+      final routineId = insertedRoutine.routineId!;
+
+      print('✅ 루틴 생성 성공: ID $routineId');
+
+      // 2단계: RoutineExercise INSERT (각각 개별적으로)
+      for (int i = 0; i < exercises.length; i++) {
+        final exercise = exercises[i];
+        
+        try {
+          final routineExerciseData = {
+            'routine_id': routineId,
+            'exercise_id': exercise['exercise_id'],
+            'sets': exercise['sets'] ?? 3,
+            'reps': exercise['reps'] ?? 10,
+            'rest_time_sec': exercise['rest_time_sec'] ?? 60,
+          };
+
+          await _supabase
+              .from('routineexercise')
+              .insert(routineExerciseData);
+
+          print('✅ 운동 ${i + 1} 추가 성공');
+        } catch (e) {
+          print('⚠️ 운동 ${i + 1} 추가 실패: $e');
+          // 개별 운동 실패는 전체를 중단하지 않음
+        }
+      }
+
+      print('✅ 단순 루틴 생성 완료: $title');
+      return insertedRoutine;
+    } catch (e) {
+      print('❌ 단순 루틴 생성 실패: $e');
+      return null;
+    }
+  }
+
+  // 루틴 업데이트 (현재 사용자의 루틴만)
+  Future<bool> updateRoutine({
+    required int routineId,
+    required String title,
+    String? description,
+    required List<Map<String, dynamic>> exercises,
+  }) async {
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        print('❌ 사용자가 로그인되지 않았습니다.');
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🔄 루틴 업데이트 시작: ID $routineId (사용자: ${currentUser.id})');
+
+      // 현재 사용자의 루틴인지 먼저 확인
+      final routineCheck = await _supabase
+          .from('workoutroutine')
+          .select('user_id')
+          .eq('routine_id', routineId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      if (routineCheck == null) {
+        print('❌ 업데이트 권한 없음: 루틴 ID $routineId는 현재 사용자의 루틴이 아닙니다.');
+        throw Exception('업데이트 권한이 없습니다.');
+      }
+
+      // 1단계: WorkoutRoutine 업데이트
       await _supabase
-          .from('WorkoutRoutine')
+          .from('workoutroutine')
+          .update({
+            'title': title,
+            'description': description ?? '',
+          })
+          .eq('routine_id', routineId)
+          .eq('user_id', currentUser.id);
+
+      print('✅ 루틴 기본 정보 업데이트 완료');
+
+      // 2단계: 기존 RoutineExercise 삭제
+      await _supabase
+          .from('routineexercise')
           .delete()
           .eq('routine_id', routineId);
+
+      print('✅ 기존 운동 목록 삭제 완료');
+
+      // 3단계: 새로운 RoutineExercise 추가
+      for (int i = 0; i < exercises.length; i++) {
+        final exercise = exercises[i];
+        
+        try {
+          final routineExerciseData = {
+            'routine_id': routineId,
+            'exercise_id': exercise['exercise_id'],
+            'sets': exercise['sets'] ?? 3,
+            'reps': exercise['reps'] ?? 10,
+            'rest_time_sec': exercise['rest_time_sec'] ?? 60,
+          };
+
+          await _supabase
+              .from('routineexercise')
+              .insert(routineExerciseData);
+
+          print('✅ 운동 ${i + 1} 추가 성공');
+        } catch (e) {
+          print('⚠️ 운동 ${i + 1} 추가 실패: $e');
+        }
+      }
+
+      print('✅ 루틴 업데이트 완료: ID $routineId');
+      return true;
+    } catch (e) {
+      print('❌ 루틴 업데이트 실패: $e');
+      return false;
+    }
+  }
+
+  // 루틴 삭제 (현재 사용자의 루틴만)
+  Future<bool> deleteRoutine(int routineId) async {
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        print('❌ 사용자가 로그인되지 않았습니다.');
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🗑️ 루틴 삭제 시작: ID $routineId (사용자: ${currentUser.id})');
+
+      // 현재 사용자의 루틴인지 먼저 확인
+      final routineCheck = await _supabase
+          .from('workoutroutine')
+          .select('user_id')
+          .eq('routine_id', routineId)
+          .eq('user_id', currentUser.id) // 현재 사용자의 루틴인지 확인
+          .maybeSingle();
+
+      if (routineCheck == null) {
+        print('❌ 삭제 권한 없음: 루틴 ID $routineId는 현재 사용자의 루틴이 아닙니다.');
+        throw Exception('삭제 권한이 없습니다.');
+      }
+
+      // 현재 사용자의 루틴만 삭제
+      final result = await _supabase
+          .from('workoutroutine')
+          .delete()
+          .eq('routine_id', routineId)
+          .eq('user_id', currentUser.id); // 이중 보안
+
       print('✅ 루틴 삭제 성공: ID $routineId');
+      return true;
     } catch (e) {
       print('❌ 루틴 삭제 실패: $e');
-      throw Exception('루틴 삭제에 실패했습니다: $e');
+      return false;
+    }
+  }
+
+  // 간단한 테스트 루틴 생성
+  Future<SupabaseWorkoutRoutine?> createTestRoutine() async {
+    try {
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('사용자가 로그인되지 않았습니다.');
+      }
+
+      print('🧪 테스트 루틴 생성 시작...');
+
+      // 1. 기존 운동 ID 확인 (푸시업)
+      final pushupExercise = await getExerciseByName('푸시업');
+      if (pushupExercise == null) {
+        print('❌ 푸시업 운동을 찾을 수 없습니다.');
+        return null;
+      }
+
+      // 2. 테스트 루틴 생성
+      final testTitle = '테스트 루틴 ${DateTime.now().millisecondsSinceEpoch}';
+      
+      final routineData = {
+        'user_id': currentUser.id,
+        'title': testTitle,
+        'description': '자동 생성된 테스트 루틴',
+      };
+
+      final routineResponse = await _supabase
+          .from('workoutroutine')
+          .insert(routineData)
+          .select()
+          .single();
+
+      final insertedRoutine = SupabaseWorkoutRoutine.fromJson(routineResponse);
+      print('✅ 테스트 루틴 생성: ${insertedRoutine.routineId}');
+
+      // 3. 테스트 운동 추가
+      final exerciseData = {
+        'routine_id': insertedRoutine.routineId!,
+        'exercise_id': pushupExercise.exerciseId!,
+        'sets': 3,
+        'reps': 10,
+        'rest_time_sec': 60,
+      };
+
+      await _supabase
+          .from('routineexercise')
+          .insert(exerciseData);
+
+      print('✅ 테스트 운동 추가 완료');
+      return insertedRoutine;
+
+    } catch (e) {
+      print('❌ 테스트 루틴 생성 실패: $e');
+      return null;
+    }
+  }
+
+  // 데이터베이스 연결 테스트
+  Future<bool> testConnection() async {
+    try {
+      print('🔍 데이터베이스 연결 테스트 시작...');
+      
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) {
+        print('❌ 사용자가 로그인되지 않았습니다.');
+        return false;
+      }
+      
+      print('✅ 사용자 인증 확인: ${currentUser.id}');
+      
+      // 간단한 쿼리로 연결 테스트
+      final response = await _supabase
+          .from('exercise')
+          .select('count')
+          .limit(1);
+      
+      print('✅ 데이터베이스 연결 성공');
+      print('📊 Exercise 테이블 접근 가능');
+      
+      return true;
+    } catch (e) {
+      print('❌ 데이터베이스 연결 실패: $e');
+      return false;
     }
   }
 
@@ -365,7 +742,7 @@ class SupabaseWorkoutService {
   Future<bool> _checkRoutineExists(int routineId) async {
     try {
       final response = await _supabase
-          .from('WorkoutRoutine')
+          .from('workoutroutine')
           .select('routine_id')
           .eq('routine_id', routineId)
           .maybeSingle();
@@ -379,7 +756,7 @@ class SupabaseWorkoutService {
   Future<bool> _checkExerciseExists(int exerciseId) async {
     try {
       final response = await _supabase
-          .from('Exercise')
+          .from('exercise')
           .select('exercise_id')
           .eq('exercise_id', exerciseId)
           .maybeSingle();
@@ -393,7 +770,7 @@ class SupabaseWorkoutService {
   Future<bool> _checkSessionExists(int sessionId) async {
     try {
       final response = await _supabase
-          .from('WorkoutSession')
+          .from('workoutsession')
           .select('session_id')
           .eq('session_id', sessionId)
           .maybeSingle();

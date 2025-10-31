@@ -69,7 +69,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final success = await authController.signUp(
       _emailController.text,
       _passwordController.text,
-      name: _nameController.text,
+      nickname: _nameController.text,
     );
 
     setState(() => _isLoading = false);

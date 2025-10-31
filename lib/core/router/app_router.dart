@@ -21,6 +21,8 @@ import 'package:flutter_application_1/features/workout/presentation/workout_deta
 import 'package:flutter_application_1/features/workout/presentation/workout_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
 import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
+import 'package:flutter_application_1/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:flutter_application_1/features/onboarding/application/onboarding_providers.dart';
 import 'package:go_router/go_router.dart';
 
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -38,6 +40,7 @@ class GoRouterRefreshStream extends ChangeNotifier {
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authNotifier = ref.watch(authControllerProvider.notifier);
   final isLoggedIn = ref.watch(authControllerProvider);
+  final onboardingCompleted = ref.watch(onboardingCompletedProvider);
   final defaultRoute = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
   final initialLocation =
       (defaultRoute.isEmpty || defaultRoute == '/') ? '/app/home' : defaultRoute;
@@ -50,6 +53,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
     redirect: (context, state) {
       final goingToApp = state.matchedLocation.startsWith('/app');
+      final goingToOnboarding = state.matchedLocation == '/onboarding';
       final loggingIn = state.matchedLocation == '/' || state.matchedLocation == '/login';
       final signingUp = state.matchedLocation == '/signup';
 
@@ -63,7 +67,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         if (stored != null && stored.isNotEmpty) {
           return stored;
         }
-        return '/app/home';
+        
+        // 로그인 후 온보딩 완료 여부 확인
+        return onboardingCompleted.when(
+          data: (completed) => completed ? '/app/home' : '/onboarding',
+          loading: () => '/app/home',
+          error: (_, __) => '/app/home',
+        );
+      }
+
+      // 로그인된 상태에서 온보딩이 완료되지 않았고 온보딩 페이지가 아닌 경우
+      if (isLoggedIn && !goingToOnboarding && goingToApp) {
+        return onboardingCompleted.when(
+          data: (completed) => completed ? null : '/onboarding',
+          loading: () => null,
+          error: (_, __) => null,
+        );
       }
 
       return null;
@@ -80,6 +99,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/signup',
         name: 'signup',
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainDashboard(
@@ -112,9 +136,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create-routine',
                 name: 'create-routine',
-                builder: (context, state) => CreateRoutineScreen(
-                  editingRoutine: state.extra as WorkoutRoutine?,
-                ),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is WorkoutRoutine) {
+                    return CreateRoutineScreen(editingRoutine: extra);
+                  } else if (extra is Map<String, dynamic>) {
+                    return CreateRoutineScreen(
+                      editingRoutine: extra['editingRoutine'] as WorkoutRoutine?,
+                      editingSupabaseRoutine: extra['editingSupabaseRoutine'],
+                    );
+                  } else {
+                    return const CreateRoutineScreen();
+                  }
+                },
               ),
             ],
           ),
