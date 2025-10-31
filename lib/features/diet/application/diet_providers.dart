@@ -8,10 +8,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/features/diet/data/diet_profile_repository.dart';
 
 class MealData {
+  MealData({
+    required this.food,
+    required this.calories,
+    List<MealComponent>? components,
+    NutritionSummary? nutrition,
+  })  : components = List.unmodifiable(components ?? const []),
+        nutrition = nutrition ?? NutritionSummary.zero;
+
   final String food;
   final String calories;
+  final List<MealComponent> components;
+  final NutritionSummary nutrition;
 
-  MealData({required this.food, required this.calories});
+  MealData copyWith({
+    String? food,
+    String? calories,
+    List<MealComponent>? components,
+    NutritionSummary? nutrition,
+  }) {
+    return MealData(
+      food: food ?? this.food,
+      calories: calories ?? this.calories,
+      components: components ?? this.components,
+      nutrition: nutrition ?? this.nutrition,
+    );
+  }
 }
 
 class DietRecommendationException implements Exception {
@@ -53,15 +75,40 @@ class DietData {
   int get totalCalories {
     int total = 0;
     if (breakfast != null) {
-      total += int.tryParse(breakfast!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      if (breakfast!.components.isNotEmpty) {
+        total += breakfast!.nutrition.calories.round();
+      } else {
+        total += int.tryParse(breakfast!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      }
     }
     if (lunch != null) {
-      total += int.tryParse(lunch!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      if (lunch!.components.isNotEmpty) {
+        total += lunch!.nutrition.calories.round();
+      } else {
+        total += int.tryParse(lunch!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      }
     }
     if (dinner != null) {
-      total += int.tryParse(dinner!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      if (dinner!.components.isNotEmpty) {
+        total += dinner!.nutrition.calories.round();
+      } else {
+        total += int.tryParse(dinner!.calories.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      }
     }
     return total;
+  }
+
+  MealData? mealByLabel(String mealType) {
+    switch (mealType) {
+      case '아침':
+        return breakfast;
+      case '점심':
+        return lunch;
+      case '저녁':
+        return dinner;
+      default:
+        return null;
+    }
   }
 }
 
@@ -74,9 +121,60 @@ class DietController extends StateNotifier<DietData> {
     return DietData(date: dateString);
   }
 
-  void updateMeal(String mealType, String food, String calories) {
-    final mealData = MealData(food: food, calories: calories);
-    
+  Future<void> saveMeal(String mealType, {required String food, required String calories}) async {
+    final trimmedFood = food.trim();
+    final trimmedCalories = calories.trim();
+    _setMeal(
+      mealType,
+      trimmedFood.isEmpty && trimmedCalories.isEmpty
+          ? null
+          : MealData(
+              food: trimmedFood,
+              calories: trimmedCalories,
+              components: const [],
+              nutrition: NutritionSummary.zero,
+            ),
+    );
+    // TODO: Supabase 저장 연동
+  }
+
+  Future<void> saveMealComponents(String mealType, List<MealComponent> components) async {
+    if (components.isEmpty) {
+      _setMeal(mealType, null);
+      return;
+    }
+
+    final normalized = components
+        .map((item) => MealComponent(food: item.food, grams: item.grams))
+        .toList(growable: false);
+
+    final summary = normalized
+        .map((item) => '${item.food.name} · ${item.grams.toStringAsFixed(0)} g')
+        .join('\n');
+
+    final totalNutrition = normalized.fold(
+      NutritionSummary.zero,
+      (previous, element) => previous + element.nutrition,
+    );
+
+    _setMeal(
+      mealType,
+      MealData(
+        food: summary,
+        calories: '${totalNutrition.calories.toStringAsFixed(0)} kcal',
+        components: normalized,
+        nutrition: totalNutrition,
+      ),
+    );
+    // TODO: Supabase 저장 연동
+  }
+
+  void clearMeal(String mealType) {
+    _setMeal(mealType, null);
+    // TODO: Supabase 저장 연동
+  }
+
+  void _setMeal(String mealType, MealData? mealData) {
     switch (mealType) {
       case '아침':
         state = state.copyWith(breakfast: mealData);
@@ -100,16 +198,7 @@ class DietController extends StateNotifier<DietData> {
   }
 
   MealData? getMealData(String mealType) {
-    switch (mealType) {
-      case '아침':
-        return state.breakfast;
-      case '점심':
-        return state.lunch;
-      case '저녁':
-        return state.dinner;
-      default:
-        return null;
-    }
+    return state.mealByLabel(mealType);
   }
 }
 
@@ -224,6 +313,36 @@ class NutritionSummary {
       protein: protein + other.protein,
       carbs: carbs + other.carbs,
       fat: fat + other.fat,
+    );
+  }
+}
+
+class MealComponent {
+  MealComponent({
+    required this.food,
+    required double grams,
+  }) : grams = grams.clamp(0, 1000).toDouble();
+
+  final FoodItem food;
+  final double grams;
+
+  NutritionSummary get nutrition {
+    final ratio = grams <= 0 ? 0 : grams / 100;
+    return NutritionSummary(
+      calories: food.calories * ratio,
+      protein: food.protein * ratio,
+      carbs: food.carbs * ratio,
+      fat: food.fat * ratio,
+    );
+  }
+
+  MealComponent copyWith({
+    FoodItem? food,
+    double? grams,
+  }) {
+    return MealComponent(
+      food: food ?? this.food,
+      grams: grams ?? this.grams,
     );
   }
 }
