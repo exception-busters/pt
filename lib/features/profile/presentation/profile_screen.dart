@@ -5,7 +5,7 @@ import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -13,14 +13,54 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileImagePath = ref.watch(profileImageControllerProvider);
-    final user = Supabase.instance.client.auth.currentUser;
-    final displayName = user?.userMetadata?['display_name'] ?? '사용자';
+    final userProfileAsync = ref.watch(userProfileControllerProvider);
+    
+    return userProfileAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(
+          title: const Text('프로필'),
+          backgroundColor: backgroundColor,
+          foregroundColor: mainButtonColor,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('프로필을 불러올 수 없습니다\n$error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.refresh(userProfileControllerProvider),
+                child: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (userProfile) => _buildProfileScreen(context, ref, profileImagePath, userProfile),
+    );
+  }
+
+  Widget _buildProfileScreen(BuildContext context, WidgetRef ref, String? profileImagePath, Map<String, dynamic>? userProfile) {
+    final displayName = userProfile?['nickname'] ?? '사용자';
+    final email = userProfile?['email'] ?? '';
+    final joinDate = userProfile?['join_date'] != null 
+        ? DateTime.parse(userProfile!['join_date']).toLocal()
+        : null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('프로필'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => ref.refresh(userProfileControllerProvider),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -72,10 +112,20 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'PT 회원',
-                      style: TextStyle(
-                        fontSize: 16,
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      joinDate != null 
+                          ? '가입일: ${joinDate.year}.${joinDate.month.toString().padLeft(2, '0')}.${joinDate.day.toString().padLeft(2, '0')}'
+                          : 'PT 회원',
+                      style: const TextStyle(
+                        fontSize: 12,
                         color: Colors.white70,
                       ),
                     ),

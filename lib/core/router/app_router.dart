@@ -112,9 +112,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'create-routine',
                 name: 'create-routine',
-                builder: (context, state) => CreateRoutineScreen(
-                  editingRoutine: state.extra as WorkoutRoutine?,
-                ),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is WorkoutRoutine) {
+                    return CreateRoutineScreen(editingRoutine: extra);
+                  } else if (extra is Map<String, dynamic>) {
+                    return CreateRoutineScreen(
+                      editingRoutine: extra['editingRoutine'] as WorkoutRoutine?,
+                      editingSupabaseRoutine: extra['editingSupabaseRoutine'],
+                    );
+                  } else {
+                    return const CreateRoutineScreen();
+                  }
+                },
               ),
             ],
           ),
