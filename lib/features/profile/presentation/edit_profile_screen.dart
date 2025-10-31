@@ -15,18 +15,35 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: '홍길동');
-  final _emailController = TextEditingController(text: 'hong@example.com');
+  final _nicknameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController(text: '010-1234-5678');
   final _heightController = TextEditingController(text: '175');
   final _weightController = TextEditingController(text: '70');
   
   String _selectedGender = '남성';
   DateTime _selectedBirthDate = DateTime(1990, 1, 1);
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  void _loadUserProfile() async {
+    final userProfile = ref.read(userProfileControllerProvider);
+    userProfile.whenData((profile) {
+      if (profile != null) {
+        _nicknameController.text = profile['nickname'] ?? '';
+        _emailController.text = profile['email'] ?? '';
+      }
+    });
+  }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _nicknameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _heightController.dispose();
@@ -48,15 +65,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('프로필이 저장되었습니다'),
-          backgroundColor: mainButtonColor,
-        ),
+  void _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await ref.read(userProfileControllerProvider.notifier).updateUserProfile(
+        nickname: _nicknameController.text,
+        email: _emailController.text,
       );
-      context.pop();
+
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('프로필이 저장되었습니다'),
+              backgroundColor: mainButtonColor,
+            ),
+          );
+          context.pop();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('프로필 저장에 실패했습니다'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -151,6 +207,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileImagePath = ref.watch(profileImageControllerProvider);
+    final userProfileAsync = ref.watch(userProfileControllerProvider);
+    
+    // 사용자 프로필 데이터가 로드되면 컨트롤러에 설정
+    userProfileAsync.whenData((profile) {
+      if (profile != null) {
+        if (_nicknameController.text.isEmpty) {
+          _nicknameController.text = profile['nickname'] ?? '';
+        }
+        if (_emailController.text.isEmpty) {
+          _emailController.text = profile['email'] ?? '';
+        }
+      }
+    });
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('개인정보 수정'),
@@ -158,14 +228,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         foregroundColor: mainButtonColor,
         actions: [
           TextButton(
-            onPressed: _saveProfile,
-            child: const Text(
-              '저장',
-              style: TextStyle(
-                color: mainButtonColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            onPressed: _isLoading ? null : _saveProfile,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(
+                    '저장',
+                    style: TextStyle(
+                      color: mainButtonColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -217,15 +293,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
                 const SizedBox(height: 32),
                 
-                // 이름
+                // 닉네임
                 TextFormField(
-                  controller: _nameController,
+                  controller: _nicknameController,
                   decoration: const InputDecoration(
-                    labelText: '이름',
+                    labelText: '닉네임',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) =>
-                      value == null || value.isEmpty ? '이름을 입력해주세요' : null,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return '닉네임을 입력해주세요';
+                    if (value.length < 2) return '닉네임은 최소 2자 이상이어야 합니다';
+                    if (value.length > 20) return '닉네임은 최대 20자까지 가능합니다';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 
@@ -334,14 +414,30 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _saveProfile,
-                    child: const Text(
-                      '저장하기',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    onPressed: _isLoading ? null : _saveProfile,
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text('저장 중...'),
+                            ],
+                          )
+                        : const Text(
+                            '저장하기',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ],

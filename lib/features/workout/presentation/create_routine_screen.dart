@@ -6,8 +6,9 @@ import 'package:go_router/go_router.dart';
 
 class CreateRoutineScreen extends ConsumerStatefulWidget {
   final WorkoutRoutine? editingRoutine;
+  final dynamic editingSupabaseRoutine; // SupabaseWorkoutRoutine
 
-  const CreateRoutineScreen({super.key, this.editingRoutine});
+  const CreateRoutineScreen({super.key, this.editingRoutine, this.editingSupabaseRoutine});
 
   @override
   ConsumerState<CreateRoutineScreen> createState() =>
@@ -25,13 +26,66 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
     if (widget.editingRoutine != null) {
       _nameController.text = widget.editingRoutine!.name;
       _selectedExercises = List.from(widget.editingRoutine!.exercises);
+    } else if (widget.editingSupabaseRoutine != null) {
+      _nameController.text = widget.editingSupabaseRoutine.title;
+      // Supabase 루틴의 운동들을 Exercise 객체로 변환
+      _selectedExercises = _convertSupabaseExercisesToExercises(widget.editingSupabaseRoutine);
     }
+  }
+
+  List<Exercise> _convertSupabaseExercisesToExercises(dynamic supabaseRoutine) {
+    final List<Exercise> exercises = [];
+    
+    print('📝 Supabase 루틴 편집 모드: ${supabaseRoutine.title}');
+    
+    if (supabaseRoutine.routineExercises != null && supabaseRoutine.routineExercises.isNotEmpty) {
+      print('🔍 운동 데이터 변환 중: ${supabaseRoutine.routineExercises.length}개');
+      
+      for (final routineExercise in supabaseRoutine.routineExercises) {
+        if (routineExercise != null && routineExercise['exercise'] != null) {
+          final exerciseData = routineExercise['exercise'];
+          final exercise = Exercise(
+            id: exerciseData['exercise_id'].toString(),
+            name: exerciseData['name'] ?? '운동명 없음',
+            description: exerciseData['description'] ?? '운동 설명이 없습니다.',
+            duration: ((routineExercise['reps'] ?? 10) * 5).clamp(30, 120), // reps 기반으로 duration 추정
+            category: exerciseData['body_part'] ?? '기타',
+          );
+          exercises.add(exercise);
+          print('✅ 운동 변환 완료: ${exercise.name}');
+        }
+      }
+    } else {
+      print('💡 운동 데이터가 없어 빈 리스트로 시작합니다. 운동을 다시 선택해주세요.');
+    }
+    
+    return exercises;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  String _getScreenTitle() {
+    if (widget.editingRoutine != null) {
+      return '루틴 수정';
+    } else if (widget.editingSupabaseRoutine != null) {
+      return '루틴 수정';
+    } else {
+      return '새 루틴 추가';
+    }
+  }
+
+  String _getSaveButtonText() {
+    if (widget.editingRoutine != null) {
+      return '루틴 수정하기';
+    } else if (widget.editingSupabaseRoutine != null) {
+      return '루틴 수정하기';
+    } else {
+      return '루틴 저장하기';
+    }
   }
 
   void _addExercise(Exercise exercise) {
@@ -112,23 +166,50 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
             ),
           );
         }
-      } else {
-        // 새 루틴 생성 - Supabase에 저장
-        final success = await ref
-            .read(supabaseRoutineNotifierProvider.notifier)
-            .createRoutine(
-              _nameController.text,
-              '사용자가 생성한 커스텀 루틴', // 기본 설명
-              _selectedExercises,
-            );
-
+      } else if (widget.editingSupabaseRoutine != null) {
+        // Supabase 루틴 수정
+        final success = await ref.read(supabaseRoutineNotifierProvider.notifier).updateRoutine(
+          widget.editingSupabaseRoutine.routineId,
+          _nameController.text,
+          '사용자가 수정한 운동 루틴',
+          _selectedExercises,
+        );
+        
         if (mounted) {
           Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-          
           if (success) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('새 루틴이 Supabase에 저장되었습니다! 🎉'),
+                content: Text('루틴이 수정되었습니다'),
+                backgroundColor: mainButtonColor,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('루틴 수정에 실패했습니다. 다시 시도해주세요.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        // 새 루틴 생성 - Supabase 데이터베이스에 저장
+        final success = await ref.read(supabaseRoutineNotifierProvider.notifier).createRoutine(
+          _nameController.text,
+          '사용자가 생성한 운동 루틴', // 기본 설명
+          _selectedExercises,
+        );
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+          if (success) {
+            // 성공 시 워크아웃 화면의 루틴 목록도 새로고침
+            ref.invalidate(supabaseRoutineNotifierProvider);
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('새 루틴이 데이터베이스에 저장되었습니다'),
                 backgroundColor: mainButtonColor,
               ),
             );
@@ -139,7 +220,6 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                 backgroundColor: Colors.red,
               ),
             );
-            return; // 실패 시 화면을 닫지 않음
           }
         }
       }
@@ -168,7 +248,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.editingRoutine != null ? '루틴 수정' : '새 루틴 추가'),
+        title: Text(_getScreenTitle()),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
       ),
@@ -242,57 +322,79 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                         ),
                         const SizedBox(height: 8),
                         Expanded(
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount:
-                            WorkoutRoutineController.availableExercises.length,
-                            itemBuilder: (context, index) {
-                              final exercise =
-                              WorkoutRoutineController.availableExercises[index];
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                decoration: BoxDecoration(
-                                  color: backgroundColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: borderColor),
+                          child: Consumer(
+                            builder: (context, ref, child) {
+                              final exercisesAsync = ref.watch(databaseExercisesProvider);
+                              
+                              return exercisesAsync.when(
+                                loading: () => const Center(
+                                  child: CircularProgressIndicator(),
                                 ),
-                                child: Column(
-                                  children: [
-                                    ListTile(
-                                      title: Text(
-                                        exercise.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          color: mainButtonColor,
-                                        ),
+                                error: (error, stack) => Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.error, size: 48, color: Colors.red),
+                                      const SizedBox(height: 16),
+                                      Text('운동 목록을 불러올 수 없습니다\n$error'),
+                                      const SizedBox(height: 16),
+                                      ElevatedButton(
+                                        onPressed: () => ref.refresh(databaseExercisesProvider),
+                                        child: const Text('다시 시도'),
                                       ),
-                                      subtitle: Text(
-                                        '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
-                                        style:
-                                        const TextStyle(color: subTextColor),
+                                    ],
+                                  ),
+                                ),
+                                data: (exercises) => ListView.builder(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  itemCount: exercises.length,
+                                  itemBuilder: (context, index) {
+                                    final exercise = exercises[index];
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: backgroundColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: borderColor),
                                       ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16.0, vertical: 8),
-                                      child: SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          onPressed: () => _addExercise(exercise),
-                                          icon:
-                                          const Icon(Icons.add, size: 16),
-                                          label: const Text('추가'),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(
-                                                color: mainButtonColor),
-                                            foregroundColor: mainButtonColor,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
+                                      child: Column(
+                                        children: [
+                                          ListTile(
+                                            title: Text(
+                                              exercise.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: mainButtonColor,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
+                                              style: const TextStyle(color: subTextColor),
+                                            ),
                                           ),
-                                        ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16.0, vertical: 8),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: OutlinedButton.icon(
+                                                onPressed: () => _addExercise(exercise),
+                                                icon: const Icon(Icons.add, size: 16),
+                                                label: const Text('추가'),
+                                                style: OutlinedButton.styleFrom(
+                                                  side: const BorderSide(
+                                                      color: mainButtonColor),
+                                                  foregroundColor: mainButtonColor,
+                                                  padding: const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                    );
+                                  },
                                 ),
                               );
                             },
@@ -497,9 +599,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                 child: ElevatedButton(
                   onPressed: _saveRoutine,
                   child: Text(
-                    widget.editingRoutine != null
-                        ? '루틴 수정하기'
-                        : '루틴 저장하기',
+                    _getSaveButtonText(),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
