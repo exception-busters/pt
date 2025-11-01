@@ -1,4 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import '../../auth/application/auth_providers.dart';
 
 class MealData {
   final String food;
@@ -50,12 +54,79 @@ class DietData {
 }
 
 class DietController extends StateNotifier<DietData> {
-  DietController() : super(_getInitialData());
+  DietController(this._ref) : super(_getInitialData()) {
+    _loadDietData();
+    
+    // 인증 상태 변화 감지
+    _ref.listen(authControllerProvider, (previous, next) {
+      if (!next) {
+        // 로그아웃 시 상태 초기화
+        state = _getInitialData();
+      } else if (previous == false && next == true) {
+        // 로그인 시 해당 사용자의 다이어트 데이터 로드
+        _loadDietData();
+      }
+    });
+  }
+
+  final Ref _ref;
 
   static DietData _getInitialData() {
     final today = DateTime.now();
     final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return DietData(date: dateString);
+  }
+
+  String _getUserDietKey() {
+    final user = Supabase.instance.client.auth.currentUser;
+    final today = DateTime.now();
+    final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    return user != null ? 'diet_data_${user.id}_$dateString' : 'diet_data_default_$dateString';
+  }
+
+  Future<void> _loadDietData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dietJson = prefs.getString(_getUserDietKey());
+      if (dietJson != null) {
+        final dietMap = json.decode(dietJson);
+        state = DietData(
+          date: dietMap['date'],
+          breakfast: dietMap['breakfast'] != null 
+              ? MealData(food: dietMap['breakfast']['food'], calories: dietMap['breakfast']['calories'])
+              : null,
+          lunch: dietMap['lunch'] != null 
+              ? MealData(food: dietMap['lunch']['food'], calories: dietMap['lunch']['calories'])
+              : null,
+          dinner: dietMap['dinner'] != null 
+              ? MealData(food: dietMap['dinner']['food'], calories: dietMap['dinner']['calories'])
+              : null,
+        );
+      }
+    } catch (e) {
+      print('다이어트 데이터 로드 실패: $e');
+    }
+  }
+
+  Future<void> _saveDietData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dietMap = {
+        'date': state.date,
+        'breakfast': state.breakfast != null 
+            ? {'food': state.breakfast!.food, 'calories': state.breakfast!.calories}
+            : null,
+        'lunch': state.lunch != null 
+            ? {'food': state.lunch!.food, 'calories': state.lunch!.calories}
+            : null,
+        'dinner': state.dinner != null 
+            ? {'food': state.dinner!.food, 'calories': state.dinner!.calories}
+            : null,
+      };
+      await prefs.setString(_getUserDietKey(), json.encode(dietMap));
+    } catch (e) {
+      print('다이어트 데이터 저장 실패: $e');
+    }
   }
 
   void updateMeal(String mealType, String food, String calories) {
@@ -72,6 +143,9 @@ class DietController extends StateNotifier<DietData> {
         state = state.copyWith(dinner: mealData);
         break;
     }
+    
+    // 데이터 저장
+    _saveDietData();
   }
 
   void checkAndResetIfNewDay() {
@@ -80,6 +154,7 @@ class DietController extends StateNotifier<DietData> {
     
     if (state.date != today) {
       state = DietData(date: today);
+      _saveDietData();
     }
   }
 
@@ -98,5 +173,5 @@ class DietController extends StateNotifier<DietData> {
 }
 
 final dietControllerProvider = StateNotifierProvider<DietController, DietData>(
-  (ref) => DietController(),
+  (ref) => DietController(ref),
 );

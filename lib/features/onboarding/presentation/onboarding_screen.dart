@@ -4,6 +4,7 @@ import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/onboarding/application/onboarding_providers.dart';
 import 'package:flutter_application_1/features/onboarding/domain/models/onboarding_data.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/widgets/number_picker_widget.dart';
+import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
 import 'package:go_router/go_router.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -599,11 +600,19 @@ class _CompletionScreen extends ConsumerWidget {
                 );
 
                 try {
-                  // 온보딩 데이터 저장
+                  // 온보딩 데이터 저장 (서버에 profile_completed = true 업데이트 포함)
                   await ref.read(onboardingProvider.notifier).saveOnboardingData();
                   
-                  // 온보딩 완료 상태 새로고침
+                  // 관련 프로바이더들 새로고침 (서버 상태 동기화)
                   ref.invalidate(onboardingCompletedProvider);
+                  ref.invalidate(profileCompletedProvider);
+                  ref.invalidate(userProfileProvider);
+                  ref.invalidate(userProfileControllerProvider);
+                  
+                  // 잠시 대기하여 프로바이더 새로고침이 완료되도록 함
+                  await Future.delayed(const Duration(milliseconds: 500));
+                  
+                  print('🎉 온보딩 완료! 서버 상태 업데이트 및 프로바이더 새로고침 완료');
                   
                   if (context.mounted) {
                     // 로딩 다이얼로그 닫기
@@ -613,6 +622,8 @@ class _CompletionScreen extends ConsumerWidget {
                     context.go('/app/home');
                   }
                 } catch (e) {
+                  print('❌ 온보딩 저장 실패: $e');
+                  
                   if (context.mounted) {
                     // 로딩 다이얼로그 닫기
                     Navigator.of(context).pop();
@@ -620,8 +631,9 @@ class _CompletionScreen extends ConsumerWidget {
                     // 에러 메시지 표시
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('저장 중 오류가 발생했습니다: $e'),
+                        content: Text('저장 중 오류가 발생했습니다. 다시 시도해주세요.\n오류: $e'),
                         backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 5),
                       ),
                     );
                   }
