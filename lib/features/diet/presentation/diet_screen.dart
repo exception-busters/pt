@@ -190,7 +190,7 @@ class _MealInputCard extends ConsumerWidget {
             )
           else
             Text(
-              '등록된 식단이 없어요. 아래 버튼으로 음식 DB에서 검색해 ${config.helpText} 등을 추가해보세요.',
+              '등록된 식단이 없습니다.',
               style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF6B7B6B)),
             ),
           const SizedBox(height: 12),
