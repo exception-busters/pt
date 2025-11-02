@@ -6,6 +6,7 @@ import '../domain/models/diet_goal_model.dart';
 import '../data/profile_data_service.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../common/mixins/auth_state_mixin.dart';
+import '../../common/data/supabase_service.dart';
 
 /// 완전한 사용자 데이터 상태
 class CompleteUserData {

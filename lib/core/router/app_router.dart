@@ -22,6 +22,7 @@ import 'package:flutter_application_1/features/workout/presentation/workout_scre
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
 import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:flutter_application_1/features/profile/presentation/profile_settings_screen.dart';
 import 'package:flutter_application_1/features/auth/presentation/auth_loading_screen.dart';
 import 'package:go_router/go_router.dart';
 
@@ -205,6 +206,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 path: 'help',
                 name: 'help',
                 builder: (context, state) => const HelpScreen(),
+              ),
+              GoRoute(
+                path: 'settings',
+                name: 'profile-settings',
+                builder: (context, state) => const ProfileSettingsScreen(),
               ),
             ],
           ),

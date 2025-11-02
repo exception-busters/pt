@@ -1,11 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../domain/models/onboarding_data.dart';
+import '../domain/models/onboarding_data.dart' as onboarding;
 import '../../common/data/supabase_service.dart';
+import '../../profile/domain/models/user_profile_model.dart' as profile;
+import '../../profile/domain/models/workout_goal_model.dart' as workout;
+import '../../profile/data/profile_data_service.dart';
 
 class OnboardingService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  Future<bool> saveUserProfile(OnboardingData data) async {
+  Future<bool> saveUserProfile(onboarding.OnboardingData data) async {
     try {
       final currentUser = SupabaseService.currentUser;
       if (currentUser == null) {
@@ -16,17 +19,46 @@ class OnboardingService {
       print('💾 온보딩 데이터 저장 시작: ${currentUser.id}');
       print('📊 저장할 데이터: ${data.toJson()}');
 
-      // 1. public_users 테이블에 온보딩 데이터 저장/업데이트
-      await _saveToPublicUsers(currentUser.id, data);
+      // OnboardingData를 새로운 모델 구조로 변환
+      final userProfile = profile.UserProfileModel(
+        userId: currentUser.id,
+        gender: data.gender != null 
+            ? (data.gender == onboarding.Gender.male ? profile.Gender.male : profile.Gender.female)
+            : null,
+        age: data.age,
+        height: data.height,
+        weight: data.weight,
+      );
 
-      // 2. users 테이블의 profile_completed를 true로 업데이트 (온보딩 완료 표시)
-      final success = await SupabaseService.updateProfileCompleted(currentUser.id, true);
-      
+      final workoutGoal = workout.WorkoutGoalModel(
+        userId: currentUser.id,
+        goalType: data.workoutGoal != null 
+            ? _mapWorkoutGoal(data.workoutGoal!)
+            : null,
+        level: data.workoutLevel != null 
+            ? _mapWorkoutLevel(data.workoutLevel!)
+            : null,
+        weeklyDays: 3, // 기본값
+        dailyDurationMin: 30, // 기본값
+        preferredTypes: ['general'], // 기본값
+      );
+
+      // 새로운 ProfileDataService를 사용하여 저장
+      final success = await ProfileDataService.saveCompleteProfile(
+        userId: currentUser.id,
+        userProfile: userProfile,
+        workoutGoal: workoutGoal,
+        // dietGoal은 온보딩에서 설정하지 않으므로 null
+      );
+
       if (success) {
-        print('✅ 온보딩 완료! profile_completed = true로 업데이트 완료');
+        // 기존 public_users 테이블에도 저장 (호환성 유지)
+        await _saveToPublicUsers(currentUser.id, data);
+        print('✅ 온보딩 데이터 저장 완료');
         return true;
       } else {
-        throw Exception('profile_completed 업데이트 실패');
+        print('❌ 온보딩 데이터 저장 실패');
+        return false;
       }
     } catch (e) {
       print('❌ 온보딩 데이터 저장 실패: $e');
@@ -34,7 +66,7 @@ class OnboardingService {
     }
   }
 
-  Future<void> _saveToPublicUsers(String userId, OnboardingData data) async {
+  Future<void> _saveToPublicUsers(String userId, onboarding.OnboardingData data) async {
     try {
       // 먼저 기존 데이터가 있는지 확인
       final existingData = await _supabase
@@ -77,7 +109,7 @@ class OnboardingService {
     }
   }
 
-  Future<OnboardingData?> getUserProfile() async {
+  Future<onboarding.OnboardingData?> getUserProfile() async {
     try {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
@@ -94,18 +126,18 @@ class OnboardingService {
         return null;
       }
 
-      return OnboardingData(
+      return onboarding.OnboardingData(
         gender: response['gender'] != null 
-            ? Gender.values.firstWhere((g) => g.name == response['gender'])
+            ? onboarding.Gender.values.firstWhere((g) => g.name == response['gender'])
             : null,
         age: response['age'],
         weight: response['weight']?.toDouble(),
         height: response['height']?.toDouble(),
         workoutGoal: response['workout_goal'] != null
-            ? WorkoutGoal.values.firstWhere((g) => g.name == response['workout_goal'])
+            ? onboarding.WorkoutGoal.values.firstWhere((g) => g.name == response['workout_goal'])
             : null,
         workoutLevel: response['workout_level'] != null
-            ? WorkoutLevel.values.firstWhere((l) => l.name == response['workout_level'])
+            ? onboarding.WorkoutLevel.values.firstWhere((l) => l.name == response['workout_level'])
             : null,
       );
     } catch (e) {
@@ -119,5 +151,58 @@ class OnboardingService {
     if (currentUser == null) return false;
 
     return await SupabaseService.isProfileCompleted(currentUser.id);
+  }
+
+  // 온보딩 WorkoutGoal을 새로운 WorkoutGoalType으로 매핑
+  workout.WorkoutGoalType _mapWorkoutGoal(onboarding.WorkoutGoal goal) {
+    switch (goal) {
+      case onboarding.WorkoutGoal.weightLoss:
+        return workout.WorkoutGoalType.weightLoss;
+      case onboarding.WorkoutGoal.muscleGain:
+        return workout.WorkoutGoalType.muscleGain;
+      case onboarding.WorkoutGoal.fitnessImprovement:
+        return workout.WorkoutGoalType.endurance;
+      case onboarding.WorkoutGoal.healthMaintenance:
+        return workout.WorkoutGoalType.general;
+    }
+  }
+
+  // 온보딩 WorkoutLevel을 새로운 WorkoutLevel로 매핑
+  workout.WorkoutLevel _mapWorkoutLevel(onboarding.WorkoutLevel level) {
+    switch (level) {
+      case onboarding.WorkoutLevel.beginner:
+        return workout.WorkoutLevel.beginner;
+      case onboarding.WorkoutLevel.intermediate:
+        return workout.WorkoutLevel.intermediate;
+      case onboarding.WorkoutLevel.advanced:
+        return workout.WorkoutLevel.advanced;
+    }
+  }
+
+  // 새로운 WorkoutGoalType을 온보딩 WorkoutGoal로 매핑 (역방향)
+  onboarding.WorkoutGoal _mapToOnboardingWorkoutGoal(workout.WorkoutGoalType goalType) {
+    switch (goalType) {
+      case workout.WorkoutGoalType.weightLoss:
+        return onboarding.WorkoutGoal.weightLoss;
+      case workout.WorkoutGoalType.muscleGain:
+        return onboarding.WorkoutGoal.muscleGain;
+      case workout.WorkoutGoalType.endurance:
+      case workout.WorkoutGoalType.strength:
+        return onboarding.WorkoutGoal.fitnessImprovement;
+      case workout.WorkoutGoalType.general:
+        return onboarding.WorkoutGoal.healthMaintenance;
+    }
+  }
+
+  // 새로운 WorkoutLevel을 온보딩 WorkoutLevel로 매핑 (역방향)
+  onboarding.WorkoutLevel _mapToOnboardingWorkoutLevel(workout.WorkoutLevel level) {
+    switch (level) {
+      case workout.WorkoutLevel.beginner:
+        return onboarding.WorkoutLevel.beginner;
+      case workout.WorkoutLevel.intermediate:
+        return onboarding.WorkoutLevel.intermediate;
+      case workout.WorkoutLevel.advanced:
+        return onboarding.WorkoutLevel.advanced;
+    }
   }
 }

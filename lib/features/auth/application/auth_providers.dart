@@ -131,6 +131,10 @@ class AuthController extends StateNotifier<AuthState> {
         _controller.add(state);
         
         print('🎉 로그인 완료! profile_completed: $profileCompleted');
+        
+        // 4. 완전한 사용자 데이터 로드 트리거 (백그라운드에서)
+        _triggerCompleteUserDataLoad();
+        
         return true;
       } else {
         state = const AuthState(isLoggedIn: false, isLoading: false);
@@ -143,6 +147,13 @@ class AuthController extends StateNotifier<AuthState> {
       _controller.add(state);
       return false;
     }
+  }
+
+  /// 완전한 사용자 데이터 로드 트리거 (백그라운드)
+  void _triggerCompleteUserDataLoad() {
+    // 이 메서드는 CompleteUserDataController에서 자동으로 처리됩니다.
+    // AuthStateMixin을 통해 로그인 이벤트가 감지되면 자동으로 데이터를 로드합니다.
+    print('📡 완전한 사용자 데이터 로드 트리거됨');
   }
 
   // profile_completed 상태를 1회만 조회하여 반환

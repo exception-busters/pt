@@ -22,19 +22,34 @@ class ProfileDataService {
 
       // 1. UserProfile 저장
       if (userProfile != null) {
-        await _client.from('userprofile').upsert(userProfile.toJson());
+        await _client
+            .from('userprofile')
+            .upsert(
+              userProfile.toJson(),
+              onConflict: 'user_id',
+            );
         print('✅ UserProfile 저장 완료');
       }
 
       // 2. WorkoutGoal 저장
       if (workoutGoal != null) {
-        await _client.from('workoutgoal').upsert(workoutGoal.toJson());
+        await _client
+            .from('workoutgoal')
+            .upsert(
+              workoutGoal.toJson(),
+              onConflict: 'user_id',
+            );
         print('✅ WorkoutGoal 저장 완료');
       }
 
       // 3. DietGoal 저장
       if (dietGoal != null) {
-        await _client.from('dietgoal').upsert(dietGoal.toJson());
+        await _client
+            .from('dietgoal')
+            .upsert(
+              dietGoal.toJson(),
+              onConflict: 'user_id',
+            );
         print('✅ DietGoal 저장 완료');
       }
 
@@ -76,18 +91,38 @@ class ProfileDataService {
         return cached;
       }
 
-      // 병렬로 모든 데이터 조회
-      final futures = await Future.wait([
-        _client.from('users').select().eq('user_id', userId).maybeSingle(),
-        _client.from('userprofile').select().eq('user_id', userId).maybeSingle(),
-        _client.from('workoutgoal').select().eq('user_id', userId).maybeSingle(),
-        _client.from('dietgoal').select().eq('user_id', userId).maybeSingle(),
-      ]);
+      // 안전한 데이터 조회 (중복 데이터 처리)
+      Map<String, dynamic>? userData;
+      Map<String, dynamic>? profileData;
+      Map<String, dynamic>? workoutData;
+      Map<String, dynamic>? dietData;
 
-      final userData = futures[0];
-      final profileData = futures[1];
-      final workoutData = futures[2];
-      final dietData = futures[3];
+      try {
+        userData = await _client.from('users').select().eq('user_id', userId).maybeSingle();
+      } catch (e) {
+        print('❌ Users 데이터 조회 실패: $e');
+      }
+
+      try {
+        final workoutResults = await _client.from('workoutgoal').select().eq('user_id', userId);
+        workoutData = workoutResults.isNotEmpty ? workoutResults.first : null;
+      } catch (e) {
+        print('❌ WorkoutGoal 데이터 조회 실패: $e');
+      }
+
+      try {
+        final dietResults = await _client.from('dietgoal').select().eq('user_id', userId);
+        dietData = dietResults.isNotEmpty ? dietResults.first : null;
+      } catch (e) {
+        print('❌ DietGoal 데이터 조회 실패: $e');
+      }
+
+      try {
+        final profileResults = await _client.from('userprofile').select().eq('user_id', userId);
+        profileData = profileResults.isNotEmpty ? profileResults.first : null;
+      } catch (e) {
+        print('❌ UserProfile 데이터 조회 실패: $e');
+      }
 
       if (userData == null) {
         print('❌ 사용자 데이터를 찾을 수 없음: $userId');
@@ -121,9 +156,14 @@ class ProfileDataService {
   /// 개별 프로필 데이터 업데이트
   static Future<bool> updateUserProfile(UserProfileModel profile) async {
     try {
-      await _client.from('userprofile').upsert(profile.toJson());
+      await _client
+          .from('userprofile')
+          .upsert(
+            profile.toJson(),
+            onConflict: 'user_id',
+          );
       _clearUserCache(profile.userId);
-      print('✅ UserProfile 업데이트 완료');
+      print('✅ UserProfile 업데이트 완료 (user_id: ${profile.userId})');
       return true;
     } catch (e) {
       print('❌ UserProfile 업데이트 실패: $e');
@@ -134,9 +174,28 @@ class ProfileDataService {
   /// 개별 운동 목표 업데이트
   static Future<bool> updateWorkoutGoal(WorkoutGoalModel workoutGoal) async {
     try {
-      await _client.from('workoutgoal').upsert(workoutGoal.toJson());
+      // 1. 기존 데이터 확인
+      final existing = await _client
+          .from('workoutgoal')
+          .select()
+          .eq('user_id', workoutGoal.userId);
+
+      if (existing.isNotEmpty) {
+        // 2. 기존 데이터가 있으면 업데이트
+        await _client
+            .from('workoutgoal')
+            .update(workoutGoal.toJson())
+            .eq('user_id', workoutGoal.userId);
+        print('✅ WorkoutGoal 업데이트 완료 (user_id: ${workoutGoal.userId})');
+      } else {
+        // 3. 기존 데이터가 없으면 삽입
+        await _client
+            .from('workoutgoal')
+            .insert(workoutGoal.toJson());
+        print('✅ WorkoutGoal 삽입 완료 (user_id: ${workoutGoal.userId})');
+      }
+
       _clearUserCache(workoutGoal.userId);
-      print('✅ WorkoutGoal 업데이트 완료');
       return true;
     } catch (e) {
       print('❌ WorkoutGoal 업데이트 실패: $e');
@@ -147,9 +206,28 @@ class ProfileDataService {
   /// 개별 식단 목표 업데이트
   static Future<bool> updateDietGoal(DietGoalModel dietGoal) async {
     try {
-      await _client.from('dietgoal').upsert(dietGoal.toJson());
+      // 1. 기존 데이터 확인
+      final existing = await _client
+          .from('dietgoal')
+          .select()
+          .eq('user_id', dietGoal.userId);
+
+      if (existing.isNotEmpty) {
+        // 2. 기존 데이터가 있으면 업데이트
+        await _client
+            .from('dietgoal')
+            .update(dietGoal.toJson())
+            .eq('user_id', dietGoal.userId);
+        print('✅ DietGoal 업데이트 완료 (user_id: ${dietGoal.userId})');
+      } else {
+        // 3. 기존 데이터가 없으면 삽입
+        await _client
+            .from('dietgoal')
+            .insert(dietGoal.toJson());
+        print('✅ DietGoal 삽입 완료 (user_id: ${dietGoal.userId})');
+      }
+
       _clearUserCache(dietGoal.userId);
-      print('✅ DietGoal 업데이트 완료');
       return true;
     } catch (e) {
       print('❌ DietGoal 업데이트 실패: $e');
