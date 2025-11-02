@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
-import 'package:flutter_application_1/features/onboarding/application/onboarding_providers.dart';
+import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
+import 'package:flutter_application_1/features/common/data/supabase_service.dart';
 import 'package:go_router/go_router.dart';
 
 class OnboardingDebugWidget extends ConsumerWidget {
@@ -13,12 +12,9 @@ class OnboardingDebugWidget extends ConsumerWidget {
   Future<void> _resetOnboarding(WidgetRef ref) async {
     try {
       // 서버에서 profile_completed를 false로 업데이트
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = SupabaseService.currentUser;
       if (user != null) {
-        await Supabase.instance.client
-            .from('users')
-            .update({'profile_completed': false})
-            .eq('user_id', user.id);
+        await SupabaseService.updateProfileCompleted(user.id, false);
         print('✅ 서버에서 profile_completed를 false로 업데이트');
       }
       
@@ -34,9 +30,8 @@ class OnboardingDebugWidget extends ConsumerWidget {
         await prefs.remove('user_workout_level_${user.id}');
       }
       
-      // 프로바이더 새로고침
-      ref.invalidate(profileCompletedProvider);
-      ref.invalidate(onboardingCompletedProvider);
+      // AuthController 상태 업데이트 및 프로바이더 새로고침
+      ref.read(authControllerProvider.notifier).updateProfileCompleted(false);
       ref.invalidate(userProfileProvider);
       
       print('✅ 온보딩 데이터 리셋 완료 (서버 + 로컬)');
@@ -47,8 +42,8 @@ class OnboardingDebugWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileCompleted = ref.watch(profileCompletedProvider);
-    final user = Supabase.instance.client.auth.currentUser;
+    // 필요한 상태만 선택적으로 watch
+    final profileCompleted = ref.watch(authControllerProvider.select((state) => state.profileCompleted));
     
     return Container(
       padding: const EdgeInsets.all(12),
@@ -86,17 +81,17 @@ class OnboardingDebugWidget extends ConsumerWidget {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
                 Expanded(
-                  child: profileCompleted.when(
-                    data: (completed) => Text(
-                      completed ? '완료됨' : '미완료',
-                      style: TextStyle(
-                        color: completed ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                  child: Text(
+                    profileCompleted == null 
+                        ? '확인 중...' 
+                        : (profileCompleted ? '완료됨' : '미완료'),
+                    style: TextStyle(
+                      color: profileCompleted == null 
+                          ? Colors.orange 
+                          : (profileCompleted ? Colors.green : Colors.red),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
-                    loading: () => const Text('로딩...', style: TextStyle(fontSize: 12)),
-                    error: (error, _) => const Text('오류', style: TextStyle(color: Colors.red, fontSize: 12)),
                   ),
                 ),
               ],
@@ -147,8 +142,8 @@ class OnboardingDebugWidget extends ConsumerWidget {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
-                    ref.invalidate(profileCompletedProvider);
                     ref.invalidate(userProfileProvider);
+                    // AuthController는 이미 최신 상태를 유지하므로 새로고침 불필요
                   },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.blue),

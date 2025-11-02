@@ -4,23 +4,20 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/models/onboarding_data.dart';
 import '../data/onboarding_service.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../common/mixins/auth_state_mixin.dart';
 
-class OnboardingNotifier extends StateNotifier<OnboardingData> {
-  OnboardingNotifier(this._ref) : super(const OnboardingData()) {
-    // 인증 상태 변화 감지
-    _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
-        // 로그아웃 시 상태 초기화
+class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMixin<OnboardingData> {
+  OnboardingNotifier(Ref ref) : super(const OnboardingData()) {
+    // 공통 인증 상태 리스너 초기화
+    initAuthListener(
+      ref,
+      onLogout: () {
         reset();
         _clearUserSpecificData();
-      } else if (previous == false && next == true) {
-        // 로그인 시 해당 사용자의 데이터 로드
-        _loadUserData();
-      }
-    });
+      },
+      onLogin: _loadUserData,
+    );
   }
-
-  final Ref _ref;
 
   String _getUserDataKey(String key) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -155,54 +152,8 @@ final onboardingProvider = StateNotifierProvider<OnboardingNotifier, OnboardingD
   return OnboardingNotifier(ref);
 });
 
-// 온보딩 완료 상태 확인 Provider (서버 기반)
-final onboardingCompletedProvider = FutureProvider<bool>((ref) async {
-  try {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      print('🔍 사용자가 로그인되지 않음 - 온보딩 필요');
-      return false;
-    }
-    
-    // 서버에서 profile_completed 상태 확인 (최우선)
-    final onboardingService = OnboardingService();
-    final serverCompleted = await onboardingService.isOnboardingCompleted();
-    
-    print('🔍 서버 기반 온보딩 상태 확인: $serverCompleted');
-    
-    if (serverCompleted) {
-      // 서버에서 완료 상태라면 로컬에도 동기화
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('onboarding_completed_${user.id}', true);
-      return true;
-    }
-    
-    // 서버에서 미완료 상태라면 로컬 캐시도 확인 (네트워크 오류 대비)
-    final prefs = await SharedPreferences.getInstance();
-    final localCompleted = prefs.getBool('onboarding_completed_${user.id}') ?? false;
-    
-    if (localCompleted) {
-      print('⚠️ 로컬에는 완료되어 있지만 서버에는 미완료 - 서버 상태 우선');
-    }
-    
-    return false; // 서버 상태를 최우선으로 함
-  } catch (e) {
-    print('❌ 온보딩 완료 상태 확인 실패: $e');
-    // 네트워크 오류 등의 경우 로컬 캐시 확인
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        final prefs = await SharedPreferences.getInstance();
-        final localCompleted = prefs.getBool('onboarding_completed_${user.id}') ?? false;
-        print('⚠️ 서버 확인 실패 - 로컬 캐시 사용: $localCompleted');
-        return localCompleted;
-      }
-    } catch (localError) {
-      print('❌ 로컬 캐시 확인도 실패: $localError');
-    }
-    return false; // 모든 확인 실패 시 안전하게 온보딩 필요로 처리
-  }
-});
+// 온보딩 완료 상태는 이제 AuthController에서 직접 관리
+// 중복 제거: onboardingCompletedProvider 삭제하고 authControllerProvider.profileCompleted 사용
 
 // 온보딩 서비스 Provider
 final onboardingServiceProvider = Provider<OnboardingService>((ref) => OnboardingService());

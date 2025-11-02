@@ -5,6 +5,7 @@ import 'package:flutter_application_1/features/onboarding/application/onboarding
 import 'package:flutter_application_1/features/onboarding/domain/models/onboarding_data.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/widgets/number_picker_widget.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
+import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
 import 'package:go_router/go_router.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -603,16 +604,14 @@ class _CompletionScreen extends ConsumerWidget {
                   // 온보딩 데이터 저장 (서버에 profile_completed = true 업데이트 포함)
                   await ref.read(onboardingProvider.notifier).saveOnboardingData();
                   
+                  // AuthController의 상태 즉시 업데이트 (DB 재조회 없이)
+                  ref.read(authControllerProvider.notifier).updateProfileCompleted(true);
+                  
                   // 관련 프로바이더들 새로고침 (서버 상태 동기화)
-                  ref.invalidate(onboardingCompletedProvider);
-                  ref.invalidate(profileCompletedProvider);
                   ref.invalidate(userProfileProvider);
                   ref.invalidate(userProfileControllerProvider);
                   
-                  // 잠시 대기하여 프로바이더 새로고침이 완료되도록 함
-                  await Future.delayed(const Duration(milliseconds: 500));
-                  
-                  print('🎉 온보딩 완료! 서버 상태 업데이트 및 프로바이더 새로고침 완료');
+                  print('🎉 온보딩 완료! 서버 상태 업데이트 및 AuthController 상태 업데이트 완료');
                   
                   if (context.mounted) {
                     // 로딩 다이얼로그 닫기

@@ -110,10 +110,10 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
     
     // 인증 상태 변화 감지
     _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
         // 로그아웃 시 상태 초기화
         state = [];
-      } else if (previous == false && next == true) {
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
         // 로그인 시 해당 사용자의 루틴 로드
         _loadRoutines();
       }
@@ -401,10 +401,10 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
     
     // 인증 상태 변화 감지
     _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
         // 로그아웃 시 상태 초기화
         state = const AsyncValue.data([]);
-      } else if (previous == false && next == true) {
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
         // 로그인 시 해당 사용자의 루틴 로드
         loadRoutines();
       }

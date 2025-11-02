@@ -15,8 +15,6 @@ import 'package:flutter_application_1/features/profile/presentation/workout_goal
 import 'package:flutter_application_1/features/profile/presentation/diet_goal_screen.dart';
 import 'package:flutter_application_1/features/profile/presentation/notification_settings_screen.dart';
 import 'package:flutter_application_1/features/profile/presentation/help_screen.dart';
-import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
-import 'package:flutter_application_1/features/profile/data/user_service.dart';
 import 'package:flutter_application_1/features/records/presentation/records_detail_screen.dart';
 import 'package:flutter_application_1/features/records/presentation/records_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_detail_screen.dart';
@@ -24,13 +22,16 @@ import 'package:flutter_application_1/features/workout/presentation/workout_scre
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
 import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/onboarding_screen.dart';
-import 'package:flutter_application_1/features/onboarding/application/onboarding_providers.dart';
+import 'package:flutter_application_1/features/auth/presentation/auth_loading_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class GoRouterRefreshStream extends ChangeNotifier {
   late final StreamSubscription _sub;
   GoRouterRefreshStream(Stream<dynamic> stream) {
-    _sub = stream.asBroadcastStream().listen((_) => notifyListeners());
+    // 중복 이벤트 방지를 위한 디바운싱
+    _sub = stream.asBroadcastStream()
+        .distinct() // 중복 이벤트 제거
+        .listen((_) => notifyListeners());
   }
   @override
   void dispose() {
@@ -40,8 +41,9 @@ class GoRouterRefreshStream extends ChangeNotifier {
 }
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ref.watch(authControllerProvider.notifier);
-  final isLoggedIn = ref.watch(authControllerProvider);
+  final authState = ref.watch(authControllerProvider);
+  final authNotifier = ref.read(authControllerProvider.notifier);
+  
   final defaultRoute = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
   final initialLocation =
       (defaultRoute.isEmpty || defaultRoute == '/') ? '/app/home' : defaultRoute;
@@ -52,72 +54,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     errorBuilder: (context, state) => NotFoundScreen(
       message: state.error?.toString() ?? '요청하신 페이지를 찾을 수 없어요.',
     ),
-    redirect: (context, state) async {
-      final goingToApp = state.matchedLocation.startsWith('/app');
-      final goingToOnboarding = state.matchedLocation == '/onboarding';
-      final loggingIn = state.matchedLocation == '/' || state.matchedLocation == '/login';
-      final signingUp = state.matchedLocation == '/signup';
+    redirect: (context, state) {
+      // 상태 추출 (한 번만)
+      final isLoggedIn = authState.isLoggedIn;
+      final profileCompleted = authState.profileCompleted;
+      final isLoading = authState.isLoading;
+      
+      // 경로 분류 (한 번만)
+      final location = state.matchedLocation;
+      final goingToApp = location.startsWith('/app');
+      final goingToAuth = location == '/' || location == '/login' || location == '/signup';
+      final goingToOnboarding = location == '/onboarding';
 
-      print('🔍 라우터 리다이렉트 체크: 로그인상태=$isLoggedIn, 목적지=${state.matchedLocation}');
+      // 로딩 중이면 대기 (깜빡임 방지)
+      if (isLoading) return null;
 
-      // 로그인되지 않은 상태에서 앱 페이지 접근 시 로그인 페이지로
+      // 미로그인 + 앱 접근 → 로그인
       if (!isLoggedIn && goingToApp) {
-        print('🔍 라우터: 미로그인 상태에서 앱 접근 - 로그인 페이지로');
         authNotifier.setRedirect(state.uri.toString());
         return '/';
       }
 
-      // 로그인된 상태에서 로그인/회원가입 페이지 접근 시
-      if (isLoggedIn && (loggingIn || signingUp)) {
-        print('🔍 라우터: 로그인 상태에서 로그인 페이지 접근 - profile_completed 확인');
-        
+      // 로그인됨 + 인증 페이지 접근 → 상태 기반 리다이렉트
+      if (isLoggedIn && goingToAuth) {
         final stored = authNotifier.takeRedirect();
-        if (stored != null && stored.isNotEmpty) {
-          print('🔍 라우터: 저장된 리다이렉트 경로 사용: $stored');
-          return stored;
-        }
+        if (stored?.isNotEmpty == true) return stored;
         
-        // 직접 UserService를 사용하여 실시간으로 profile_completed 확인
-        try {
-          final userService = ref.read(userServiceProvider);
-          final profileCompleted = await userService.isProfileCompleted();
-          
-          print('🔍 라우터: 실시간 profile_completed 확인 결과 = $profileCompleted');
-          
-          if (profileCompleted) {
-            print('🔍 라우터: 프로필 완료됨 - 홈으로 이동');
-            return '/app/home';
-          } else {
-            print('🔍 라우터: 프로필 미완료 - 온보딩으로 이동');
-            return '/onboarding';
-          }
-        } catch (e) {
-          print('❌ 라우터: profile_completed 확인 실패 - 안전하게 온보딩으로: $e');
-          return '/onboarding';
-        }
+        if (profileCompleted == null) return null; // 상태 확인 중
+        return profileCompleted ? '/app/home' : '/onboarding';
       }
 
-      // 로그인된 상태에서 프로필이 완료되지 않았고 온보딩 페이지가 아닌 경우
-      if (isLoggedIn && !goingToOnboarding && goingToApp) {
-        print('🔍 라우터: 로그인 상태에서 앱 페이지 접근 - profile_completed 재확인');
-        
-        try {
-          final userService = ref.read(userServiceProvider);
-          final profileCompleted = await userService.isProfileCompleted();
-          
-          print('🔍 라우터: 앱 접근 시 profile_completed 확인 결과 = $profileCompleted');
-          
-          if (!profileCompleted) {
-            print('🔍 라우터: 프로필 미완료 - 온보딩 페이지로 리다이렉트');
-            return '/onboarding';
-          }
-          
-          print('🔍 라우터: 프로필 완료됨 - 정상 진행');
-          return null; // 프로필 완료 시 정상 진행
-        } catch (e) {
-          print('❌ 라우터: profile_completed 확인 실패 - 안전하게 온보딩으로: $e');
-          return '/onboarding';
-        }
+      // 로그인됨 + 앱 접근 + 프로필 미완료 → 온보딩
+      if (isLoggedIn && goingToApp && !goingToOnboarding) {
+        if (profileCompleted == null) return null; // 상태 확인 중
+        if (!profileCompleted) return '/onboarding';
       }
 
       return null;
@@ -139,6 +109,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/loading',
+        name: 'loading',
+        builder: (context, state) => const AuthLoadingScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainDashboard(

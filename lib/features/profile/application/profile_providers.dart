@@ -4,24 +4,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/user_service.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../common/mixins/auth_state_mixin.dart';
 
-class ProfileImageController extends StateNotifier<String?> {
-  ProfileImageController(this._ref) : super(null) {
-    _loadProfileImage();
+class ProfileImageController extends StateNotifier<String?> with AuthStateMixin<String?> {
+  ProfileImageController(Ref ref) : super(null) {
+    // 공통 인증 상태 리스너 초기화
+    initAuthListener(
+      ref,
+      onLogout: () => state = null,
+      onLogin: _loadProfileImage,
+    );
     
-    // 인증 상태 변화 감지
-    _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
-        // 로그아웃 시 상태 초기화
-        state = null;
-      } else if (previous == false && next == true) {
-        // 로그인 시 프로필 이미지 다시 로드
-        _loadProfileImage();
-      }
-    });
+    _loadProfileImage();
   }
-
-  final Ref _ref;
 
   String _getProfileImageKey() {
     // 현재 사용자 ID를 기반으로 키 생성
@@ -82,31 +77,23 @@ final userProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
   return await userService.getCurrentUserProfile();
 });
 
-// 프로필 완성 여부 확인 프로바이더 (서버 기반)
-final profileCompletedProvider = FutureProvider<bool>((ref) async {
-  final userService = ref.read(userServiceProvider);
-  return await userService.isProfileCompleted();
-});
+// 프로필 완성 여부 확인 프로바이더 (AuthController 상태 사용)
+// 더 이상 DB를 직접 조회하지 않고 AuthController의 상태를 사용
 
 // 사용자 프로필 컨트롤러
-class UserProfileController extends StateNotifier<AsyncValue<Map<String, dynamic>?>> {
-  UserProfileController(this._userService, this._ref) : super(const AsyncValue.loading()) {
-    loadUserProfile();
+class UserProfileController extends StateNotifier<AsyncValue<Map<String, dynamic>?>> with AuthStateMixin<AsyncValue<Map<String, dynamic>?>> {
+  UserProfileController(this._userService, Ref ref) : super(const AsyncValue.loading()) {
+    // 공통 인증 상태 리스너 초기화
+    initAuthListener(
+      ref,
+      onLogout: () => state = const AsyncValue.data(null),
+      onLogin: loadUserProfile,
+    );
     
-    // 인증 상태 변화 감지
-    _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
-        // 로그아웃 시 상태 초기화
-        state = const AsyncValue.data(null);
-      } else if (previous == false && next == true) {
-        // 로그인 시 프로필 다시 로드
-        loadUserProfile();
-      }
-    });
+    loadUserProfile();
   }
 
   final UserService _userService;
-  final Ref _ref;
 
   Future<void> loadUserProfile() async {
     try {

@@ -2,14 +2,39 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../common/data/supabase_service.dart';
 
-class AuthController extends StateNotifier<bool> {
-  AuthController() : super(false);
+class AuthState {
+  final bool isLoggedIn;
+  final bool? profileCompleted; // null = 미확인, true/false = 확인됨
+  final bool isLoading;
 
-  final _controller = StreamController<bool>.broadcast();
+  const AuthState({
+    required this.isLoggedIn,
+    this.profileCompleted,
+    this.isLoading = false,
+  });
+
+  AuthState copyWith({
+    bool? isLoggedIn,
+    bool? profileCompleted,
+    bool? isLoading,
+  }) {
+    return AuthState(
+      isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      profileCompleted: profileCompleted ?? this.profileCompleted,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+}
+
+class AuthController extends StateNotifier<AuthState> {
+  AuthController() : super(const AuthState(isLoggedIn: false));
+
+  final _controller = StreamController<AuthState>.broadcast();
   String? _pendingRedirect;
 
-  Stream<bool> get stream => _controller.stream;
+  Stream<AuthState> get stream => _controller.stream;
 
   void setRedirect(String path) {
     _pendingRedirect = path;
@@ -35,43 +60,54 @@ class AuthController extends StateNotifier<bool> {
         
         // Users 테이블에 사용자 정보 저장 (profile_completed는 기본값 false)
         try {
-          await Supabase.instance.client.from('users').insert({
-            'user_id': response.user!.id,
-            'email': email,
-            'nickname': nickname ?? '사용자',
-            'join_date': DateTime.now().toIso8601String(),
-            'profile_completed': false, // 명시적으로 false 설정
-          });
-          print('✅ users 테이블에 사용자 정보 저장 완료 (profile_completed: false)');
+          await SupabaseService.createUser(
+            userId: response.user!.id,
+            email: email,
+            nickname: nickname,
+            profileCompleted: false,
+          );
         } catch (e) {
           print('❌ users 테이블 저장 오류: $e');
           // 트리거가 있다면 이미 저장되었을 수 있으므로 에러를 무시하고 계속 진행
         }
         
-        state = true;
-        _controller.add(true);
+        // 회원가입 시에는 profile_completed가 false임을 명시적으로 설정
+        state = const AuthState(
+          isLoggedIn: true,
+          profileCompleted: false,
+          isLoading: false,
+        );
+        _controller.add(state);
         return true;
       } else if (response.session != null) {
         print('회원가입 완료, 자동 로그인 세션 있음: ${response.session}');
-        state = true;
-        _controller.add(true);
+        state = const AuthState(
+          isLoggedIn: true,
+          profileCompleted: false,
+          isLoading: false,
+        );
+        _controller.add(state);
         return true;
       } else {
         print('회원가입 완료, 이메일 확인 필요: ${response}');
-        state = false;
-        _controller.add(false);
+        state = const AuthState(isLoggedIn: false, isLoading: false);
+        _controller.add(state);
         return false;
       }
     } catch (e) {
       print('SignUp Error: $e');
-      state = false;
-      _controller.add(false);
+      state = const AuthState(isLoggedIn: false, isLoading: false);
+      _controller.add(state);
       return false;
     }
   }
 
   Future<bool> signIn(String email, String password) async {
     try {
+      // 로딩 상태 시작
+      state = state.copyWith(isLoading: true);
+      _controller.add(state);
+
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -80,25 +116,60 @@ class AuthController extends StateNotifier<bool> {
       if (response.user != null) {
         print('✅ 로그인 성공: ${response.user!.id}');
         
-        // 로그인 후 users 테이블에 사용자 데이터가 있는지 확인하고 없으면 생성
+        // 1. 사용자 존재 확인 및 생성 (비동기)
         await _ensureUserExistsInDatabase(response.user!);
         
-        // 로그인 후 profile_completed 상태 확인 및 출력
-        await _checkAndPrintProfileStatus(response.user!);
+        // 2. profile_completed 상태를 1회만 조회하여 상태에 저장
+        final profileCompleted = await _loadProfileCompletedStatus(response.user!);
         
-        // 상태 업데이트 (이것이 라우터의 리다이렉트를 트리거함)
-        state = true;
-        _controller.add(true);
+        // 3. 최종 상태 업데이트 (로그인 완료 + profile_completed 정보 포함)
+        state = AuthState(
+          isLoggedIn: true,
+          profileCompleted: profileCompleted,
+          isLoading: false,
+        );
+        _controller.add(state);
+        
+        print('🎉 로그인 완료! profile_completed: $profileCompleted');
         return true;
       } else {
-        state = false;
-        _controller.add(false);
+        state = const AuthState(isLoggedIn: false, isLoading: false);
+        _controller.add(state);
         return false;
       }
     } catch (e) {
       print('SignIn Error: $e');
-      state = false;
-      _controller.add(false);
+      state = const AuthState(isLoggedIn: false, isLoading: false);
+      _controller.add(state);
+      return false;
+    }
+  }
+
+  // profile_completed 상태를 1회만 조회하여 반환
+  Future<bool> _loadProfileCompletedStatus(User user) async {
+    try {
+      print('🔍 profile_completed 상태 1회 조회 중...');
+      
+      final userInfo = await SupabaseService.getUserInfo(user.id);
+      
+      if (userInfo != null) {
+        final profileCompleted = userInfo['profile_completed'] ?? false;
+        final nickname = userInfo['nickname'] ?? '사용자';
+        final email = userInfo['email'] ?? '';
+
+        print('📊 ===== 로그인 사용자 프로필 상태 =====');
+        print('👤 사용자 ID: ${user.id}');
+        print('📧 이메일: $email');
+        print('🏷️ 닉네임: $nickname');
+        print('✅ 프로필 완성 여부: $profileCompleted');
+        print('=====================================');
+        
+        return profileCompleted;
+      }
+      
+      return false;
+    } catch (e) {
+      print('❌ profile_completed 상태 확인 실패: $e');
       return false;
     }
   }
@@ -108,26 +179,17 @@ class AuthController extends StateNotifier<bool> {
     try {
       print('🔍 users 테이블에서 사용자 확인: ${user.id}');
       
-      // 사용자가 users 테이블에 있는지 확인
-      final existingUser = await Supabase.instance.client
-          .from('users')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-      if (existingUser == null) {
+      final userExists = await SupabaseService.userExists(user.id);
+      
+      if (!userExists) {
         print('⚠️ users 테이블에 사용자 없음 - 새로 생성');
         
-        // 사용자가 없으면 생성
-        await Supabase.instance.client.from('users').insert({
-          'user_id': user.id,
-          'email': user.email ?? '',
-          'nickname': user.userMetadata?['display_name'] ?? '사용자',
-          'join_date': DateTime.now().toIso8601String(),
-          'profile_completed': false,
-        });
-        
-        print('✅ users 테이블에 사용자 생성 완료 (profile_completed: false)');
+        await SupabaseService.createUser(
+          userId: user.id,
+          email: user.email ?? '',
+          nickname: user.userMetadata?['display_name'] ?? '사용자',
+          profileCompleted: false,
+        );
       } else {
         print('✅ users 테이블에 사용자 존재 확인');
       }
@@ -136,32 +198,7 @@ class AuthController extends StateNotifier<bool> {
     }
   }
 
-  // 로그인 후 profile_completed 상태 확인 및 콘솔 출력
-  Future<void> _checkAndPrintProfileStatus(User user) async {
-    try {
-      print('🔍 profile_completed 상태 확인 중...');
-      
-      final response = await Supabase.instance.client
-          .from('users')
-          .select('profile_completed, nickname, email')
-          .eq('user_id', user.id)
-          .single();
 
-      final profileCompleted = response['profile_completed'] ?? false;
-      final nickname = response['nickname'] ?? '사용자';
-      final email = response['email'] ?? '';
-
-      print('📊 ===== 로그인 사용자 프로필 상태 =====');
-      print('👤 사용자 ID: ${user.id}');
-      print('📧 이메일: $email');
-      print('🏷️ 닉네임: $nickname');
-      print('✅ 프로필 완성 여부: $profileCompleted');
-      print('=====================================');
-      
-    } catch (e) {
-      print('❌ profile_completed 상태 확인 실패: $e');
-    }
-  }
 
   void signOut() async {
     try {
@@ -171,23 +208,34 @@ class AuthController extends StateNotifier<bool> {
       // Supabase 로그아웃
       await Supabase.instance.client.auth.signOut();
       
-      // 상태 업데이트
-      state = false;
-      _controller.add(false);
+      // 상태 초기화
+      state = const AuthState(isLoggedIn: false);
+      _controller.add(state);
       _pendingRedirect = null;
       
-      // 사용자별 로컬 데이터 정리 (선택적)
+      // 사용자별 데이터 정리
       if (currentUser != null) {
         await _clearUserSpecificData(currentUser.id);
+        // 캐시 정리
+        SupabaseService.clearUserCache(currentUser.id);
       }
       
-      print('✅ 로그아웃 완료');
+      print('✅ 로그아웃 완료 (캐시 정리됨)');
     } catch (e) {
       print('❌ 로그아웃 중 오류: $e');
       // 오류가 있어도 상태는 업데이트
-      state = false;
-      _controller.add(false);
+      state = const AuthState(isLoggedIn: false);
+      _controller.add(state);
       _pendingRedirect = null;
+    }
+  }
+
+  // profile_completed 상태 업데이트 (온보딩 완료 시 호출)
+  void updateProfileCompleted(bool completed) {
+    if (state.isLoggedIn) {
+      state = state.copyWith(profileCompleted: completed);
+      _controller.add(state);
+      print('✅ AuthController: profile_completed 상태 업데이트 = $completed');
     }
   }
 
@@ -214,6 +262,11 @@ class AuthController extends StateNotifier<bool> {
   }
 }
 
-final authControllerProvider = StateNotifierProvider<AuthController, bool>(
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
   (ref) => AuthController(),
 );
+
+// 편의를 위한 개별 프로바이더들 (필요시에만 사용)
+final isLoggedInProvider = Provider<bool>((ref) => ref.watch(authControllerProvider).isLoggedIn);
+final profileCompletedProvider = Provider<bool?>((ref) => ref.watch(authControllerProvider).profileCompleted);
+final authLoadingProvider = Provider<bool>((ref) => ref.watch(authControllerProvider).isLoading);

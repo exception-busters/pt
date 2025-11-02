@@ -59,10 +59,10 @@ class DietController extends StateNotifier<DietData> {
     
     // 인증 상태 변화 감지
     _ref.listen(authControllerProvider, (previous, next) {
-      if (!next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
         // 로그아웃 시 상태 초기화
         state = _getInitialData();
-      } else if (previous == false && next == true) {
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
         // 로그인 시 해당 사용자의 다이어트 데이터 로드
         _loadDietData();
       }
