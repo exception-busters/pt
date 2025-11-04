@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:go_router/go_router.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Models
 import '../models/exercise_model.dart';
 
 // Services
 import '../services/exercise_loader.dart';
+import '../services/exercise_mapper.dart';
 import '../services/pose_scorer.dart';
+import '../features/workout/data/supabase_workout_service.dart';
 import '../services/feedback_generator.dart';
 import '../services/phase_manager.dart';
 import '../services/angle_smoother.dart';
@@ -16,17 +21,16 @@ import '../services/landmark_smoother.dart';
 import '../services/tts_service.dart';
 
 // Widgets
-import '../widgets/exercise_dropdown.dart';
 import '../widgets/phase_progress_widget.dart';
 import '../widgets/compact_score_display.dart';
-import '../widgets/collapsible_feedback_panel.dart';
-import '../widgets/angle_legend_widget.dart';
 import '../pose_painter.dart';
 import '../angle_calculator.dart';
 
 /// 운동 자세 교정 메인 화면
 class ExerciseScreen extends StatefulWidget {
-  const ExerciseScreen({Key? key}) : super(key: key);
+  final List<int>? exerciseIds; // 루틴의 exercise_id 리스트 (선택적)
+
+  const ExerciseScreen({Key? key, this.exerciseIds}) : super(key: key);
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
@@ -48,6 +52,13 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   List<ExerciseModel> _exercises = [];
   ExerciseModel? _selectedExercise;
   PhaseManager? _phaseManager;
+  int _currentExerciseIndex = 0; // 현재 진행 중인 운동 인덱스
+  
+  // 운동별 video_url 저장 (exercise_id -> video_url)
+  Map<int, String?> _exerciseVideoUrls = {};
+  
+  // 동영상 재생 여부
+  bool _hasShownVideo = false; // 첫 운동 시작 시에만 영상 표시
 
   // 피드백 및 점수 (ValueNotifier로 최적화)
   final ValueNotifier<List<String>> _feedbacksNotifier = ValueNotifier([]);
@@ -65,6 +76,18 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   int _frameCount = 0;
   static const int _frameSkipThreshold = 3; // 30fps → 10fps (버퍼 부족 방지)
   DateTime _lastUpdateTime = DateTime.now();
+  
+  // 운동 완료 상태 추적
+  bool _wasCompleted = false;
+  
+  // 스켈레톤 렌더링 표시 여부
+  bool _showSkeleton = true;
+  
+  // 준비 피드백 메시지 (맨 아래 고정)
+  final ValueNotifier<String?> _readyFeedbackNotifier = ValueNotifier(null);
+  
+  // 마지막으로 읽은 단계 설명 (중복 방지)
+  String? _lastSpokenPhaseDescription;
 
   @override
   void initState() {
@@ -90,22 +113,90 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _poseDetector.close();
     _feedbacksNotifier.dispose();
     _scoreNotifier.dispose();
+    _readyFeedbackNotifier.dispose();
     _ttsService.dispose(); // TTS 리소스 해제
     super.dispose();
   }
 
   Future<void> _loadExercises() async {
     try {
-      final exercises = await ExerciseLoader.getAllExercises();
+      List<ExerciseModel> exercises;
+      final Map<int, String?> videoUrls = {};
+      
+      // 루틴의 exercise_id 리스트가 있으면 해당 운동들만 로드
+      if (widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty) {
+        exercises = [];
+        
+        // Supabase에서 video_url 가져오기
+        final service = SupabaseWorkoutService();
+        for (final exerciseId in widget.exerciseIds!) {
+          // ExerciseModel 로드
+          final exercise = await ExerciseMapper.loadExerciseFromExerciseId(exerciseId);
+          if (exercise != null) {
+            exercises.add(exercise);
+          }
+          
+          // SupabaseExercise에서 video_url 가져오기
+          final supabaseExercise = await service.getExerciseByListId(exerciseId);
+          if (supabaseExercise != null) {
+            videoUrls[exerciseId] = supabaseExercise.videoUrl;
+          }
+        }
+        print('루틴 운동 데이터 로드 완료: ${exercises.length}개 (IDs: ${widget.exerciseIds})');
+      } else {
+        // 전체 운동 로드 (기존 동작)
+        exercises = await ExerciseLoader.getAllExercises();
+        print('전체 운동 데이터 로드 완료: ${exercises.length}개');
+      }
+      
       setState(() {
         _exercises = exercises;
+        _exerciseVideoUrls = videoUrls;
+        _currentExerciseIndex = 0; // 첫 번째 운동부터 시작
         if (exercises.isNotEmpty) {
           _selectedExercise = exercises[0];
           _phaseManager = PhaseManager(exercises[0]);
           _lastUpdateTime = DateTime.now();
+          _wasCompleted = false; // 완료 상태 리셋
+          _lastSpokenPhaseDescription = null; // 단계 설명 초기화
+          _hasShownVideo = false; // 첫 운동 영상 표시 플래그 리셋
         }
       });
-      print('운동 데이터 로드 완료: ${exercises.length}개');
+      
+      // 첫 운동 시작 전 영상 재생
+      if (exercises.isNotEmpty && widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty) {
+        final firstExerciseId = widget.exerciseIds![0];
+        final videoUrl = videoUrls[firstExerciseId];
+        if (videoUrl != null && !_hasShownVideo) {
+          _hasShownVideo = true;
+          // 약간의 지연 후 영상 재생 다이얼로그 표시
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              _showVideoDialog(videoUrl);
+            }
+          });
+        } else {
+          // 영상이 없으면 첫 단계 설명 읽기
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && _phaseManager != null && _selectedExercise != null) {
+              final phaseDescription = _phaseManager!.currentPhase.description;
+              _ttsService.speak(phaseDescription);
+              _lastSpokenPhaseDescription = phaseDescription;
+            }
+          });
+        }
+      } else {
+        // 첫 단계 설명 읽기 (약간의 지연 후)
+        if (exercises.isNotEmpty) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && _phaseManager != null && _selectedExercise != null) {
+              final phaseDescription = _phaseManager!.currentPhase.description;
+              _ttsService.speak(phaseDescription);
+              _lastSpokenPhaseDescription = phaseDescription;
+            }
+          });
+        }
+      }
     } catch (e) {
       print('운동 데이터 로드 실패: $e');
     }
@@ -251,6 +342,200 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     return InputImage.fromBytes(bytes: bytes, metadata: inputImageData);
   }
 
+  /// YouTube URL에서 video ID 추출
+  String? _extractYouTubeVideoId(String url) {
+    // 다양한 YouTube URL 형식 지원
+    final patterns = [
+      RegExp(r'youtube\.com/watch\?v=([a-zA-Z0-9_-]+)'),
+      RegExp(r'youtu\.be/([a-zA-Z0-9_-]+)'),
+      RegExp(r'youtube\.com/shorts/([a-zA-Z0-9_-]+)'),
+      RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)'),
+    ];
+    
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(url);
+      if (match != null && match.groupCount >= 1) {
+        return match.group(1);
+      }
+    }
+    return null;
+  }
+
+  /// 동영상 재생 다이얼로그 표시
+  void _showVideoDialog(String videoUrl) {
+    final videoId = _extractYouTubeVideoId(videoUrl);
+    
+    if (videoId == null) {
+      // YouTube URL이 아니면 외부 브라우저로 열기
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => AlertDialog(
+          title: const Text('운동 영상'),
+          content: const Text('영상을 외부 브라우저에서 열까요?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final uri = Uri.parse(videoUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('열기'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // YouTube 플레이어 다이얼로그
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 헤더
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.white24, width: 1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _selectedExercise?.exerciseName ?? '운동 영상',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              // YouTube 플레이어
+              Container(
+                width: double.infinity,
+                height: 250,
+                child: YoutubePlayer(
+                  controller: YoutubePlayerController(
+                    initialVideoId: videoId,
+                    flags: const YoutubePlayerFlags(
+                      autoPlay: true,
+                      mute: false,
+                    ),
+                  ),
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: Colors.blue,
+                  progressColors: const ProgressBarColors(
+                    playedColor: Colors.blue,
+                    handleColor: Colors.blueAccent,
+                  ),
+                ),
+              ),
+              // 닫기 버튼
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('운동 시작하기'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 다음 운동으로 이동하거나 모든 운동이 완료되면 운동 탭으로 돌아가기
+  void _moveToNextExercise() {
+    // 약간의 지연 후 다음 운동으로 이동 (사용자가 완료 메시지를 볼 수 있도록)
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      
+      // 다음 운동이 있는지 확인
+      if (_currentExerciseIndex < _exercises.length - 1) {
+        // 다음 운동으로 이동
+        final nextExerciseId = widget.exerciseIds?[_currentExerciseIndex + 1];
+        final nextVideoUrl = nextExerciseId != null ? _exerciseVideoUrls[nextExerciseId] : null;
+        
+        setState(() {
+          _currentExerciseIndex++;
+          _selectedExercise = _exercises[_currentExerciseIndex];
+          _phaseManager = PhaseManager(_exercises[_currentExerciseIndex]);
+          _wasCompleted = false; // 완료 상태 리셋
+          _lastUpdateTime = DateTime.now();
+          _scoreNotifier.value = 0.0;
+          _feedbacksNotifier.value = [];
+          _readyFeedbackNotifier.value = null;
+          _angleSmoother.resetAll();
+          _landmarkSmoother.resetAll();
+          _lastSpokenFeedback = null;
+          _lastSpokenPhaseDescription = null;
+          _ttsService.resetLastSpoken();
+        });
+        print('다음 운동으로 이동: ${_selectedExercise!.exerciseName} (${_currentExerciseIndex + 1}/${_exercises.length})');
+        
+        // 다음 운동 시작 전 영상 재생
+        if (nextVideoUrl != null && mounted) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              _showVideoDialog(nextVideoUrl);
+            }
+          });
+        } else {
+          // 영상이 없으면 첫 단계 설명 읽기
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && _phaseManager != null && _selectedExercise != null) {
+              final phaseDescription = _phaseManager!.currentPhase.description;
+              _ttsService.speak(phaseDescription);
+              _lastSpokenPhaseDescription = phaseDescription;
+            }
+          });
+        }
+      } else {
+        // 모든 운동 완료 - 홈 화면으로 이동
+        print('🎉 모든 운동 완료! 홈 화면으로 이동합니다.');
+        context.go('/app/home');
+      }
+    });
+  }
+
   void _updateFeedback() {
     if (_poses.isEmpty || _selectedExercise == null) {
       _feedbacksNotifier.value = [];
@@ -283,6 +568,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _selectedExercise!.feedbackRules,
     );
 
+    // 준비 피드백과 일반 피드백 분리
+    String? readyFeedback;
+    List<String> ttsFeedbacks = [];
+
     if (_phaseManager != null) {
       final now = DateTime.now();
       final deltaTime = now.difference(_lastUpdateTime).inMilliseconds / 1000.0;
@@ -295,34 +584,69 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       );
 
       if (phaseChanged) {
-        if (_phaseManager!.isCompleted) {
-          feedbacks.insert(0, '🎉 운동 완료!');
-        } else {
-          feedbacks.insert(
-            0,
-            '✓ 다음 단계: ${_phaseManager!.currentPhase.phaseName}',
-          );
+        // 단계 변경 시 설명 먼저 읽기
+        final phaseDescription = _phaseManager!.currentPhase.description;
+        if (_lastSpokenPhaseDescription != phaseDescription) {
+          _ttsService.speak(phaseDescription);
+          _lastSpokenPhaseDescription = phaseDescription;
         }
+        
+        if (_phaseManager!.isCompleted) {
+          // 운동 완료 - TTS만 제공
+          ttsFeedbacks.add('🎉 운동 완료!');
+          // 운동 완료 시 다음 운동으로 이동 또는 운동 탭으로 돌아가기
+          if (!_wasCompleted) {
+            _wasCompleted = true;
+            _moveToNextExercise();
+          }
+        } else {
+          // 다음 단계 - TTS만 제공 (설명은 이미 읽음)
+          ttsFeedbacks.add('✓ 다음 단계: ${_phaseManager!.currentPhase.phaseName}');
+        }
+      }
+      
+      // 첫 단계 시작 시에도 설명 읽기
+      if (_phaseManager!.currentPhaseIndex == 0 && !_phaseManager!.isReady && !_phaseManager!.isCompleted) {
+        final phaseDescription = _phaseManager!.currentPhase.description;
+        if (_lastSpokenPhaseDescription != phaseDescription) {
+          _ttsService.speak(phaseDescription);
+          _lastSpokenPhaseDescription = phaseDescription;
+        }
+      }
+      
+      // 운동 완료 상태 체크 (phaseChanged가 false여도 완료될 수 있음)
+      if (_phaseManager!.isCompleted && !_wasCompleted) {
+        _wasCompleted = true;
+        ttsFeedbacks.add('🎉 운동 완료!');
+        _moveToNextExercise();
       }
 
       if (!_phaseManager!.isReady && !_phaseManager!.isCompleted) {
-        // 2초 준비 타이머 표시
-        feedbacks.insert(
-          0,
-          '⏳ 준비: 자세를 2초 유지하세요 (${_phaseManager!.readyDuration.toStringAsFixed(1)}초)',
-        );
+        // 준비 피드백 - 맨 아래 고정 표시
+        readyFeedback = '⏳ 준비: 자세를 2초 유지하세요 (${_phaseManager!.readyDuration.toStringAsFixed(1)}초)';
       } else if (_phaseManager!.isReady && !_phaseManager!.isCompleted) {
-        // 운동 진행 중
-        feedbacks.insert(0, '⚠️ ${_phaseManager!.currentPhase.description}');
+        // 운동 진행 중 - TTS만 제공
+        ttsFeedbacks.add('⚠️ ${_phaseManager!.currentPhase.description}');
+        readyFeedback = null; // 준비 완료되면 준비 피드백 제거
+      } else {
+        readyFeedback = null;
+      }
+    }
+
+    // 일반 피드백도 TTS만 제공 (텍스트는 표시하지 않음)
+    for (final feedback in feedbacks) {
+      if (!feedback.contains('준비:') && !feedback.contains('운동 완료')) {
+        ttsFeedbacks.add(feedback);
       }
     }
 
     _scoreNotifier.value = score;
-    _feedbacksNotifier.value = feedbacks;
+    _feedbacksNotifier.value = []; // 텍스트 피드백 비우기 (표시하지 않음)
+    _readyFeedbackNotifier.value = readyFeedback; // 준비 피드백만 별도로 관리
 
-    // TTS: 피드백 최상단 내용 음성 재생
-    if (feedbacks.isNotEmpty) {
-      final topFeedback = feedbacks[0];
+    // TTS: 피드백 음성 재생 (첫 번째 피드백만)
+    if (ttsFeedbacks.isNotEmpty) {
+      final topFeedback = ttsFeedbacks[0];
       // 이전 피드백과 다를 때만 재생 (중복 방지)
       if (_lastSpokenFeedback != topFeedback) {
         _ttsService.speak(topFeedback);
@@ -505,7 +829,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         children: [
           Transform.scale(scaleX: -1, child: CameraPreview(_controller!)),
 
-          if (_imageSize != null)
+          if (_imageSize != null && _showSkeleton)
             Transform.scale(
               scaleX: -1,
               child: CustomPaint(
@@ -517,6 +841,51 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 child: Container(),
               ),
             ),
+          
+          // 개발자 전용 스킵 버튼
+          if (_phaseManager != null && !_phaseManager!.isCompleted)
+            Positioned(
+              top: 48,
+              left: 16,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.skip_next,
+                  color: Colors.orange,
+                  size: 28,
+                ),
+                onPressed: () {
+                  // 개발자 전용: 운동 완료까지 모든 단계 스킵
+                  if (_phaseManager != null) {
+                    setState(() {
+                      _wasCompleted = false;
+                      _lastUpdateTime = DateTime.now();
+                      _scoreNotifier.value = 0.0;
+                      _feedbacksNotifier.value = [];
+                      _readyFeedbackNotifier.value = null;
+                      _angleSmoother.resetAll();
+                      _landmarkSmoother.resetAll();
+                      _lastSpokenFeedback = null;
+                      _lastSpokenPhaseDescription = null;
+                      _ttsService.resetLastSpoken();
+                      
+                      // 모든 단계를 스킵하여 운동 완료까지 이동
+                      while (!_phaseManager!.isCompleted) {
+                        _phaseManager!.forceNextPhase();
+                      }
+                      
+                      // 운동 완료 처리
+                      _wasCompleted = true;
+                      _moveToNextExercise();
+                    });
+                  }
+                },
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: 0.5),
+                  padding: const EdgeInsets.all(12),
+                ),
+                tooltip: '개발자: 운동 완료까지 스킵',
+              ),
+            ),
 
           Positioned(
             top: 48,
@@ -524,30 +893,45 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             right: 16,
             child: Column(
               children: [
-                if (_exercises.isNotEmpty)
-                  ExerciseDropdown(
-                    exercises: _exercises,
-                    selectedExercise: _selectedExercise,
-                    onChanged: (exercise) {
-                      setState(() {
-                        _selectedExercise = exercise;
-                        _scoreNotifier.value = 0.0;
-                        _feedbacksNotifier.value = [];
-                        _angleSmoother.resetAll();
-                        _landmarkSmoother.resetAll();
-                        _lastSpokenFeedback = null; // TTS 초기화
-                        _ttsService.resetLastSpoken(); // TTS 서비스 초기화
-                        if (exercise != null) {
-                          _phaseManager = PhaseManager(exercise);
-                          _lastUpdateTime = DateTime.now();
-                        } else {
-                          _phaseManager = null;
-                        }
-                      });
-                    },
+                // 현재 운동 이름 표시
+                if (_selectedExercise != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.fitness_center, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedExercise!.exerciseName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_exercises.length > 1) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '(${_currentExerciseIndex + 1}/${_exercises.length})',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-
-                const SizedBox(height: 12),
+                
+                const SizedBox(height: 8),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -588,66 +972,109 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               ],
             ),
           ),
+          
+          // 스켈레톤 토글 버튼과 동영상 버튼
+          Positioned(
+            top: 48,
+            right: 16,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 동영상 재생 버튼
+                if (_selectedExercise != null && widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty)
+                  Builder(
+                    builder: (context) {
+                      final currentExerciseId = widget.exerciseIds![_currentExerciseIndex];
+                      final videoUrl = _exerciseVideoUrls[currentExerciseId];
+                      if (videoUrl == null) return const SizedBox.shrink();
+                      
+                      return IconButton(
+                        icon: const Icon(
+                          Icons.play_circle_outline,
+                          color: Colors.red,
+                          size: 28,
+                        ),
+                        onPressed: () {
+                          _showVideoDialog(videoUrl);
+                        },
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black.withValues(alpha: 0.5),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        tooltip: '운동 영상 보기',
+                      );
+                    },
+                  ),
+                if (_selectedExercise != null && widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty)
+                  const SizedBox(width: 8),
+                // 스켈레톤 토글 버튼
+                IconButton(
+                  icon: Icon(
+                    _showSkeleton ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showSkeleton = !_showSkeleton;
+                    });
+                  },
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                  tooltip: '스켈레톤 표시/숨김',
+                ),
+              ],
+            ),
+          ),
 
           if (_phaseManager != null)
             Positioned(
-              top: 150,
+              top: 100,
               left: 16,
               right: 16,
-              child: Column(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   PhaseStepIndicator(phaseManager: _phaseManager),
-                  const SizedBox(height: 12),
+                  const SizedBox(width: 8),
                   PhaseProgressWidget(phaseManager: _phaseManager),
                 ],
               ),
             ),
 
+          // 준비 피드백 (맨 아래 고정)
           Positioned(
             bottom: 24,
             left: 16,
             right: 16,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ValueListenableBuilder<List<String>>(
-                  valueListenable: _feedbacksNotifier,
-                  builder: (context, feedbacks, child) {
-                    return CollapsibleFeedbackPanel(feedbacks: feedbacks);
-                  },
-                ),
-
-                if (_phaseManager != null && _phaseManager!.isCompleted) ...[
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _phaseManager?.reset();
-                        _lastUpdateTime = DateTime.now();
-                      });
-                    },
-                    icon: const Icon(Icons.replay),
-                    label: const Text('다시 시작'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
+            child: ValueListenableBuilder<String?>(
+              valueListenable: _readyFeedbackNotifier,
+              builder: (context, readyFeedback, child) {
+                if (readyFeedback == null) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
-                ],
-              ],
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    readyFeedback,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              },
             ),
           ),
-
-          if (_selectedExercise != null)
-            Positioned(
-              left: 16,
-              bottom: 200,
-              child: AngleLegendWidget(exercise: _selectedExercise),
-            ),
         ],
       ),
     );

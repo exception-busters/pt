@@ -17,8 +17,17 @@ class MainDashboard extends StatelessWidget {
   ];
 
   int _locationToIndex() {
-    final matchIndex = _tabs.indexWhere((tab) => location.startsWith(tab.path));
-    return matchIndex >= 0 ? matchIndex : 0;
+    // 정확한 경로 매칭: 하위 경로도 고려
+    final currentPath = location.split('?').first; // 쿼리 파라미터 제거
+    
+    for (int i = 0; i < _tabs.length; i++) {
+      final tab = _tabs[i];
+      // 정확히 일치하거나 하위 경로인 경우
+      if (currentPath == tab.path || currentPath.startsWith('${tab.path}/')) {
+        return i;
+      }
+    }
+    return 0;
   }
 
   @override
@@ -31,8 +40,21 @@ class MainDashboard extends StatelessWidget {
         type: BottomNavigationBarType.fixed,
         currentIndex: currentIndex,
         onTap: (index) {
-          if (index == currentIndex) return;
-          context.go(_tabs[index].path);
+          final targetPath = _tabs[index].path;
+          final currentPath = location.split('?').first; // 쿼리 파라미터 제거
+          
+          // 현재 경로와 같으면 무시
+          if (currentPath == targetPath || currentPath.startsWith('$targetPath/')) {
+            return;
+          }
+          
+          // 하위 경로에서 탭 전환 시 루트 경로로 이동
+          try {
+            context.go(targetPath);
+          } catch (e) {
+            // 네비게이션 오류 시 fallback
+            debugPrint('탭 전환 오류: $e');
+          }
         },
         backgroundColor: backgroundColor,
         selectedItemColor: mainButtonColor,

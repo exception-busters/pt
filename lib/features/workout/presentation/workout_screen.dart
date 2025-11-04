@@ -247,12 +247,32 @@ class WorkoutScreen extends ConsumerWidget {
                               children: supabaseRoutines.map((routine) => _SupabaseRoutineCard(
                                 routine: routine,
                                 onTap: () {
+                                  // 루틴의 exercise_id 리스트 추출
+                                  List<int> exerciseIds = [];
+                                  if (routine.routineExercises != null) {
+                                    for (final routineExercise in routine.routineExercises!) {
+                                      if (routineExercise != null && routineExercise['exercise'] != null) {
+                                        final exerciseId = routineExercise['exercise']['exercise_id'];
+                                        if (exerciseId != null) {
+                                          exerciseIds.add(exerciseId as int);
+                                        }
+                                      }
+                                    }
+                                  }
+                                  
+                                  // 메시지 표시
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('${routine.title} 루틴을 시작합니다'),
                                       backgroundColor: mainButtonColor,
+                                      duration: const Duration(seconds: 1),
                                     ),
                                   );
+                                  
+                                  // ExerciseScreen으로 이동
+                                  context.push('/app/workout/exercise', extra: {
+                                    'exerciseIds': exerciseIds,
+                                  });
                                 },
                                 onDelete: () => _showSupabaseDeleteDialog(context, ref, routine),
                               )).toList(),
@@ -316,12 +336,31 @@ class WorkoutScreen extends ConsumerWidget {
                         children: aiRecommendedRoutines.map((routine) => _AIRecoRoutCard(
                           routine: routine,
                           onTap: () {
+                            // AI 추천 루틴의 exercise_id 리스트 추출
+                            List<int> exerciseIds = [];
+                            for (final exercise in routine.exercises) {
+                              // Exercise 모델에서 id를 추출 (문자열을 정수로 변환)
+                              try {
+                                final exerciseId = int.parse(exercise.id);
+                                exerciseIds.add(exerciseId);
+                              } catch (e) {
+                                print('운동 ID 파싱 실패: ${exercise.id}');
+                              }
+                            }
+                            
+                            // 메시지 표시
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('${routine.name} 루틴을 시작합니다'),
                                 backgroundColor: mainButtonColor,
+                                duration: const Duration(seconds: 1),
                               ),
                             );
+                            
+                            // ExerciseScreen으로 이동
+                            context.push('/app/workout/exercise', extra: {
+                              'exerciseIds': exerciseIds,
+                            });
                           },
                         )).toList(),
                       ),
@@ -491,10 +530,13 @@ class _SupabaseRoutineCard extends StatelessWidget {
                       padding: const EdgeInsets.all(4),
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     ),
-                    const Icon(
-                      Icons.play_arrow,
-                      color: Colors.grey,
-                      size: 24,
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow, color: mainButtonColor, size: 24),
+                      onPressed: () {
+                        onTap(); // 카드의 onTap 호출 (루틴 시작)
+                      },
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
@@ -580,10 +622,13 @@ class _AIRecoRoutCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.play_arrow,
-                  color: mainButtonColor,
-                  size: 24,
+                GestureDetector(
+                  onTap: onTap,
+                  child: const Icon(
+                    Icons.play_arrow,
+                    color: mainButtonColor,
+                    size: 24,
+                  ),
                 ),
               ],
             ),

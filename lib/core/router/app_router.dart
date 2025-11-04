@@ -21,6 +21,7 @@ import 'package:flutter_application_1/features/workout/presentation/workout_deta
 import 'package:flutter_application_1/features/workout/presentation/workout_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
 import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
+import 'package:flutter_application_1/screens/exercise_screen.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:flutter_application_1/features/profile/presentation/profile_settings_screen.dart';
 import 'package:flutter_application_1/features/auth/presentation/auth_loading_screen.dart';
@@ -119,7 +120,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => MainDashboard(
           child: child,
-          location: state.uri.toString(),
+          location: state.matchedLocation,
         ),
         routes: [
           GoRoute(
@@ -159,6 +160,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   } else {
                     return const CreateRoutineScreen();
                   }
+                },
+              ),
+              GoRoute(
+                path: 'exercise',
+                name: 'exercise',
+                builder: (context, state) {
+                  final extra = state.extra;
+                  List<int>? exerciseIds;
+                  if (extra is Map<String, dynamic>) {
+                    exerciseIds = extra['exerciseIds'] as List<int>?;
+                  }
+                  return ExerciseScreen(exerciseIds: exerciseIds);
                 },
               ),
             ],

@@ -157,4 +157,9 @@ class PhaseManager {
   String getPhaseDescription() {
     return currentPhase.description;
   }
+
+  /// 개발자 전용: 다음 단계로 강제 이동
+  bool forceNextPhase() {
+    return _nextPhase();
+  }
 }

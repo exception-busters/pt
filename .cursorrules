@@ -1,0 +1,12 @@
+# Cursor MCP Supabase 설정
+
+이 프로젝트는 다음 Supabase 프로젝트를 사용합니다:
+- URL: https://wkmnnzndtggrlrzjlncn.supabase.co
+- Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbW5uem5kdGdncmxyempsbmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExODU1NDIsImV4cCI6MjA3Njc2MTU0Mn0.bd9pcs-4YDyL98YcKhBzq53u2CONtjUv7NdYEcDA-eU
+
+MCP Supabase 서버가 이 프로젝트에 연결되도록 환경 변수를 설정하세요.
+
+
+
+
+

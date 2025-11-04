@@ -1,0 +1,29 @@
+{
+    "geminicodeassist.updateChannel": "Insiders",
+    "workbench.colorTheme": "Mermaid Light",
+    "geminicodeassist.project": "analytical-dynamics-7vbmb",
+    "liveServer.settings.donotShowInfoMsg": true,
+    "[dart]": {
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.rulers": [
+            80
+        ],
+        "editor.selectionHighlight": false,
+        "editor.tabCompletion": "onlySnippets",
+        "editor.wordBasedSuggestions": "off"
+    },
+    "mcp": {
+        "servers": {
+            "@supabase/mcp-server-supabase": {
+                "env": {
+                    "SUPABASE_URL": "https://wkmnnzndtggrlrzjlncn.supabase.co",
+                    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbW5uem5kdGdncmxyempsbmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExODU1NDIsImV4cCI6MjA3Njc2MTU0Mn0.bd9pcs-4YDyL98YcKhBzq53u2CONtjUv7NdYEcDA-eU"
+                }
+            }
+        }
+    }
+}
+
+
+
