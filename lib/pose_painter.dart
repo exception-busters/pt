@@ -10,36 +10,35 @@ class PosePainter extends CustomPainter {
 
   PosePainter(this.poses, this.imageSize, {this.exercise});
 
+  // Paint 객체 캐싱 - 매번 생성하지 않음 (성능 최적화)
+  static final Paint _basePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.0
+    ..color = Colors.white.withValues(alpha: 0.3)
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _circlePaint = Paint()
+    ..color = Colors.white.withValues(alpha: 0.5)
+    ..style = PaintingStyle.fill;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (poses.isEmpty) {
       return;
     }
-    
-    // 1. 기본 선 스타일 설정 (뼈대 - 연한 회색)
-    final basePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..color = Colors.white.withValues(alpha: 0.3)
-      ..strokeCap = StrokeCap.round;
-
-    // 2. 점 스타일 설정 (관절)
-    final circlePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.5)
-      ..style = PaintingStyle.fill;
 
     // 3. 각 포즈에 대해 그리기
     for (final pose in poses) {
-      // 3-1. 기본 스켈레톤 그리기 (연한 색상)
-      _drawBaseSkeleton(canvas, basePaint, pose, imageSize, size);
+      // 3-1. 기본 스켈레톤 그리기 (연한 색상) - 캐싱된 Paint 사용
+      _drawBaseSkeleton(canvas, _basePaint, pose, imageSize, size);
 
       // 3-2. 운동이 선택되었다면, 각도별로 강조 표시
       if (exercise != null) {
         _drawAngleHighlights(canvas, pose, imageSize, size);
       }
 
-      // 3-3. 몸 랜드마크에만 점 그리기 (얼굴 제외)
-      _drawBodyLandmarks(canvas, circlePaint, pose, imageSize, size);
+      // 3-3. 몸 랜드마크에만 점 그리기 (얼굴 제외) - 캐싱된 Paint 사용
+      _drawBodyLandmarks(canvas, _circlePaint, pose, imageSize, size);
     }
   }
 
@@ -98,6 +97,12 @@ class PosePainter extends CustomPainter {
       inputImageSize, size);
   }
 
+  // Paint 객체 캐싱 - 각도 강조용 (색상만 변경하여 재사용)
+  static final Paint _anglePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 6.0
+    ..strokeCap = StrokeCap.round;
+
   /// 각도별 강조 표시 (각 각도마다 다른 색상)
   void _drawAngleHighlights(
     Canvas canvas,
@@ -121,16 +126,12 @@ class PosePainter extends CustomPainter {
       // 각도에 할당된 색상 가져오기
       final color = angleColors[angleKey] ?? _getColorByIndex(angleIndex);
       
-      // 두꺼운 선 스타일
-      final anglePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6.0
-        ..color = color
-        ..strokeCap = StrokeCap.round;
+      // 캐싱된 Paint 객체 재사용 (색상만 변경)
+      _anglePaint.color = color;
 
       // 3점을 연결하는 2개의 선 그리기
-      _drawAngleLine(canvas, anglePaint, pose, points[0], points[1], inputImageSize, size);
-      _drawAngleLine(canvas, anglePaint, pose, points[1], points[2], inputImageSize, size);
+      _drawAngleLine(canvas, _anglePaint, pose, points[0], points[1], inputImageSize, size);
+      _drawAngleLine(canvas, _anglePaint, pose, points[1], points[2], inputImageSize, size);
 
       angleIndex++;
     }

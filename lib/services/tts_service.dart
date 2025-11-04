@@ -11,28 +11,25 @@ class TtsService {
   bool _isInitialized = false;
   String? _lastSpokenText; // 중복 방지용
 
-  /// TTS 초기화
+  /// TTS 초기화 (비동기 - 메인 스레드 블로킹 방지)
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
       _flutterTts = FlutterTts();
 
-      // 한국어 설정
-      await _flutterTts!.setLanguage('ko-KR');
-
-      // 말하기 속도 (0.0 ~ 1.0) - 조금 느리게 하면 더 명확하게 들림
-      await _flutterTts!.setSpeechRate(0.45);
-
-      // 음성 높이 (0.0 ~ 2.0)
-      await _flutterTts!.setPitch(1.0);
-
-      // 볼륨 (0.0 ~ 1.0) - 최대 볼륨
-      await _flutterTts!.setVolume(1.0);
+      // 초기화를 비동기로 처리하여 메인 스레드 블로킹 방지
+      await Future.wait([
+        _flutterTts!.setLanguage('ko-KR'),
+        _flutterTts!.setSpeechRate(0.45),
+        _flutterTts!.setPitch(1.0),
+        _flutterTts!.setVolume(1.0),
+      ]);
 
       _isInitialized = true;
     } catch (e) {
       print('TTS 초기화 실패: $e');
+      // 초기화 실패해도 앱이 계속 작동하도록 함
     }
   }
 
