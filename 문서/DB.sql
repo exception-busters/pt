@@ -17,6 +17,18 @@ CREATE TABLE public.challenge (
   reward_points numeric,
   CONSTRAINT challenge_pkey PRIMARY KEY (challenge_id)
 );
+CREATE TABLE public.dietgoal (
+  diet_id integer NOT NULL DEFAULT nextval('dietgoal_diet_id_seq'::regclass),
+  user_id uuid,
+  daily_calorie_target integer,
+  diet_type character varying,
+  meals_per_day integer,
+  daily_water_ml integer,
+  dietary_restrictions ARRAY,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT dietgoal_pkey PRIMARY KEY (diet_id),
+  CONSTRAINT dietgoal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.exercise (
   exercise_id integer NOT NULL DEFAULT nextval('exercise_exercise_id_seq'::regclass),
   name character varying,
@@ -46,17 +58,6 @@ CREATE TABLE public.foodinfo (
   carbs numeric,
   fat numeric,
   CONSTRAINT foodinfo_pkey PRIMARY KEY (food_id)
-);
-CREATE TABLE public.goal (
-  goal_id integer NOT NULL DEFAULT nextval('goal_goal_id_seq'::regclass),
-  user_id uuid,
-  goal_type character varying,
-  target_value numeric,
-  current_value numeric,
-  start_date date,
-  end_date date,
-  CONSTRAINT goal_pkey PRIMARY KEY (goal_id),
-  CONSTRAINT goal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.item (
   item_id integer NOT NULL DEFAULT nextval('item_item_id_seq'::regclass),
@@ -114,14 +115,6 @@ CREATE TABLE public.posedata (
   keypoints_json json,
   CONSTRAINT posedata_pkey PRIMARY KEY (pose_id),
   CONSTRAINT posedata_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.workoutsession(session_id)
-);
-CREATE TABLE public.progress (
-  progress_id integer NOT NULL DEFAULT nextval('progress_progress_id_seq'::regclass),
-  goal_id integer,
-  date date,
-  value numeric,
-  CONSTRAINT progress_pkey PRIMARY KEY (progress_id),
-  CONSTRAINT progress_goal_id_fkey FOREIGN KEY (goal_id) REFERENCES public.goal(goal_id)
 );
 CREATE TABLE public.purchase (
   purchase_id integer NOT NULL DEFAULT nextval('purchase_purchase_id_seq'::regclass),
@@ -196,13 +189,11 @@ CREATE TABLE public.usermeal (
 );
 CREATE TABLE public.userprofile (
   user_id uuid NOT NULL,
-  level integer,
+  gender character varying,
   age integer,
   height numeric,
   weight numeric,
-  gender character varying,
-  profile_image character varying,
-  bio text,
+  created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT userprofile_pkey PRIMARY KEY (user_id),
   CONSTRAINT userprofile_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
@@ -210,8 +201,22 @@ CREATE TABLE public.users (
   user_id uuid NOT NULL,
   email character varying NOT NULL UNIQUE,
   nickname character varying,
-  join_date timestamp without time zone,
+  profile_image text,
+  join_date timestamp without time zone DEFAULT now(),
+  profile_completed boolean DEFAULT false,
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
+);
+CREATE TABLE public.workoutgoal (
+  goal_id integer NOT NULL DEFAULT nextval('workoutgoal_goal_id_seq'::regclass),
+  user_id uuid,
+  goal_type character varying,
+  level character varying,
+  weekly_days integer,
+  daily_duration_min integer,
+  preferred_types ARRAY,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT workoutgoal_pkey PRIMARY KEY (goal_id),
+  CONSTRAINT workoutgoal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.workoutrecords (
   record_id integer NOT NULL DEFAULT nextval('workoutrecords_record_id_seq'::regclass),

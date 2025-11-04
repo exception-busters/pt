@@ -243,10 +243,10 @@ class _MealInputCard extends ConsumerWidget {
     );
   }
 
-  void _handleClear(BuildContext context, WidgetRef ref) {
+  Future<void> _handleClear(BuildContext context, WidgetRef ref) async {
     FocusScope.of(context).unfocus();
     final messenger = ScaffoldMessenger.of(context);
-    ref.read(dietControllerProvider.notifier).clearMeal(config.label);
+    await ref.read(dietControllerProvider.notifier).clearMeal(config.label);
     messenger.showSnackBar(
       SnackBar(
         content: Text('${config.label} 식단을 비웠어요.'),
