@@ -36,6 +36,24 @@ class SupabaseExercise {
     );
   }
 
+  // Exercise_list 테이블용 팩토리 메서드
+  factory SupabaseExercise.fromExerciseListJson(Map<String, dynamic> json) {
+    return SupabaseExercise(
+      exerciseId: json['id'] as int?,
+      name: json['name'] as String,
+      bodyPart: '맨몸운동', // 기본값
+      description: json['description'] as String?,
+      difficulty: '초급', // 기본값
+      videoUrl: null,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       if (exerciseId != null) 'exercise_id': exerciseId,

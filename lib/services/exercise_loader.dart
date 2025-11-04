@@ -22,7 +22,7 @@ class ExerciseLoader {
     }
   }
 
-  /// 특정 운동 ID로 운동 찾기
+  /// 특정 운동 ID로 운동 찾기 (문자열 ID: "001", "002", "003")
   static Future<ExerciseModel?> getExerciseById(String exerciseId) async {
     final data = await loadExercises();
     try {
@@ -33,6 +33,14 @@ class ExerciseLoader {
       print('운동 ID $exerciseId를 찾을 수 없습니다');
       return null;
     }
+  }
+
+  /// exercise 테이블의 exercise_id(정수)로 운동 찾기 (1, 2, 3 → "001", "002", "003")
+  /// exercise 테이블의 exercise_id와 exercise_reference.json의 exercise_id를 매핑
+  static Future<ExerciseModel?> getExerciseByListId(int exerciseId) async {
+    // exercise 테이블의 exercise_id를 exercise_reference.json의 exercise_id 형식으로 변환
+    final exerciseIdString = exerciseId.toString().padLeft(3, '0'); // 1 → "001", 2 → "002", 3 → "003"
+    return getExerciseById(exerciseIdString);
   }
 
   /// 모든 운동 목록 가져오기

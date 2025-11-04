@@ -350,24 +350,70 @@ class SupabaseWorkoutService {
     }
   }
 
-  // 모든 운동 조회
+  // 모든 운동 조회 (exercise 테이블 사용)
   Future<List<SupabaseExercise>> getAllExercises() async {
+    try {
+      print('🔍 exercise 테이블 조회 시작...');
+      
+      final response = await _supabase
+          .from('exercise')
+          .select()
+          .order('exercise_id', ascending: true);
+      
+      print('✅ 조회 성공: ${response.length}개 운동 발견');
+      
+      return (response as List)
+          .map((json) => SupabaseExercise.fromJson(json))
+          .toList();
+    } catch (e, stackTrace) {
+      print('❌ 모든 운동 조회 실패: $e');
+      print('스택 트레이스: $stackTrace');
+      
+      // 테이블이 없는 경우 안내
+      if (e.toString().contains('exercise') || e.toString().contains('PGRST205')) {
+        print('⚠️ exercise 테이블을 찾을 수 없습니다. Supabase 스키마 캐시를 새로고침해야 할 수 있습니다.');
+        print('💡 Supabase 대시보드 > API > Settings > Schema Cache에서 새로고침하거나, 몇 분 후 다시 시도해주세요.');
+      }
+      
+      return [];
+    }
+  }
+
+  // exercise 테이블에서 운동 조회 (새로운 메서드)
+  Future<List<Map<String, dynamic>>> getExerciseList() async {
     try {
       final response = await _supabase
           .from('exercise')
           .select()
           .order('exercise_id', ascending: true);
       
-      return (response as List)
-          .map((json) => SupabaseExercise.fromJson(json))
-          .toList();
+      return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
-      print('❌ 모든 운동 조회 실패: $e');
+      print('❌ exercise 조회 실패: $e');
       return [];
     }
   }
 
-  // 운동 이름으로 검색
+  // exercise의 id로 운동 조회
+  Future<SupabaseExercise?> getExerciseByListId(int exerciseId) async {
+    try {
+      final response = await _supabase
+          .from('exercise')
+          .select()
+          .eq('exercise_id', exerciseId)
+          .maybeSingle();
+      
+      if (response != null) {
+        return SupabaseExercise.fromJson(response);
+      }
+      return null;
+    } catch (e) {
+      print('❌ exercise ID $exerciseId 조회 실패: $e');
+      return null;
+    }
+  }
+
+  // 운동 이름으로 검색 (exercise 테이블 사용)
   Future<SupabaseExercise?> getExerciseByName(String name) async {
     try {
       final response = await _supabase
@@ -638,7 +684,7 @@ class SupabaseWorkoutService {
       }
 
       // 현재 사용자의 루틴만 삭제
-      final result = await _supabase
+      await _supabase
           .from('workoutroutine')
           .delete()
           .eq('routine_id', routineId)
@@ -723,13 +769,13 @@ class SupabaseWorkoutService {
       print('✅ 사용자 인증 확인: ${currentUser.id}');
       
       // 간단한 쿼리로 연결 테스트
-      final response = await _supabase
+      await _supabase
           .from('exercise')
           .select('count')
           .limit(1);
       
       print('✅ 데이터베이스 연결 성공');
-      print('📊 Exercise 테이블 접근 가능');
+      print('📊 exercise 테이블 접근 가능');
       
       return true;
     } catch (e) {

@@ -127,79 +127,7 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
     return user != null ? 'workout_routines_${user.id}' : 'workout_routines_default';
   }
 
-  // 기본 운동 목록
-  static final List<Exercise> availableExercises = [
-    Exercise(
-      id: 'plank',
-      name: '플랭크',
-      description: '코어 근육을 강화하는 운동',
-      duration: 60,
-      category: '코어',
-    ),
-    Exercise(
-      id: 'squat',
-      name: '스쿼트',
-      description: '하체 근육을 강화하는 운동',
-      duration: 45,
-      category: '하체',
-    ),
-    Exercise(
-      id: 'lunge',
-      name: '런지',
-      description: '하체와 균형감각을 기르는 운동',
-      duration: 60,
-      category: '하체',
-    ),
-    Exercise(
-      id: 'pushup',
-      name: '팔굽혀펴기',
-      description: '상체 근육을 강화하는 운동',
-      duration: 45,
-      category: '상체',
-    ),
-    Exercise(
-      id: 'burpee',
-      name: '버피',
-      description: '전신 운동으로 체력 향상',
-      duration: 60,
-      category: '전신',
-    ),
-    Exercise(
-      id: 'jumping_jack',
-      name: '점핑잭',
-      description: '유산소 운동으로 심박수 증가',
-      duration: 30,
-      category: '유산소',
-    ),
-    Exercise(
-      id: 'mountain_climber',
-      name: '마운틴 클라이머',
-      description: '코어와 유산소를 동시에',
-      duration: 45,
-      category: '전신',
-    ),
-    Exercise(
-      id: 'wall_sit',
-      name: '벽 스쿼트',
-      description: '하체 지구력을 기르는 운동',
-      duration: 60,
-      category: '하체',
-    ),
-    Exercise(
-      id: 'high_knees',
-      name: '하이니',
-      description: '무릎을 높이 올리는 유산소 운동',
-      duration: 30,
-      category: '유산소',
-    ),
-    Exercise(
-      id: 'crunches',
-      name: '크런치',
-      description: '복근을 강화하는 운동',
-      duration: 45,
-      category: '코어',
-    ),
-  ];
+  // 하드코딩된 운동 목록 제거됨 - 이제 Exercise_list 테이블에서만 가져옴
 
   Future<void> _loadRoutines() async {
     try {
@@ -331,11 +259,15 @@ final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref)
 // Supabase 연동 프로바이더들
 final supabaseWorkoutServiceProvider = Provider<SupabaseWorkoutService>((ref) => SupabaseWorkoutService());
 
-// 데이터베이스에서 운동 목록을 가져오는 프로바이더
+// 데이터베이스에서 운동 목록을 가져오는 프로바이더 (Exercise_list 테이블 사용)
 final databaseExercisesProvider = FutureProvider<List<Exercise>>((ref) async {
   final service = ref.read(supabaseWorkoutServiceProvider);
   try {
     final supabaseExercises = await service.getAllExercises();
+    if (supabaseExercises.isEmpty) {
+      print('⚠️ Exercise_list 테이블에 운동이 없습니다.');
+      return [];
+    }
     return supabaseExercises.map((supabaseExercise) => Exercise(
       id: supabaseExercise.exerciseId.toString(),
       name: supabaseExercise.name,
@@ -345,8 +277,8 @@ final databaseExercisesProvider = FutureProvider<List<Exercise>>((ref) async {
     )).toList();
   } catch (e) {
     print('데이터베이스에서 운동 목록 가져오기 실패: $e');
-    // 실패 시 하드코딩된 운동 목록 반환
-    return WorkoutRoutineController.availableExercises;
+    // 실패 시 빈 리스트 반환 (하드코딩된 목록 제거)
+    return [];
   }
 });
 
@@ -433,33 +365,22 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
 
       print('🚀 루틴 생성 시작: $title (운동 ${exercises.length}개)');
       
-      // 1. 운동 ID 매핑 (기존 운동 확인 및 새 운동 생성)
+      // 1. 운동 ID 매핑 (Exercise_list에 있는 운동만 사용)
       final List<Map<String, dynamic>> exerciseData = [];
       
       for (int i = 0; i < exercises.length; i++) {
         final exercise = exercises[i];
         print('📝 운동 처리 중 (${i + 1}/${exercises.length}): ${exercise.name}');
         
-        // 기존 운동이 있는지 확인
+        // Exercise_list에서 운동 확인
         SupabaseExercise? supabaseExercise = await _service.getExerciseByName(exercise.name);
         
         if (supabaseExercise == null) {
-          // 새 운동 생성
-          final newExercise = SupabaseExercise(
-            name: exercise.name,
-            bodyPart: exercise.category,
-            description: exercise.description,
-            difficulty: '초급', // 기본값
-          );
-          
-          supabaseExercise = await _service.insertExercise(newExercise);
-          if (supabaseExercise == null) {
-            throw Exception('운동 생성 실패: ${exercise.name}');
-          }
-          print('✅ 새 운동 생성: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
-        } else {
-          print('✅ 기존 운동 사용: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
+          // Exercise_list에 없는 운동은 사용할 수 없음
+          throw Exception('운동 "${exercise.name}"이(가) Exercise_list에 없습니다. 현재 지원되는 운동만 루틴에 추가할 수 있습니다.');
         }
+        
+        print('✅ Exercise_list에서 운동 확인: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
         
         // 운동 데이터 추가
         exerciseData.add({
@@ -504,33 +425,22 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
 
       print('🔄 루틴 업데이트 시작: $title (운동 ${exercises.length}개)');
       
-      // 1. 운동 ID 매핑 (기존 운동 확인 및 새 운동 생성)
+      // 1. 운동 ID 매핑 (Exercise_list에 있는 운동만 사용)
       final List<Map<String, dynamic>> exerciseData = [];
       
       for (int i = 0; i < exercises.length; i++) {
         final exercise = exercises[i];
         print('📝 운동 처리 중 (${i + 1}/${exercises.length}): ${exercise.name}');
         
-        // 기존 운동이 있는지 확인
+        // Exercise_list에서 운동 확인
         SupabaseExercise? supabaseExercise = await _service.getExerciseByName(exercise.name);
         
         if (supabaseExercise == null) {
-          // 새 운동 생성
-          final newExercise = SupabaseExercise(
-            name: exercise.name,
-            bodyPart: exercise.category,
-            description: exercise.description,
-            difficulty: '초급', // 기본값
-          );
-          
-          supabaseExercise = await _service.insertExercise(newExercise);
-          if (supabaseExercise == null) {
-            throw Exception('운동 생성 실패: ${exercise.name}');
-          }
-          print('✅ 새 운동 생성: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
-        } else {
-          print('✅ 기존 운동 사용: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
+          // Exercise_list에 없는 운동은 사용할 수 없음
+          throw Exception('운동 "${exercise.name}"이(가) Exercise_list에 없습니다. 현재 지원되는 운동만 루틴에 추가할 수 있습니다.');
         }
+        
+        print('✅ Exercise_list에서 운동 확인: ${supabaseExercise.name} (ID: ${supabaseExercise.exerciseId})');
         
         // 운동 데이터 추가
         exerciseData.add({
