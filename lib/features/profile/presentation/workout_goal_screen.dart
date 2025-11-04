@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../domain/models/workout_goal_model.dart';
+import '../data/profile_data_service.dart';
 
 class WorkoutGoalScreen extends ConsumerStatefulWidget {
   const WorkoutGoalScreen({super.key});
@@ -16,40 +19,189 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
   int _dailyWorkoutMinutes = 30;
   String _selectedLevel = '초급';
   List<String> _selectedWorkoutTypes = ['유산소'];
+  bool _isLoading = true;
 
   final List<String> _goals = ['체중감량', '근육증가', '체력향상', '건강유지'];
   final List<String> _levels = ['초급', '중급', '고급'];
   final List<String> _workoutTypes = ['유산소', '근력운동', '요가', '필라테스', '스트레칭'];
 
-  void _saveGoals() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('운동 목표가 저장되었습니다'),
-        backgroundColor: mainButtonColor,
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingData();
+  }
+
+  Future<void> _loadExistingData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final userData = await ProfileDataService.loadCompleteUserData(user.id);
+      final workoutGoal = userData?['workout'] as WorkoutGoalModel?;
+      
+      if (workoutGoal != null && mounted) {
+        setState(() {
+          _selectedGoal = _getGoalStringFromType(workoutGoal.goalType);
+          _selectedLevel = _getLevelStringFromType(workoutGoal.level);
+          _weeklyWorkoutDays = workoutGoal.weeklyDays ?? 3;
+          _dailyWorkoutMinutes = workoutGoal.dailyDurationMin ?? 30;
+          _selectedWorkoutTypes = workoutGoal.preferredTypes ?? ['유산소'];
+        });
+      }
+    } catch (e) {
+      print('기존 운동 목표 로드 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _getGoalStringFromType(WorkoutGoalType? type) {
+    switch (type) {
+      case WorkoutGoalType.weightLoss:
+        return '체중감량';
+      case WorkoutGoalType.muscleGain:
+        return '근육증가';
+      case WorkoutGoalType.endurance:
+        return '체력향상';
+      case WorkoutGoalType.general:
+      default:
+        return '건강유지';
+    }
+  }
+
+  String _getLevelStringFromType(WorkoutLevel? level) {
+    switch (level) {
+      case WorkoutLevel.beginner:
+        return '초급';
+      case WorkoutLevel.intermediate:
+        return '중급';
+      case WorkoutLevel.advanced:
+        return '고급';
+      default:
+        return '초급';
+    }
+  }
+
+  void _saveGoals() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인이 필요합니다'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 화면 데이터를 모델로 변환
+    final workoutGoal = WorkoutGoalModel(
+      userId: user.id,
+      goalType: _getGoalTypeFromString(_selectedGoal),
+      level: _getLevelFromString(_selectedLevel),
+      weeklyDays: _weeklyWorkoutDays,
+      dailyDurationMin: _dailyWorkoutMinutes,
+      preferredTypes: _selectedWorkoutTypes,
+    );
+
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: mainButtonColor),
       ),
     );
-    context.pop();
+
+    try {
+      // 데이터베이스에 저장
+      final success = await ProfileDataService.updateWorkoutGoal(workoutGoal);
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('운동 목표가 저장되었습니다'),
+              backgroundColor: mainButtonColor,
+            ),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('저장에 실패했습니다. 다시 시도해주세요.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  WorkoutGoalType _getGoalTypeFromString(String goal) {
+    switch (goal) {
+      case '체중감량':
+        return WorkoutGoalType.weightLoss;
+      case '근육증가':
+        return WorkoutGoalType.muscleGain;
+      case '체력향상':
+        return WorkoutGoalType.endurance;
+      case '건강유지':
+      default:
+        return WorkoutGoalType.general;
+    }
+  }
+
+  WorkoutLevel _getLevelFromString(String level) {
+    switch (level) {
+      case '초급':
+        return WorkoutLevel.beginner;
+      case '중급':
+        return WorkoutLevel.intermediate;
+      case '고급':
+        return WorkoutLevel.advanced;
+      default:
+        return WorkoutLevel.beginner;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('운동 목표 설정'),
+          backgroundColor: backgroundColor,
+          foregroundColor: mainButtonColor,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: mainButtonColor),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('운동 목표 설정'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
-        actions: [
-          TextButton(
-            onPressed: _saveGoals,
-            child: const Text(
-              '저장',
-              style: TextStyle(
-                color: mainButtonColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

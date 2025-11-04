@@ -6,6 +6,7 @@ import '../data/supabase_workout_service.dart';
 import '../domain/models/supabase_exercise.dart';
 import '../domain/models/supabase_workout_routine.dart';
 import '../domain/models/supabase_routine_exercise.dart';
+import '../../auth/application/auth_providers.dart';
 
 class Exercise {
   final String id;
@@ -104,11 +105,27 @@ class WorkoutRoutine {
 }
 
 class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
-  WorkoutRoutineController() : super([]) {
+  WorkoutRoutineController(this._ref) : super([]) {
     _loadRoutines();
+    
+    // 인증 상태 변화 감지
+    _ref.listen(authControllerProvider, (previous, next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
+        // 로그아웃 시 상태 초기화
+        state = [];
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
+        // 로그인 시 해당 사용자의 루틴 로드
+        _loadRoutines();
+      }
+    });
   }
 
-  static const String _routinesKey = 'workout_routines';
+  final Ref _ref;
+
+  String _getUserRoutinesKey() {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user != null ? 'workout_routines_${user.id}' : 'workout_routines_default';
+  }
 
   // 기본 운동 목록
   static final List<Exercise> availableExercises = [
@@ -187,7 +204,7 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
   Future<void> _loadRoutines() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final routinesJson = prefs.getString(_routinesKey);
+      final routinesJson = prefs.getString(_getUserRoutinesKey());
       if (routinesJson != null) {
         final List<dynamic> routinesList = json.decode(routinesJson);
         state = routinesList.map((json) => WorkoutRoutine.fromJson(json)).toList();
@@ -201,7 +218,7 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final routinesJson = json.encode(state.map((routine) => routine.toJson()).toList());
-      await prefs.setString(_routinesKey, routinesJson);
+      await prefs.setString(_getUserRoutinesKey(), routinesJson);
     } catch (e) {
       // 에러 처리
     }
@@ -226,7 +243,7 @@ class WorkoutRoutineController extends StateNotifier<List<WorkoutRoutine>> {
 }
 
 final workoutRoutineControllerProvider = StateNotifierProvider<WorkoutRoutineController, List<WorkoutRoutine>>(
-  (ref) => WorkoutRoutineController(),
+  (ref) => WorkoutRoutineController(ref),
 );
 
 // AI 추천 루틴 생성기
@@ -379,11 +396,23 @@ class RoutineCreationState {
 
 // Supabase 루틴 관리 NotifierProvider
 class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWorkoutRoutine>>> {
-  SupabaseRoutineNotifier(this._service) : super(const AsyncValue.loading()) {
+  SupabaseRoutineNotifier(this._service, this._ref) : super(const AsyncValue.loading()) {
     loadRoutines();
+    
+    // 인증 상태 변화 감지
+    _ref.listen(authControllerProvider, (previous, next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
+        // 로그아웃 시 상태 초기화
+        state = const AsyncValue.data([]);
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
+        // 로그인 시 해당 사용자의 루틴 로드
+        loadRoutines();
+      }
+    });
   }
 
   final SupabaseWorkoutService _service;
+  final Ref _ref;
 
   Future<void> loadRoutines() async {
     try {
@@ -552,7 +581,7 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
 
 final supabaseRoutineNotifierProvider = StateNotifierProvider<SupabaseRoutineNotifier, AsyncValue<List<SupabaseWorkoutRoutine>>>((ref) {
   final service = ref.read(supabaseWorkoutServiceProvider);
-  return SupabaseRoutineNotifier(service);
+  return SupabaseRoutineNotifier(service, ref);
 });
 
 // 루틴 생성 상태 관리 프로바이더

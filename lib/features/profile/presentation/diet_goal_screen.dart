@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../domain/models/diet_goal_model.dart';
+import '../data/profile_data_service.dart';
 
 class DietGoalScreen extends ConsumerStatefulWidget {
   const DietGoalScreen({super.key});
@@ -16,6 +19,7 @@ class _DietGoalScreenState extends ConsumerState<DietGoalScreen> {
   int _mealsPerDay = 3;
   double _waterGoal = 2.0;
   List<String> _dietaryRestrictions = [];
+  bool _isLoading = true;
 
   final List<String> _dietTypes = [
     '균형잡힌 식단',
@@ -36,35 +40,165 @@ class _DietGoalScreenState extends ConsumerState<DietGoalScreen> {
     '고혈압 관리',
   ];
 
-  void _saveDietGoals() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('식단 목표가 저장되었습니다'),
-        backgroundColor: mainButtonColor,
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingData();
+  }
+
+  Future<void> _loadExistingData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final userData = await ProfileDataService.loadCompleteUserData(user.id);
+      final dietGoal = userData?['diet'] as DietGoalModel?;
+      
+      if (dietGoal != null && mounted) {
+        setState(() {
+          _dailyCalorieGoal = dietGoal.dailyCalorieTarget ?? 1800;
+          _selectedDietType = _getDietTypeStringFromType(dietGoal.dietType);
+          _mealsPerDay = dietGoal.mealsPerDay ?? 3;
+          _waterGoal = (dietGoal.dailyWaterMl ?? 2000) / 1000.0; // ml를 L로 변환
+          _dietaryRestrictions = dietGoal.dietaryRestrictions ?? [];
+        });
+      }
+    } catch (e) {
+      print('기존 식단 목표 로드 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _getDietTypeStringFromType(DietType? type) {
+    switch (type) {
+      case DietType.balanced:
+        return '균형잡힌 식단';
+      case DietType.lowCarb:
+        return '저탄수화물';
+      case DietType.highProtein:
+        return '고단백질';
+      case DietType.keto:
+        return '케토';
+      case DietType.vegan:
+        return '비건';
+      case DietType.vegetarian:
+      default:
+        return '균형잡힌 식단';
+    }
+  }
+
+  void _saveDietGoals() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인이 필요합니다'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 화면 데이터를 모델로 변환
+    final dietGoal = DietGoalModel(
+      userId: user.id,
+      dailyCalorieTarget: _dailyCalorieGoal,
+      dietType: _getDietTypeFromString(_selectedDietType),
+      mealsPerDay: _mealsPerDay,
+      dailyWaterMl: (_waterGoal * 1000).round(), // L를 ml로 변환
+      dietaryRestrictions: _dietaryRestrictions.isEmpty ? null : _dietaryRestrictions,
+    );
+
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: mainButtonColor),
       ),
     );
-    context.pop();
+
+    try {
+      // 데이터베이스에 저장
+      final success = await ProfileDataService.updateDietGoal(dietGoal);
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('식단 목표가 저장되었습니다'),
+              backgroundColor: mainButtonColor,
+            ),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('저장에 실패했습니다. 다시 시도해주세요.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  DietType _getDietTypeFromString(String type) {
+    switch (type) {
+      case '균형잡힌 식단':
+        return DietType.balanced;
+      case '저탄수화물':
+        return DietType.lowCarb;
+      case '고단백질':
+        return DietType.highProtein;
+      case '케토':
+        return DietType.keto;
+      case '비건':
+        return DietType.vegan;
+      case '지중해식':
+      default:
+        return DietType.balanced;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('식단 목표 설정'),
+          backgroundColor: backgroundColor,
+          foregroundColor: mainButtonColor,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: mainButtonColor),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('식단 목표 설정'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
-        actions: [
-          TextButton(
-            onPressed: _saveDietGoals,
-            child: const Text(
-              '저장',
-              style: TextStyle(
-                color: mainButtonColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
