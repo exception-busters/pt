@@ -137,43 +137,45 @@ class PosePainter extends CustomPainter {
   }
 
   /// 각도별 고유 색상 정의 (캐싱됨)
-  /// 같은 angle key는 어떤 운동에서든 동일한 색상 사용
+  /// 같은 의미의 angle은 동일한 색상 사용
   static final Map<String, Color> _angleColors = {
-    // Body tilt angles (몸통 기울기)
+    // Body tilt (몸통 기울기)
     'left_body_tilt': Color(0xFF66BB6A),        // 밝은 녹색
     'right_body_tilt': Color(0xFFEC407A),       // 밝은 분홍
     
-    // Elbow angles (팔꿈치)
+    // Elbow (팔꿈치)
     'left_elbow_angle': Color(0xFF42A5F5),      // 밝은 파랑
     'right_elbow_angle': Color(0xFFFF7043),     // 밝은 주황
     
-    // Knee angles - 일반 (무릎)
+    // Knee - 좌측 (무릎) ✨ 통일됨
     'left_knee_angle': Color(0xFFAB47BC),       // 보라
-    'right_knee_angle': Color(0xFF26A69A),      // 청록
+    'knee_angle_left': Color(0xFFAB47BC),       // 보라 (left_knee_angle과 동일)
     
-    // Knee angles - 특정 동작용
+    // Knee - 우측 ✨ 통일됨
+    'right_knee_angle': Color(0xFF26A69A),      // 청록
+    'knee_angle_right': Color(0xFF26A69A),      // 청록 (right_knee_angle과 동일)
+    
+    // Knee - 전후 동작용
     'front_knee_angle': Color(0xFFFFCA28),      // 황금색
     'back_knee_angle': Color(0xFF9CCC65),       // 연두
-    'knee_angle_left': Color(0xFF29B6F6),       // 하늘색
-    'knee_angle_right': Color(0xFFD4E157),      // 라임 그린
     
-    // Hip flexion (고관절 굴곡)
-    'left_hip_flexion': Color(0xFFC0CA33),      // 올리브 그린 (lime 대체)
-    'right_hip_flexion': Color(0xFFFF5722),     // 딥 오렌지
-    
-    // Hip angles - 일반 (고관절)
+    // Hip - 좌측 ✨ 통일됨 (flexion, angle, angle_left 모두 동일)
+    'left_hip_flexion': Color(0xFF7E57C2),      // 딥 퍼플
     'left_hip_angle': Color(0xFF7E57C2),        // 딥 퍼플
-    'right_hip_angle': Color(0xFF03A9F4),       // 라이트 블루
+    'hip_angle_left': Color(0xFF7E57C2),        // 딥 퍼플
     
-    // Hip angles - 특정 동작용
+    // Hip - 우측 ✨ 통일됨 (flexion, angle, angle_right 모두 동일)
+    'right_hip_flexion': Color(0xFF03A9F4),     // 라이트 블루
+    'right_hip_angle': Color(0xFF03A9F4),       // 라이트 블루
+    'hip_angle_right': Color(0xFF03A9F4),       // 라이트 블루
+    
+    // Hip - 전후 동작용
     'front_hip_angle': Color(0xFFF06292),       // 연한 핑크
     'back_hip_angle': Color(0xFF4DD0E1),        // 시안
-    'hip_angle_left': Color(0xFFFFEE58),        // 밝은 노랑
-    'hip_angle_right': Color(0xFFEF5350),       // 빨강
     
-    // Shoulder angles (어깨)
-    'left_shoulder_angle': Color(0xFFFF6E40),   // 딥 오렌지 (연함)
-    'right_shoulder_angle': Color(0xFF4DB6AC),  // 청록 (연함)
+    // Shoulder (어깨)
+    'left_shoulder_angle': Color(0xFFFF6E40),   // 딥 오렌지
+    'right_shoulder_angle': Color(0xFF4DB6AC),  // 청록
     
     // Back and torso (등/상체)
     'back_angle': Color(0xFF5C6BC0),            // 인디고
