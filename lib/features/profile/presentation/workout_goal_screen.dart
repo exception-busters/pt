@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../application/complete_profile_providers.dart';
 import '../domain/models/workout_goal_model.dart';
 import '../data/profile_data_service.dart';
 
@@ -14,14 +15,14 @@ class WorkoutGoalScreen extends ConsumerStatefulWidget {
 }
 
 class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
-  String _selectedGoal = '체중감량';
+  String _selectedGoal = '다이어트';
   int _weeklyWorkoutDays = 3;
   int _dailyWorkoutMinutes = 30;
   String _selectedLevel = '초급';
   List<String> _selectedWorkoutTypes = ['유산소'];
   bool _isLoading = true;
 
-  final List<String> _goals = ['체중감량', '근육증가', '체력향상', '건강유지'];
+  final List<String> _goals = ['다이어트', '근력향상', '건강유지'];
   final List<String> _levels = ['초급', '중급', '고급'];
   final List<String> _workoutTypes = ['유산소', '근력운동', '요가', '필라테스', '스트레칭'];
 
@@ -63,11 +64,12 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
   String _getGoalStringFromType(WorkoutGoalType? type) {
     switch (type) {
       case WorkoutGoalType.weightLoss:
-        return '체중감량';
+        return '다이어트';
       case WorkoutGoalType.muscleGain:
-        return '근육증가';
+        return '근력향상';
       case WorkoutGoalType.endurance:
-        return '체력향상';
+      case WorkoutGoalType.strength:
+        return '건강유지';
       case WorkoutGoalType.general:
       default:
         return '건강유지';
@@ -119,8 +121,8 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
     );
 
     try {
-      // 데이터베이스에 저장
-      final success = await ProfileDataService.updateWorkoutGoal(workoutGoal);
+      final controller = ref.read(completeUserDataProvider.notifier);
+      final success = await controller.updateWorkoutGoal(workoutGoal);
       
       if (mounted) {
         Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
@@ -157,12 +159,11 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
 
   WorkoutGoalType _getGoalTypeFromString(String goal) {
     switch (goal) {
-      case '체중감량':
+      case '다이어트':
         return WorkoutGoalType.weightLoss;
       case '근육증가':
+      case '근력향상':
         return WorkoutGoalType.muscleGain;
-      case '체력향상':
-        return WorkoutGoalType.endurance;
       case '건강유지':
       default:
         return WorkoutGoalType.general;

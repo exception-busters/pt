@@ -51,7 +51,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     
     if (userData.workout != null) {
       final workout = userData.workout!;
-      _selectedWorkoutGoal = workout.goalType;
+      _selectedWorkoutGoal = _normalizeWorkoutGoal(workout.goalType);
       _selectedWorkoutLevel = workout.level;
     }
     
@@ -277,7 +277,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         labelText: '운동 목표',
         border: OutlineInputBorder(),
       ),
-      items: WorkoutGoalType.values.map((goal) {
+      items: const [
+        WorkoutGoalType.weightLoss,
+        WorkoutGoalType.muscleGain,
+        WorkoutGoalType.general,
+      ].map((goal) {
         return DropdownMenuItem(
           value: goal,
           child: Text(_getWorkoutGoalDisplayName(goal)),
@@ -324,15 +328,29 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
   String _getWorkoutGoalDisplayName(WorkoutGoalType goal) {
     switch (goal) {
       case WorkoutGoalType.weightLoss:
-        return '체중 감량';
+        return '다이어트';
       case WorkoutGoalType.muscleGain:
-        return '근육 증가';
+        return '근력향상';
       case WorkoutGoalType.endurance:
-        return '지구력 향상';
+        return '건강유지';
       case WorkoutGoalType.strength:
-        return '근력 향상';
+        return '건강유지';
       case WorkoutGoalType.general:
-        return '일반 건강';
+        return '건강유지';
+    }
+  }
+
+  WorkoutGoalType? _normalizeWorkoutGoal(WorkoutGoalType? goal) {
+    switch (goal) {
+      case WorkoutGoalType.weightLoss:
+      case WorkoutGoalType.muscleGain:
+        return goal;
+      case WorkoutGoalType.general:
+      case WorkoutGoalType.endurance:
+      case WorkoutGoalType.strength:
+        return WorkoutGoalType.general;
+      default:
+        return null;
     }
   }
 

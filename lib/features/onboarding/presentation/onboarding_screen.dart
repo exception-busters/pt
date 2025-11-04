@@ -443,8 +443,12 @@ class _WorkoutPreferencesScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  ...WorkoutGoal.values.map((goal) {
+
+                  ...const [
+                    WorkoutGoal.weightLoss,
+                    WorkoutGoal.muscleGain,
+                    WorkoutGoal.healthMaintenance,
+                  ].map((goal) {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: RadioListTile<WorkoutGoal>(

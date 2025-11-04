@@ -161,7 +161,7 @@ class OnboardingService {
       case onboarding.WorkoutGoal.muscleGain:
         return workout.WorkoutGoalType.muscleGain;
       case onboarding.WorkoutGoal.fitnessImprovement:
-        return workout.WorkoutGoalType.endurance;
+        return workout.WorkoutGoalType.general;
       case onboarding.WorkoutGoal.healthMaintenance:
         return workout.WorkoutGoalType.general;
     }
@@ -186,10 +186,11 @@ class OnboardingService {
         return onboarding.WorkoutGoal.weightLoss;
       case workout.WorkoutGoalType.muscleGain:
         return onboarding.WorkoutGoal.muscleGain;
+      case workout.WorkoutGoalType.general:
       case workout.WorkoutGoalType.endurance:
       case workout.WorkoutGoalType.strength:
-        return onboarding.WorkoutGoal.fitnessImprovement;
-      case workout.WorkoutGoalType.general:
+        return onboarding.WorkoutGoal.healthMaintenance;
+      default:
         return onboarding.WorkoutGoal.healthMaintenance;
     }
   }

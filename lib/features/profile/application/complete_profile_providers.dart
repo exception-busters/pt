@@ -58,6 +58,10 @@ class CompleteUserDataController extends StateNotifier<CompleteUserData>
       onLogout: _clearData,
       onLogin: loadUserData,
     );
+
+    if (isLoggedIn) {
+      loadUserData();
+    }
   }
 
   /// 사용자 데이터 로드
