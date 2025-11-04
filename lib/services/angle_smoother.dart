@@ -35,7 +35,7 @@ class AngleSmoother {
   double smoothAngleAdaptive(
     String angleKey,
     double angle, {
-    double threshold = 5.0,  // 임계값 낮춤 (10.0 -> 5.0)
+    double threshold = 5.0,  // 임계값
   }) {
     // 버퍼가 없으면 생성
     if (!_angleBuffers.containsKey(angleKey)) {
@@ -49,9 +49,9 @@ class AngleSmoother {
       final lastValue = buffer.last;
       final change = (angle - lastValue).abs();
 
-      // 변화가 크면 즉시 반응 (alpha = 0.6) - 0.7에서 낮춤
-      // 변화가 작으면 스무딩 (alpha = 0.15) - 0.2에서 낮춤
-      final alpha = change > threshold ? 0.6 : 0.15;
+      // 변화가 크면 빠르게 반응 (alpha = 0.7)
+      // 변화가 작아도 반응성 향상 (alpha = 0.3) - 0.15에서 높임
+      final alpha = change > threshold ? 0.7 : 0.3;
       return _smoothAngleExponential(angleKey, angle, alpha: alpha);
     }
 

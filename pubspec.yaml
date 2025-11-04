@@ -33,6 +33,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_mlkit_pose_detection: ^0.14.0  # ML Kit 포즈 감지
   camera: ^0.11.0+2                      # 카메라 접근
+  flutter_tts: ^4.0.2                    # TTS (음성 피드백)
 
 dev_dependencies:
   flutter_test:

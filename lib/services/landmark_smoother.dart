@@ -16,8 +16,8 @@ class LandmarkSmoother {
   final Map<PoseLandmarkType, _SmoothedPoint> _previousPoints = {};
   
   LandmarkSmoother({
-    this.alpha = 0.3,  // 기본값: 적당한 스무딩 (0.3 = 30% 새 값, 70% 이전 값)
-    this.movementThreshold = 3.0,  // 기본값: 3픽셀 이하 움직임은 무시
+    this.alpha = 0.5,  // 기본값: 빠른 반응 (0.5 = 50% 새 값, 50% 이전 값)
+    this.movementThreshold = 2.0,  // 기본값: 2픽셀 이하 움직임만 무시 (더 민감하게)
   });
 
   /// 포즈 랜드마크 스무딩
