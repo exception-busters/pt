@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -26,12 +28,12 @@ migrate_working_dir/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
-.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
 /build/
-
+.flutter-plugins-dependencies
+/coverage/
 # Symbolication related
 app.*.symbols
 
@@ -47,8 +49,3 @@ app.*.map.json
 python_server/__pycache__/
 python_server/*.pyc
 
-# PT-Pose-Data (대용량 데이터셋 - IDE 인덱싱 제외)
-PT-Pose-Data/
-
-# pose_detection_v2 (별도 프로젝트)
-pose_detection_v2/
