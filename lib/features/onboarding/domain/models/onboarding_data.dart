@@ -75,11 +75,11 @@ extension WorkoutGoalExtension on WorkoutGoal {
   String get displayName {
     switch (this) {
       case WorkoutGoal.weightLoss:
-        return '체중감량';
+        return '다이어트';
       case WorkoutGoal.muscleGain:
-        return '근육증가';
+        return '근력향상';
       case WorkoutGoal.fitnessImprovement:
-        return '체력향상';
+        return '건강유지';
       case WorkoutGoal.healthMaintenance:
         return '건강유지';
     }

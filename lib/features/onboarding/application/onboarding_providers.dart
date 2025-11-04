@@ -35,12 +35,19 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
       final workoutGoalStr = prefs.getString(_getUserDataKey('user_workout_goal'));
       final workoutLevelStr = prefs.getString(_getUserDataKey('user_workout_level'));
 
+      final workoutGoal = workoutGoalStr != null
+          ? WorkoutGoal.values.firstWhere(
+              (g) => g.name == workoutGoalStr,
+              orElse: () => WorkoutGoal.weightLoss,
+            )
+          : null;
+
       state = OnboardingData(
         gender: genderStr != null ? Gender.values.firstWhere((g) => g.name == genderStr, orElse: () => Gender.male) : null,
         age: age,
         weight: weight,
         height: height,
-        workoutGoal: workoutGoalStr != null ? WorkoutGoal.values.firstWhere((g) => g.name == workoutGoalStr, orElse: () => WorkoutGoal.weightLoss) : null,
+        workoutGoal: workoutGoal == WorkoutGoal.fitnessImprovement ? WorkoutGoal.healthMaintenance : workoutGoal,
         workoutLevel: workoutLevelStr != null ? WorkoutLevel.values.firstWhere((l) => l.name == workoutLevelStr, orElse: () => WorkoutLevel.beginner) : null,
       );
     } catch (e) {

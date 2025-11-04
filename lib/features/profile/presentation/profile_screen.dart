@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
+import 'package:flutter_application_1/features/profile/application/complete_profile_providers.dart';
+import 'package:flutter_application_1/features/profile/domain/models/workout_goal_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
 
@@ -14,6 +16,16 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileImagePath = ref.watch(profileImageControllerProvider);
     final userProfileAsync = ref.watch(userProfileControllerProvider);
+    final completeData = ref.watch(completeUserDataProvider);
+
+    final authState = ref.watch(authControllerProvider);
+    if (authState.isLoggedIn &&
+        !completeData.isLoading &&
+        completeData.workout == null &&
+        completeData.profile == null &&
+        completeData.user == null) {
+      ref.read(completeUserDataProvider.notifier).loadUserData();
+    }
     
     return userProfileAsync.when(
       loading: () => const Scaffold(
@@ -41,16 +53,33 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
       ),
-      data: (userProfile) => _buildProfileScreen(context, ref, profileImagePath, userProfile),
+      data: (userProfile) => _buildProfileScreen(
+        context,
+        ref,
+        profileImagePath,
+        userProfile,
+        completeData,
+      ),
     );
   }
 
-  Widget _buildProfileScreen(BuildContext context, WidgetRef ref, String? profileImagePath, Map<String, dynamic>? userProfile) {
+  Widget _buildProfileScreen(
+    BuildContext context,
+    WidgetRef ref,
+    String? profileImagePath,
+    Map<String, dynamic>? userProfile,
+    CompleteUserData completeData,
+  ) {
     final displayName = userProfile?['nickname'] ?? '사용자';
     final email = userProfile?['email'] ?? '';
     final joinDate = userProfile?['join_date'] != null 
         ? DateTime.parse(userProfile!['join_date']).toLocal()
         : null;
+
+    final workoutGoal = completeData.workout;
+    final goalText = _mapGoalLabel(workoutGoal?.goalType);
+    final weeklyText = _mapWeeklyPlan(workoutGoal?.weeklyDays);
+    final durationText = _mapDuration(workoutGoal?.dailyDurationMin);
     return Scaffold(
       appBar: AppBar(
         title: const Text('프로필'),
@@ -133,9 +162,9 @@ class ProfileScreen extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildProfileStat('목표', '체중감량'),
-                        _buildProfileStat('PT', '김PT'),
-                        _buildProfileStat('기간', '3개월'),
+                        _buildProfileStat('목표', goalText),
+                        _buildProfileStat('주간 계획', weeklyText),
+                        _buildProfileStat('운동 시간', durationText),
                       ],
                     ),
                   ],
@@ -213,5 +242,34 @@ class ProfileScreen extends ConsumerWidget {
         onTap: onTap,
       ),
     );
+  }
+
+  String _mapGoalLabel(WorkoutGoalType? goalType) {
+    switch (goalType) {
+      case WorkoutGoalType.weightLoss:
+        return '다이어트';
+      case WorkoutGoalType.muscleGain:
+        return '근력향상';
+      case WorkoutGoalType.general:
+      case WorkoutGoalType.endurance:
+      case WorkoutGoalType.strength:
+        return '건강유지';
+      default:
+        return '설정 필요';
+    }
+  }
+
+  String _mapWeeklyPlan(int? weeklyDays) {
+    if (weeklyDays == null || weeklyDays <= 0) {
+      return '설정 필요';
+    }
+    return '주 $weeklyDays회';
+  }
+
+  String _mapDuration(int? dailyMinutes) {
+    if (dailyMinutes == null || dailyMinutes <= 0) {
+      return '설정 필요';
+    }
+    return '회당 ${dailyMinutes}분';
   }
 }
