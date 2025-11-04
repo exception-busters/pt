@@ -3,8 +3,10 @@ import 'dart:math';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
 import 'package:flutter_application_1/features/diet/data/diet_profile_repository.dart';
 
 class MealData {
@@ -136,6 +138,156 @@ class DietController extends StateNotifier<DietData> {
     return DietData(date: dateString);
   }
 
+  String _getUserDietKey() {
+    final user = Supabase.instance.client.auth.currentUser;
+    final today = DateTime.now();
+    final dateString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    return user != null ? 'diet_data_${user.id}_$dateString' : 'diet_data_default_$dateString';
+  }
+
+  Future<void> _loadDietData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dietJson = prefs.getString(_getUserDietKey());
+      if (dietJson == null) {
+        return;
+      }
+
+      final decoded = jsonDecode(dietJson) as Map<String, dynamic>?;
+      if (decoded == null) {
+        return;
+      }
+
+      state = DietData(
+        date: decoded['date'] as String? ?? state.date,
+        breakfast: _mealFromJson(decoded['breakfast']),
+        lunch: _mealFromJson(decoded['lunch']),
+        dinner: _mealFromJson(decoded['dinner']),
+      );
+    } catch (error) {
+      print('다이어트 데이터 로드 실패: $error');
+    }
+  }
+
+  Future<void> _saveDietData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dietMap = <String, dynamic>{
+        'date': state.date,
+        'breakfast': _mealToJson(state.breakfast),
+        'lunch': _mealToJson(state.lunch),
+        'dinner': _mealToJson(state.dinner),
+      };
+
+      await prefs.setString(_getUserDietKey(), jsonEncode(dietMap));
+    } catch (error) {
+      print('다이어트 데이터 저장 실패: $error');
+    }
+  }
+
+  MealData? _mealFromJson(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final components = (value['components'] as List?)
+            ?.map((item) => _mealComponentFromJson(item))
+            .whereType<MealComponent>()
+            .toList(growable: false) ??
+        const <MealComponent>[];
+
+    return MealData(
+      food: value['food'] as String? ?? '',
+      calories: value['calories'] as String? ?? '',
+      components: components,
+      nutrition: _nutritionFromJson(value['nutrition']),
+    );
+  }
+
+  Map<String, dynamic>? _mealToJson(MealData? meal) {
+    if (meal == null) {
+      return null;
+    }
+
+    return <String, dynamic>{
+      'food': meal.food,
+      'calories': meal.calories,
+      'components': meal.components
+          .map((component) => _mealComponentToJson(component))
+          .toList(growable: false),
+      'nutrition': _nutritionToJson(meal.nutrition),
+    };
+  }
+
+  MealComponent? _mealComponentFromJson(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final foodMap = value['food'];
+    if (foodMap is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final food = FoodItem(
+      code: foodMap['code'] as String? ?? '',
+      name: foodMap['name'] as String? ?? '이름 미확인',
+      category: foodMap['category'] as String? ?? '기타',
+      calories: (foodMap['calories'] as num?)?.toDouble() ?? 0,
+      protein: (foodMap['protein'] as num?)?.toDouble() ?? 0,
+      carbs: (foodMap['carbs'] as num?)?.toDouble() ?? 0,
+      fat: (foodMap['fat'] as num?)?.toDouble() ?? 0,
+      fiber: (foodMap['fiber'] as num?)?.toDouble() ?? 0,
+      sodium: (foodMap['sodium'] as num?)?.toDouble() ?? 0,
+    );
+
+    final grams = (value['grams'] as num?)?.toDouble();
+    if (grams == null) {
+      return null;
+    }
+
+    return MealComponent(food: food, grams: grams);
+  }
+
+  Map<String, dynamic> _mealComponentToJson(MealComponent component) {
+    return <String, dynamic>{
+      'food': {
+        'code': component.food.code,
+        'name': component.food.name,
+        'category': component.food.category,
+        'calories': component.food.calories,
+        'protein': component.food.protein,
+        'carbs': component.food.carbs,
+        'fat': component.food.fat,
+        'fiber': component.food.fiber,
+        'sodium': component.food.sodium,
+      },
+      'grams': component.grams,
+    };
+  }
+
+  NutritionSummary _nutritionFromJson(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return NutritionSummary.zero;
+    }
+
+    return NutritionSummary(
+      calories: (value['calories'] as num?)?.toDouble() ?? 0,
+      protein: (value['protein'] as num?)?.toDouble() ?? 0,
+      carbs: (value['carbs'] as num?)?.toDouble() ?? 0,
+      fat: (value['fat'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> _nutritionToJson(NutritionSummary nutrition) {
+    return <String, dynamic>{
+      'calories': nutrition.calories,
+      'protein': nutrition.protein,
+      'carbs': nutrition.carbs,
+      'fat': nutrition.fat,
+    };
+  }
+
   Future<void> saveMeal(String mealType, {required String food, required String calories}) async {
     final trimmedFood = food.trim();
     final trimmedCalories = calories.trim();
@@ -222,7 +374,7 @@ class DietController extends StateNotifier<DietData> {
 }
 
 final dietControllerProvider = StateNotifierProvider<DietController, DietData>(
-  (ref) => DietController(),
+  (ref) => DietController(ref),
 );
 
 // --- Today diet recommendation ------------------------------------------------
