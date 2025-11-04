@@ -54,26 +54,4 @@ class AngleCalculator {
     return angle;
   }
 
-  /// 2D 각도 계산 (호환성을 위해 유지)
-  static double calculateAngle2D(
-    PoseLandmark point1,
-    PoseLandmark point2,
-    PoseLandmark point3,
-  ) {
-    final double radians = atan2(
-      point3.y - point2.y,
-      point3.x - point2.x
-    ) - atan2(
-      point1.y - point2.y,
-      point1.x - point2.x
-    );
-
-    double angle = radians * 180.0 / pi;
-    angle = angle.abs();
-    if (angle > 180.0) {
-      angle = 360.0 - angle;
-    }
-
-    return angle;
-  }
 }

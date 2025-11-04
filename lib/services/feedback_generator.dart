@@ -109,14 +109,6 @@ class FeedbackGenerator {
     if (score >= 50) return '미흡';
     return '부족';
   }
-
-  /// 점수에 따른 색상 코드 (UI에서 사용)
-  static String getScoreColor(double score) {
-    if (score >= 90) return '#4CAF50'; // Green
-    if (score >= 70) return '#8BC34A'; // Light Green
-    if (score >= 50) return '#FFC107'; // Amber
-    return '#F44336'; // Red
-  }
 }
 
 
