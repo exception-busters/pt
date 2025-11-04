@@ -59,11 +59,14 @@ PT-Pose-Data/
 - `3`: 앉은 자세
 
 #### 4. 운동형 (2자리)
-- `01`: 스탠딩 사이드 크런치 ⭐ **(우선 구현 대상)**
-- `02`: 스탠딩 니업
-- `03`: 바벨 데드리프트
-- `04`: 스탠딩 프론트 다이나믹 런지
-- `05`: 스탠딩 백워드 다이나믹 런지
+- `01`: 스탠딩 사이드 크런치 ⭐ **(구현 완료 - 선정)**
+- `02`: 스탠딩 니업 ⭐ **(구현 완료 - 선정)**
+- `03`: 스쿼트 ⭐ **(구현 완료 - 선정)**
+- `04`: 스탠딩 프론트 다이나믹 런지 ⭐ **(구현 완료 - 선정)**
+- `05`: 스탠딩 백워드 다이나믹 런지 ❌ (제외됨 - 04번과 중복)
+- `06`: 스탠딩 암 서클 ❌ (제외됨 - 측정 어려움)
+- `07`: 스탠딩 레그 스윙 ❌ (제외됨 - 측정 어려움)
+- `08`: 굿모닝 (Good Morning) ⭐ **(구현 완료 - 선정)**
 - ... (더 많은 운동)
 
 ### 운동 01번 상세 정보
@@ -647,18 +650,19 @@ PoseLandmark? _getLandmark(Pose pose, String name) {
 
 ### Phase 1: 데이터 추출 (Python 스크립트)
 ```bash
-# 스크립트 위치: scripts/extract_reference_data.py
+# 스크립트 위치: scripts/extract_reference_data.py, scripts/analyze_exercise_08.py
 # 입력: PT-Pose-Data/
 # 출력: assets/exercise_reference.json
 ```
 
 **작업 내용:**
-1. ✅ Training 데이터 파싱 (맨몸운동_01)
+1. ✅ Training 데이터 파싱 (맨몸운동_01, 맨몸운동_08)
 2. ✅ Validation 데이터 파싱 (body_01)
 3. ✅ 프레임별 랜드마크 추출
 4. ✅ 관절 각도 계산
 5. ✅ 통계 분석 (평균, 표준편차)
 6. ✅ JSON 파일 생성
+7. ✅ 미세한 떨림 보정 로직 구현 (Savitzky-Golay 필터)
 
 ### Phase 2: Flutter 통합
 **파일 생성:**
@@ -670,11 +674,14 @@ lib/
 ├── services/
 │   ├── pose_scorer.dart              # 점수 계산 로직
 │   ├── feedback_generator.dart       # 피드백 생성
-│   └── exercise_loader.dart          # JSON 로드
+│   ├── exercise_loader.dart          # JSON 로드
+│   ├── angle_smoother.dart           # ✅ 떨림 보정 서비스
+│   └── phase_manager.dart            # 단계 관리
 └── widgets/
     ├── exercise_dropdown.dart        # 운동 선택 드롭다운
     ├── score_display.dart            # 점수 표시
-    └── feedback_panel.dart           # 피드백 패널
+    ├── feedback_panel.dart           # 피드백 패널
+    └── phase_progress_widget.dart    # 단계 진행 표시
 ```
 
 **작업 내용:**
@@ -684,6 +691,8 @@ lib/
 4. ✅ FeedbackGenerator 구현
 5. ✅ UI 컴포넌트 추가
 6. ✅ main.dart 통합
+7. ✅ 떨림 보정 로직 통합 (AngleSmoother)
+8. ✅ 복합 랜드마크 매핑 (Neck, Back, Waist)
 
 ### Phase 3: UI/UX 개선
 1. 운동 선택 드롭다운
@@ -776,5 +785,73 @@ double calculateAngle(Point a, Point b, Point c) {
 
 ## 버전 이력
 - v1.0 (2025-10-31): 초안 작성, 운동 01번 (스탠딩 사이드 크런치) 분석 완료
+- v1.1 (2025-11-03): 운동 08번 (굿모닝) 추가, 떨림 보정 로직 구현 완료
+- v1.2 (2025-11-03): 운동 02~07번 전체 추가, 각도별 색상 시각화 완료
+- v1.3 (2025-11-03): 인식 기준 관대화 - tolerance 2배 증가 + 점수 계산 알고리즘 개선
+- v1.4 (2025-11-03): 최종 5개 운동 선정 - 코칭 실현성 기준으로 05, 06, 07번 제외
+
+---
+
+## 추가된 기능 (v1.1)
+
+### 1. 운동 08번 (굿모닝) 추가
+- **운동 코드**: 001-1-1-08
+- **난이도**: 중급
+- **주요 각도**:
+  - 힙 각도 (좌/우): 힙을 중심으로 상체를 숙이는 각도
+  - 무릎 각도 (좌/우): 무릎을 펴진 상태로 유지
+  - 등 각도: 등을 곧게 유지하는 각도
+  - 상체 숙임 각도: 전체 상체의 앞으로 숙임 정도
+
+### 2. 떨림 보정 시스템
+인간의 몸은 미세한 떨림이 있으므로, 안정적인 각도 측정을 위해 여러 필터링 기법을 구현:
+
+#### 구현된 필터 종류:
+1. **단순 이동 평균 (Simple Moving Average)**
+   - 가장 기본적인 스무딩 방법
+   - N개 프레임의 평균 계산
+
+2. **가중 이동 평균 (Weighted Moving Average)**
+   - 최근 프레임에 더 높은 가중치 부여
+   - 더 반응성이 좋은 스무딩
+
+3. **지수 이동 평균 (Exponential Moving Average)**
+   - alpha 파라미터로 반응성 조절
+   - 메모리 효율적 (이전 평균값만 저장)
+
+4. **미디안 필터 (Median Filter)**
+   - 이상치 제거에 효과적
+   - 갑작스러운 튀는 값 방지
+
+5. **적응형 필터 (Adaptive Filter)** ⭐ **(기본 사용)**
+   - 변화가 클 때: 빠르게 반응 (alpha = 0.7)
+   - 변화가 작을 때: 스무딩 (alpha = 0.2)
+   - 자연스러운 동작 추적
+
+#### 사용 예시:
+```dart
+// main.dart에서
+final _angleSmoother = AngleSmoother(windowSize: 5);
+
+// 각도 계산 시
+final rawAngle = AngleCalculator.calculateAngle(p1, p2, p3);
+final smoothedAngle = _angleSmoother.smoothAngleAdaptive(
+  'hip_angle_left',
+  rawAngle,
+  threshold: 10.0, // 10도 이상 변화시 즉시 반응
+);
+```
+
+### 3. 복합 랜드마크 매핑
+PT Pose Data의 랜드마크를 ML Kit의 랜드마크로 매핑:
+
+| PT Pose Data | ML Kit 매핑 | 설명 |
+|-------------|-------------|------|
+| Neck | 양쪽 어깨 중점 | 목 위치 근사 |
+| Back | 어깨와 힙의 중간점 | 등 중앙 위치 |
+| Waist | 양쪽 힙 중점 | 허리 위치 |
+| Shoulder | 양쪽 어깨 평균 | 어깨 중점 |
+| Hip | 양쪽 힙 평균 | 힙 중점 |
+| Knee | 양쪽 무릎 평균 | 무릎 중점 |
 
 
