@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "last_updated": "2025-10-31",
+  "last_updated": "2025-11-03",
   "exercises": [
     {
       "exercise_id": "001",
@@ -23,50 +23,92 @@
       "key_angles": {
         "left_body_tilt": {
           "name": "좌측 상체 기울기",
-          "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+          "points": [
+            "Left Shoulder",
+            "Left Hip",
+            "Left Knee"
+          ],
           "ideal_mean": 160.0,
-          "ideal_range": [140.0, 170.0],
-          "tolerance": 10.0,
+          "ideal_range": [
+            140.0,
+            170.0
+          ],
+          "tolerance": 20.0,
           "weight": 1.2
         },
         "right_body_tilt": {
           "name": "우측 상체 기울기",
-          "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+          "points": [
+            "Right Shoulder",
+            "Right Hip",
+            "Right Knee"
+          ],
           "ideal_mean": 160.0,
-          "ideal_range": [140.0, 170.0],
-          "tolerance": 10.0,
+          "ideal_range": [
+            140.0,
+            170.0
+          ],
+          "tolerance": 20.0,
           "weight": 1.2
         },
         "left_elbow_angle": {
           "name": "좌측 팔꿈치 각도",
-          "points": ["Left Shoulder", "Left Elbow", "Left Wrist"],
+          "points": [
+            "Left Shoulder",
+            "Left Elbow",
+            "Left Wrist"
+          ],
           "ideal_mean": 165.0,
-          "ideal_range": [150.0, 180.0],
-          "tolerance": 12.0,
+          "ideal_range": [
+            150.0,
+            180.0
+          ],
+          "tolerance": 24.0,
           "weight": 0.5
         },
         "right_elbow_angle": {
           "name": "우측 팔꿈치 각도",
-          "points": ["Right Shoulder", "Right Elbow", "Right Wrist"],
+          "points": [
+            "Right Shoulder",
+            "Right Elbow",
+            "Right Wrist"
+          ],
           "ideal_mean": 165.0,
-          "ideal_range": [150.0, 180.0],
-          "tolerance": 12.0,
+          "ideal_range": [
+            150.0,
+            180.0
+          ],
+          "tolerance": 24.0,
           "weight": 0.5
         },
         "left_knee_angle": {
           "name": "좌측 무릎 각도",
-          "points": ["Left Hip", "Left Knee", "Left Ankle"],
+          "points": [
+            "Left Hip",
+            "Left Knee",
+            "Left Ankle"
+          ],
           "ideal_mean": 173.0,
-          "ideal_range": [165.0, 180.0],
-          "tolerance": 8.0,
+          "ideal_range": [
+            165.0,
+            180.0
+          ],
+          "tolerance": 20.0,
           "weight": 0.6
         },
         "right_knee_angle": {
           "name": "우측 무릎 각도",
-          "points": ["Right Hip", "Right Knee", "Right Ankle"],
+          "points": [
+            "Right Hip",
+            "Right Knee",
+            "Right Ankle"
+          ],
           "ideal_mean": 173.0,
-          "ideal_range": [165.0, 180.0],
-          "tolerance": 8.0,
+          "ideal_range": [
+            165.0,
+            180.0
+          ],
+          "tolerance": 20.0,
           "weight": 0.6
         }
       },
@@ -161,6 +203,636 @@
         "골반이 함께 기울어지는 경우",
         "무릎을 구부리는 경우",
         "너무 빠르게 동작하는 경우",
+        "호흡을 멈추는 경우"
+      ]
+    },
+    {
+      "exercise_id": "002",
+      "exercise_code": "001-1-1-02",
+      "exercise_name": "스탠딩 니업",
+      "category": "맨몸운동",
+      "posture": "서기",
+      "difficulty": "초급",
+      "description": "서서 무릎을 교대로 가슴 쪽으로 들어올리는 유산소 운동",
+      "key_joints": [
+        "Back",
+        "Left Hip",
+        "Right Hip",
+        "Left Knee",
+        "Right Knee",
+        "Left Ankle",
+        "Right Ankle"
+      ],
+      "key_angles": {
+        "left_hip_flexion": {
+          "name": "좌측 힙 굴곡",
+          "points": [
+            "Back",
+            "Left Hip",
+            "Left Knee"
+          ],
+          "ideal_mean": 138.9,
+          "ideal_range": [
+            108.9,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "right_hip_flexion": {
+          "name": "우측 힙 굴곡",
+          "points": [
+            "Back",
+            "Right Hip",
+            "Right Knee"
+          ],
+          "ideal_mean": 137.6,
+          "ideal_range": [
+            107.6,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "left_knee_angle": {
+          "name": "좌측 무릎 각도",
+          "points": [
+            "Left Hip",
+            "Left Knee",
+            "Left Ankle"
+          ],
+          "ideal_mean": 142.9,
+          "ideal_range": [
+            112.9,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.0
+        },
+        "right_knee_angle": {
+          "name": "우측 무릎 각도",
+          "points": [
+            "Right Hip",
+            "Right Knee",
+            "Right Ankle"
+          ],
+          "ideal_mean": 143.2,
+          "ideal_range": [
+            113.2,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.0
+        }
+      },
+      "motion_phases": [
+        {
+          "phase_id": 1,
+          "phase_name": "시작 자세",
+          "description": "양발을 어깨 너비로 벌리고 서세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "자연스러운 서기 자세"
+          ]
+        },
+        {
+          "phase_id": 2,
+          "phase_name": "왼쪽 무릎 들기",
+          "description": "왼쪽 무릎을 가슴 쪽으로 들어올리세요",
+          "duration_sec": 1.5,
+          "key_checks": [
+            "무릎을 90도까지 굴곡",
+            "균형 유지"
+          ]
+        },
+        {
+          "phase_id": 3,
+          "phase_name": "왼쪽 내리기",
+          "description": "천천히 왼발을 내려놓으세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "부드럽게 착지"
+          ]
+        },
+        {
+          "phase_id": 4,
+          "phase_name": "오른쪽 무릎 들기",
+          "description": "오른쪽 무릎을 가슴 쪽으로 들어올리세요",
+          "duration_sec": 1.5,
+          "key_checks": [
+            "무릎을 90도까지 굴곡",
+            "균형 유지"
+          ]
+        },
+        {
+          "phase_id": 5,
+          "phase_name": "완료",
+          "description": "시작 자세로 돌아가세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "양발 지면에 고정"
+          ]
+        }
+      ],
+      "feedback_rules": [
+        {
+          "condition": "left_hip_flexion < 60",
+          "feedback": "왼쪽 무릎을 더 높이 들어올리세요",
+          "severity": "info"
+        },
+        {
+          "condition": "right_hip_flexion < 60",
+          "feedback": "오른쪽 무릎을 더 높이 들어올리세요",
+          "severity": "info"
+        }
+      ],
+      "common_mistakes": [
+        "무릎을 충분히 들지 않음",
+        "상체가 앞으로 기울어짐",
+        "너무 빠른 동작"
+      ]
+    },
+    {
+      "exercise_id": "003",
+      "exercise_code": "001-1-1-03",
+      "exercise_name": "스쿼트",
+      "category": "맨몸운동",
+      "posture": "서기",
+      "difficulty": "초급",
+      "description": "하체 근력을 강화하는 기본 운동",
+      "key_joints": [
+        "Back",
+        "Waist",
+        "Left Hip",
+        "Right Hip",
+        "Left Knee",
+        "Right Knee",
+        "Left Ankle",
+        "Right Ankle"
+      ],
+      "key_angles": {
+        "left_knee_angle": {
+          "name": "좌측 무릎 각도",
+          "points": [
+            "Left Hip",
+            "Left Knee",
+            "Left Ankle"
+          ],
+          "ideal_mean": 149.3,
+          "ideal_range": [
+            70.0,
+            110.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "right_knee_angle": {
+          "name": "우측 무릎 각도",
+          "points": [
+            "Right Hip",
+            "Right Knee",
+            "Right Ankle"
+          ],
+          "ideal_mean": 149.4,
+          "ideal_range": [
+            70.0,
+            110.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "left_hip_angle": {
+          "name": "좌측 힙 각도",
+          "points": [
+            "Back",
+            "Left Hip",
+            "Left Knee"
+          ],
+          "ideal_mean": 139.7,
+          "ideal_range": [
+            70.0,
+            110.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.2
+        },
+        "right_hip_angle": {
+          "name": "우측 힙 각도",
+          "points": [
+            "Back",
+            "Right Hip",
+            "Right Knee"
+          ],
+          "ideal_mean": 140.6,
+          "ideal_range": [
+            70.0,
+            110.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.2
+        }
+      },
+      "motion_phases": [
+        {
+          "phase_id": 1,
+          "phase_name": "시작 자세",
+          "description": "양발을 어깨 너비로 벌리고 서세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "자연스러운 서기"
+          ]
+        },
+        {
+          "phase_id": 2,
+          "phase_name": "하강",
+          "description": "엉덩이를 뒤로 빼며 무릎을 구부리세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "무릎 90도 굴곡",
+            "등 곧게 유지"
+          ]
+        },
+        {
+          "phase_id": 3,
+          "phase_name": "유지",
+          "description": "최하단에서 1초간 유지하세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "자세 유지"
+          ]
+        },
+        {
+          "phase_id": 4,
+          "phase_name": "상승",
+          "description": "천천히 시작 자세로 돌아오세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "무릎 펴기"
+          ]
+        },
+        {
+          "phase_id": 5,
+          "phase_name": "완료",
+          "description": "시작 자세로 복귀",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "완전히 서기"
+          ]
+        }
+      ],
+      "feedback_rules": [
+        {
+          "condition": "left_knee_angle < 70",
+          "feedback": "너무 깊게 앉았습니다",
+          "severity": "warning"
+        },
+        {
+          "condition": "right_knee_angle < 70",
+          "feedback": "너무 깊게 앉았습니다",
+          "severity": "warning"
+        }
+      ],
+      "common_mistakes": [
+        "무릎이 발끝을 넘어감",
+        "등이 구부러짐",
+        "너무 빠른 동작"
+      ]
+    },
+    {
+      "exercise_id": "004",
+      "exercise_code": "001-1-1-04",
+      "exercise_name": "스탠딩 프론트 다이나믹 런지",
+      "category": "맨몸운동",
+      "posture": "서기",
+      "difficulty": "중급",
+      "description": "앞으로 나가며 런지하여 하체 근력과 균형을 강화하는 운동",
+      "key_joints": [
+        "Back",
+        "Left Hip",
+        "Right Hip",
+        "Left Knee",
+        "Right Knee",
+        "Left Ankle",
+        "Right Ankle"
+      ],
+      "key_angles": {
+        "front_knee_angle": {
+          "name": "앞쪽 무릎 각도",
+          "points": [
+            "Left Hip",
+            "Left Knee",
+            "Left Ankle"
+          ],
+          "ideal_mean": 152.1,
+          "ideal_range": [
+            75.0,
+            105.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "back_knee_angle": {
+          "name": "뒤쪽 무릎 각도",
+          "points": [
+            "Right Hip",
+            "Right Knee",
+            "Right Ankle"
+          ],
+          "ideal_mean": 151.2,
+          "ideal_range": [
+            80.0,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.2
+        },
+        "front_hip_angle": {
+          "name": "앞쪽 힙 각도",
+          "points": [
+            "Back",
+            "Left Hip",
+            "Left Knee"
+          ],
+          "ideal_mean": 145.3,
+          "ideal_range": [
+            80.0,
+            110.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.3
+        }
+      },
+      "motion_phases": [
+        {
+          "phase_id": 1,
+          "phase_name": "시작 자세",
+          "description": "양발을 모으고 서세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "자연스러운 서기"
+          ]
+        },
+        {
+          "phase_id": 2,
+          "phase_name": "앞으로 나가기",
+          "description": "한 발을 앞으로 크게 내디디세요",
+          "duration_sec": 1.5,
+          "key_checks": [
+            "큰 보폭"
+          ]
+        },
+        {
+          "phase_id": 3,
+          "phase_name": "하강",
+          "description": "무릎을 구부려 내려가세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "앞 무릎 90도",
+            "뒤 무릎 지면 가까이"
+          ]
+        },
+        {
+          "phase_id": 4,
+          "phase_name": "상승",
+          "description": "힘차게 일어나며 시작 자세로",
+          "duration_sec": 1.5,
+          "key_checks": [
+            "발 모으기"
+          ]
+        },
+        {
+          "phase_id": 5,
+          "phase_name": "완료",
+          "description": "반대쪽 다리 준비",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "균형 잡기"
+          ]
+        }
+      ],
+      "feedback_rules": [
+        {
+          "condition": "front_knee_angle < 75",
+          "feedback": "앞 무릎이 너무 굽혀졌습니다",
+          "severity": "warning"
+        },
+        {
+          "condition": "front_knee_angle > 105",
+          "feedback": "더 깊게 내려가세요",
+          "severity": "info"
+        }
+      ],
+      "common_mistakes": [
+        "앞 무릎이 발끝을 넘어감",
+        "상체가 앞으로 기울어짐",
+        "보폭이 너무 좁음"
+      ]
+    },
+    {
+      "exercise_id": "008",
+      "exercise_code": "001-1-1-08",
+      "exercise_name": "굿모닝",
+      "category": "맨몸운동",
+      "posture": "서기",
+      "difficulty": "중급",
+      "description": "힙을 중심으로 상체를 앞으로 숙여 햄스트링과 허리를 강화하는 운동",
+      "key_joints": [
+        "Neck",
+        "Back",
+        "Waist",
+        "Left Shoulder",
+        "Right Shoulder",
+        "Left Hip",
+        "Right Hip",
+        "Left Knee",
+        "Right Knee",
+        "Left Ankle",
+        "Right Ankle"
+      ],
+      "key_angles": {
+        "hip_angle_left": {
+          "name": "좌측 힙 각도",
+          "points": [
+            "Back",
+            "Left Hip",
+            "Left Knee"
+          ],
+          "ideal_mean": 133.5,
+          "ideal_range": [
+            108.5,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "hip_angle_right": {
+          "name": "우측 힙 각도",
+          "points": [
+            "Back",
+            "Right Hip",
+            "Right Knee"
+          ],
+          "ideal_mean": 141.8,
+          "ideal_range": [
+            116.8,
+            120.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.5
+        },
+        "knee_angle_left": {
+          "name": "좌측 무릎 각도",
+          "points": [
+            "Left Hip",
+            "Left Knee",
+            "Left Ankle"
+          ],
+          "ideal_mean": 110.1,
+          "ideal_range": [
+            165.0,
+            180.0
+          ],
+          "tolerance": 20.0,
+          "weight": 0.8
+        },
+        "knee_angle_right": {
+          "name": "우측 무릎 각도",
+          "points": [
+            "Right Hip",
+            "Right Knee",
+            "Right Ankle"
+          ],
+          "ideal_mean": 105.3,
+          "ideal_range": [
+            165.0,
+            180.0
+          ],
+          "tolerance": 20.0,
+          "weight": 0.8
+        },
+        "back_angle": {
+          "name": "등 각도",
+          "points": [
+            "Neck",
+            "Back",
+            "Waist"
+          ],
+          "ideal_mean": 164.3,
+          "ideal_range": [
+            150.0,
+            180.0
+          ],
+          "tolerance": 24.0,
+          "weight": 1.2
+        },
+        "torso_forward_bend": {
+          "name": "상체 숙임 각도",
+          "points": [
+            "Shoulder",
+            "Hip",
+            "Knee"
+          ],
+          "ideal_mean": 134.5,
+          "ideal_range": [
+            114.5,
+            100.0
+          ],
+          "tolerance": 30.0,
+          "weight": 1.8
+        }
+      },
+      "motion_phases": [
+        {
+          "phase_id": 1,
+          "phase_name": "시작 자세",
+          "description": "양발을 어깨 너비로 벌리고 서서 상체를 곧게 펴세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "상체를 자연스럽게 곧게 펴기",
+            "무릎은 자연스럽게 펴기 (175도 이상)",
+            "시선은 정면"
+          ]
+        },
+        {
+          "phase_id": 2,
+          "phase_name": "상체 숙이기",
+          "description": "힙을 중심으로 상체를 천천히 앞으로 숙이세요. 등은 곧게 유지하세요",
+          "duration_sec": 2.5,
+          "key_checks": [
+            "힙 각도 60~100도",
+            "등을 곧게 유지 (등 각도 150도 이상)",
+            "무릎은 펴진 상태 유지",
+            "햄스트링 스트레칭 느끼기"
+          ]
+        },
+        {
+          "phase_id": 3,
+          "phase_name": "최대 숙임 유지",
+          "description": "상체를 숙인 상태에서 1초간 유지하세요",
+          "duration_sec": 1.0,
+          "key_checks": [
+            "등을 곧게 유지",
+            "호흡 유지"
+          ]
+        },
+        {
+          "phase_id": 4,
+          "phase_name": "원위치 복귀",
+          "description": "천천히 시작 자세로 돌아오세요",
+          "duration_sec": 2.5,
+          "key_checks": [
+            "등을 곧게 유지하면서 복귀",
+            "힙을 중심으로 상체 세우기"
+          ]
+        },
+        {
+          "phase_id": 5,
+          "phase_name": "운동 완료",
+          "description": "시작 자세로 돌아와 호흡을 정리하세요",
+          "duration_sec": 2.0,
+          "key_checks": [
+            "시작 자세로 복귀",
+            "호흡 정리"
+          ]
+        }
+      ],
+      "feedback_rules": [
+        {
+          "condition": "back_angle < 150",
+          "feedback": "등이 구부러졌습니다. 등을 곧게 펴세요",
+          "severity": "warning"
+        },
+        {
+          "condition": "knee_angle_left < 165",
+          "feedback": "왼쪽 무릎을 펴세요",
+          "severity": "warning"
+        },
+        {
+          "condition": "knee_angle_right < 165",
+          "feedback": "오른쪽 무릎을 펴세요",
+          "severity": "warning"
+        },
+        {
+          "condition": "hip_angle_left < 50",
+          "feedback": "너무 깊게 숙였습니다",
+          "severity": "warning"
+        },
+        {
+          "condition": "hip_angle_left > 120",
+          "feedback": "더 깊게 숙여주세요",
+          "severity": "info"
+        },
+        {
+          "condition": "abs(hip_angle_left - hip_angle_right) > 15",
+          "feedback": "좌우 균형을 맞춰주세요",
+          "severity": "warning"
+        }
+      ],
+      "common_mistakes": [
+        "등을 둥글게 구부리는 경우",
+        "무릎을 구부리는 경우",
+        "너무 빠르게 동작하는 경우",
+        "힙이 아닌 허리로 숙이는 경우",
         "호흡을 멈추는 경우"
       ]
     }

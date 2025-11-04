@@ -11,12 +11,14 @@ import 'services/exercise_loader.dart';
 import 'services/pose_scorer.dart';
 import 'services/feedback_generator.dart';
 import 'services/phase_manager.dart';
+import 'services/angle_smoother.dart';
 
 // Widgets
 import 'widgets/exercise_dropdown.dart';
-import 'widgets/score_display.dart';
-import 'widgets/feedback_panel.dart';
 import 'widgets/phase_progress_widget.dart';
+import 'widgets/compact_score_display.dart';
+import 'widgets/collapsible_feedback_panel.dart';
+import 'widgets/angle_legend_widget.dart';
 import 'pose_painter.dart';
 import 'angle_calculator.dart';
 
@@ -68,7 +70,9 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
   // 피드백 및 점수
   List<String> _feedbacks = [];
   double _score = 0.0;
-  Map<String, double> _detailedScores = {};
+
+  // 떨림 보정
+  late final AngleSmoother _angleSmoother;
 
   // 성능 관리
   int _frameCount = 0;
@@ -78,6 +82,7 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
   @override
   void initState() {
     super.initState();
+    _angleSmoother = AngleSmoother(windowSize: 5); // 5 프레임 윈도우로 떨림 보정
     _initializePoseDetector();
     _initializeCamera();
     _loadExercises();
@@ -247,7 +252,6 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
     if (_poses.isEmpty || _selectedExercise == null) {
       _feedbacks = [];
       _score = 0.0;
-      _detailedScores = {};
       return;
     }
     
@@ -313,12 +317,13 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
     }
     
     // 6. 상태 업데이트
-    _score = score;
-    _feedbacks = feedbacks;
-    _detailedScores = detailedScores;
+    setState(() {
+      _score = score;
+      _feedbacks = feedbacks;
+    });
   }
 
-  /// 사용자 각도 계산
+  /// 사용자 각도 계산 (떨림 보정 포함)
   Map<String, double> _calculateUserAngles(
     Pose pose,
     ExerciseModel exercise,
@@ -337,16 +342,28 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
       final point3 = _getLandmark(pose, points[2]);
       
       if (point1 != null && point2 != null && point3 != null) {
-        angles[angleKey] = AngleCalculator.calculateAngle(point1, point2, point3);
+        // 원시 각도 계산
+        final rawAngle = AngleCalculator.calculateAngle(point1, point2, point3);
+        
+        // 떨림 보정: 적응형 필터 적용
+        // 변화가 클 때는 빠르게 반응, 작을 때는 스무딩
+        final smoothedAngle = _angleSmoother.smoothAngleAdaptive(
+          angleKey,
+          rawAngle,
+          threshold: 10.0, // 10도 이상 변화시 즉시 반응
+        );
+        
+        angles[angleKey] = smoothedAngle;
       }
     }
     
     return angles;
   }
 
-  /// 랜드마크 가져오기
+  /// 랜드마크 가져오기 (PT Pose Data → ML Kit 매핑)
   PoseLandmark? _getLandmark(Pose pose, String name) {
-    final typeMap = {
+    // 직접 매핑 가능한 랜드마크
+    final directMap = {
       'Nose': PoseLandmarkType.nose,
       'Left Shoulder': PoseLandmarkType.leftShoulder,
       'Right Shoulder': PoseLandmarkType.rightShoulder,
@@ -360,12 +377,121 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
       'Right Knee': PoseLandmarkType.rightKnee,
       'Left Ankle': PoseLandmarkType.leftAnkle,
       'Right Ankle': PoseLandmarkType.rightAnkle,
-      'Waist': PoseLandmarkType.leftHip, // Waist는 Hip으로 근사
-      'Neck': PoseLandmarkType.nose, // Neck은 nose로 근사
     };
     
-    final type = typeMap[name];
-    return type != null ? pose.landmarks[type] : null;
+    // 직접 매핑
+    if (directMap.containsKey(name)) {
+      return pose.landmarks[directMap[name]];
+    }
+    
+    // 복합 랜드마크 (중점 계산)
+    switch (name) {
+      case 'Neck':
+        // 목: 양쪽 어깨 중점
+        final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
+        final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
+        if (leftShoulder != null && rightShoulder != null) {
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (leftShoulder.x + rightShoulder.x) / 2,
+            y: (leftShoulder.y + rightShoulder.y) / 2,
+            z: (leftShoulder.z + rightShoulder.z) / 2,
+            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
+          );
+        }
+        break;
+        
+      case 'Back':
+        // 등: 양쪽 어깨 중점에서 약간 아래
+        final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
+        final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
+        final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
+        final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
+        
+        if (leftShoulder != null && rightShoulder != null && 
+            leftHip != null && rightHip != null) {
+          // 어깨와 힙의 중간점 (등 중앙)
+          final shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+          final shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
+          final shoulderMidZ = (leftShoulder.z + rightShoulder.z) / 2;
+          
+          final hipMidX = (leftHip.x + rightHip.x) / 2;
+          final hipMidY = (leftHip.y + rightHip.y) / 2;
+          final hipMidZ = (leftHip.z + rightHip.z) / 2;
+          
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (shoulderMidX + hipMidX) / 2,
+            y: (shoulderMidY + hipMidY) / 2,
+            z: (shoulderMidZ + hipMidZ) / 2,
+            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood + 
+                        leftHip.likelihood + rightHip.likelihood) / 4,
+          );
+        }
+        break;
+        
+      case 'Waist':
+        // 허리: 양쪽 힙 중점
+        final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
+        final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
+        if (leftHip != null && rightHip != null) {
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (leftHip.x + rightHip.x) / 2,
+            y: (leftHip.y + rightHip.y) / 2,
+            z: (leftHip.z + rightHip.z) / 2,
+            likelihood: (leftHip.likelihood + rightHip.likelihood) / 2,
+          );
+        }
+        break;
+        
+      case 'Shoulder':
+        // 어깨 중점: 양쪽 어깨 평균
+        final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
+        final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
+        if (leftShoulder != null && rightShoulder != null) {
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (leftShoulder.x + rightShoulder.x) / 2,
+            y: (leftShoulder.y + rightShoulder.y) / 2,
+            z: (leftShoulder.z + rightShoulder.z) / 2,
+            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
+          );
+        }
+        break;
+        
+      case 'Hip':
+        // 힙 중점: 양쪽 힙 평균
+        final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
+        final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
+        if (leftHip != null && rightHip != null) {
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (leftHip.x + rightHip.x) / 2,
+            y: (leftHip.y + rightHip.y) / 2,
+            z: (leftHip.z + rightHip.z) / 2,
+            likelihood: (leftHip.likelihood + rightHip.likelihood) / 2,
+          );
+        }
+        break;
+        
+      case 'Knee':
+        // 무릎 중점: 양쪽 무릎 평균
+        final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
+        final rightKnee = pose.landmarks[PoseLandmarkType.rightKnee];
+        if (leftKnee != null && rightKnee != null) {
+          return PoseLandmark(
+            type: PoseLandmarkType.nose, // 타입은 임시
+            x: (leftKnee.x + rightKnee.x) / 2,
+            y: (leftKnee.y + rightKnee.y) / 2,
+            z: (leftKnee.z + rightKnee.z) / 2,
+            likelihood: (leftKnee.likelihood + rightKnee.likelihood) / 2,
+          );
+        }
+        break;
+    }
+    
+    return null;
   }
 
   @override
@@ -381,12 +507,24 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 레이어 1: 카메라 프리뷰
-          CameraPreview(_controller!),
+          // 레이어 1: 카메라 프리뷰 (미러링)
+          Transform.scale(
+            scaleX: -1,
+            child: CameraPreview(_controller!),
+          ),
           
-          // 레이어 2: 스켈레톤 오버레이
+          // 레이어 2: 스켈레톤 오버레이 (미러링) - 각도별 색상 표시
           if (_imageSize != null)
-            CustomPaint(painter: PosePainter(_poses, _imageSize!)),
+            Transform.scale(
+              scaleX: -1,
+              child: CustomPaint(
+                painter: PosePainter(
+                  _poses, 
+                  _imageSize!,
+                  exercise: _selectedExercise, // 선택된 운동 전달
+                ),
+              ),
+            ),
           
           // 레이어 3: 상단 UI (운동 선택 + 상태)
           Positioned(
@@ -418,26 +556,38 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
                 
                 const SizedBox(height: 12),
                 
-                // 포즈 감지 상태
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _poses.isEmpty
-                        ? Colors.red.withValues(alpha: 0.7)
-                        : Colors.green.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _poses.isEmpty ? '포즈 감지 안됨' : '포즈 감지됨 ✓',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                // 포즈 감지 상태 + 점수 표시
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 포즈 감지 상태
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _poses.isEmpty
+                            ? Colors.red.withValues(alpha: 0.7)
+                            : Colors.green.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _poses.isEmpty ? '포즈 감지 안됨' : '포즈 감지됨 ✓',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    
+                    // 점수 표시 (컴팩트)
+                    if (_selectedExercise != null && _score > 0) ...[
+                      const SizedBox(width: 8),
+                      CompactScoreDisplay(score: _score),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -458,7 +608,7 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
               ),
             ),
           
-          // 레이어 5: 하단 UI (점수 + 피드백)
+          // 레이어 5: 하단 UI (피드백 + 리셋)
           Positioned(
             bottom: 24,
             left: 16,
@@ -466,17 +616,8 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 점수 표시
-                if (_selectedExercise != null && _score > 0)
-                  ScoreDisplay(
-                    score: _score,
-                    detailedScores: _detailedScores,
-                  ),
-                
-                const SizedBox(height: 12),
-                
-                // 피드백 패널
-                FeedbackPanel(feedbacks: _feedbacks),
+                // 피드백 패널 (접을 수 있음)
+                CollapsibleFeedbackPanel(feedbacks: _feedbacks),
                 
                 // 리셋 버튼 (운동 완료 시)
                 if (_phaseManager != null && _phaseManager!.isCompleted) ...[
@@ -503,6 +644,14 @@ class _CameraPreviewWidgetState extends State<CameraPreviewWidget> {
               ],
             ),
           ),
+
+          // 레이어 6: 좌측 하단 - 각도 색상 범례
+          if (_selectedExercise != null)
+            Positioned(
+              left: 16,
+              bottom: 200,
+              child: AngleLegendWidget(exercise: _selectedExercise),
+            ),
         ],
       ),
     );
