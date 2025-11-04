@@ -14,6 +14,7 @@ import '../services/exercise_loader.dart';
 import '../services/exercise_mapper.dart';
 import '../services/pose_scorer.dart';
 import '../features/workout/data/supabase_workout_service.dart';
+import '../features/workout/domain/models/supabase_exercise.dart';
 import '../services/feedback_generator.dart';
 import '../services/phase_manager.dart';
 import '../services/angle_smoother.dart';
@@ -45,8 +46,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   // ML Kit 포즈 감지
   late final PoseDetector _poseDetector;
   bool _isBusy = false;
-  List<Pose> _poses = [];
-  Size? _imageSize;
+  final ValueNotifier<List<Pose>> _posesNotifier = ValueNotifier([]);
+  final ValueNotifier<Size?> _imageSizeNotifier = ValueNotifier(null);
 
   // 운동 데이터
   List<ExerciseModel> _exercises = [];
@@ -74,11 +75,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   // 성능 관리 (적응형 프레임 레이트)
   int _frameCount = 0;
-  static const int _frameSkipThreshold = 3; // 30fps → 10fps (버퍼 부족 방지)
+  static const int _frameSkipThreshold = 4; // 30fps → 7.5fps (CPU 사용량 감소)
   DateTime _lastUpdateTime = DateTime.now();
   
   // 운동 완료 상태 추적
   bool _wasCompleted = false;
+  
+  // 다음 운동으로 이동 중인지 추적 (중복 호출 방지)
+  bool _isMovingToNext = false;
   
   // 스켈레톤 렌더링 표시 여부
   bool _showSkeleton = true;
@@ -88,16 +92,42 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   
   // 마지막으로 읽은 단계 설명 (중복 방지)
   String? _lastSpokenPhaseDescription;
+  
+  // 동영상 다이얼로그 열림 상태
+  bool _isVideoDialogOpen = false;
 
   @override
   void initState() {
     super.initState();
+    // 가벼운 초기화만 먼저 실행 (동기)
     _angleSmoother = AngleSmoother(windowSize: 7);
     _landmarkSmoother = LandmarkSmoother(alpha: 0.5, movementThreshold: 2.0);
-    _ttsService.initialize(); // TTS 초기화
-    _initializePoseDetector();
-    _initializeCamera();
-    _loadExercises();
+    
+    // 모든 무거운 초기화를 비동기로 지연 실행 - 메인 스레드 블로킹 방지
+    // 첫 프레임 렌더링 후 초기화 시작
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAsync();
+    });
+  }
+
+  /// 비동기 초기화 (메인 스레드 블로킹 방지)
+  Future<void> _initializeAsync() async {
+    // 모든 무거운 초기화를 병렬로 실행
+    await Future.wait([
+      // PoseDetector 초기화 (비동기로 이동)
+      Future(() {
+        _initializePoseDetector();
+      }),
+      // 카메라 초기화
+      _initializeCamera(),
+      // TTS 초기화 (에러가 나도 앱은 계속 실행)
+      _ttsService.initialize().catchError((e) {
+        print('TTS 초기화 오류: $e');
+      }),
+    ]);
+    
+    // 운동 데이터 로드 (카메라 초기화 후 실행하여 사용자 경험 향상)
+    await _loadExercises();
   }
 
   @override
@@ -114,30 +144,46 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _feedbacksNotifier.dispose();
     _scoreNotifier.dispose();
     _readyFeedbackNotifier.dispose();
+    _posesNotifier.dispose(); // 추가: 포즈 리소스 해제
+    _imageSizeNotifier.dispose(); // 추가: 이미지 크기 리소스 해제
     _ttsService.dispose(); // TTS 리소스 해제
     super.dispose();
   }
 
   Future<void> _loadExercises() async {
     try {
-      List<ExerciseModel> exercises;
+      List<ExerciseModel> exercises = [];
       final Map<int, String?> videoUrls = {};
       
       // 루틴의 exercise_id 리스트가 있으면 해당 운동들만 로드
       if (widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty) {
-        exercises = [];
-        
-        // Supabase에서 video_url 가져오기
+        // 병렬 처리로 네트워크 요청 최적화 - 순차 처리 대신 동시 실행
         final service = SupabaseWorkoutService();
-        for (final exerciseId in widget.exerciseIds!) {
-          // ExerciseModel 로드
-          final exercise = await ExerciseMapper.loadExerciseFromExerciseId(exerciseId);
+        final futures = widget.exerciseIds!.map((exerciseId) async {
+          // ExerciseModel과 SupabaseExercise를 병렬로 로드
+          final results = await Future.wait([
+            ExerciseMapper.loadExerciseFromExerciseId(exerciseId),
+            service.getExerciseByListId(exerciseId),
+          ]);
+          
+          return {
+            'exercise': results[0] as ExerciseModel?,
+            'supabaseExercise': results[1] as SupabaseExercise?,
+            'exerciseId': exerciseId,
+          };
+        });
+        
+        final results = await Future.wait(futures);
+        
+        for (final result in results) {
+          final exercise = result['exercise'] as ExerciseModel?;
+          final supabaseExercise = result['supabaseExercise'] as SupabaseExercise?;
+          final exerciseId = result['exerciseId'] as int;
+          
           if (exercise != null) {
             exercises.add(exercise);
           }
           
-          // SupabaseExercise에서 video_url 가져오기
-          final supabaseExercise = await service.getExerciseByListId(exerciseId);
           if (supabaseExercise != null) {
             videoUrls[exerciseId] = supabaseExercise.videoUrl;
           }
@@ -203,12 +249,16 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   void _initializePoseDetector() {
-    final options = PoseDetectorOptions(
-      mode: PoseDetectionMode.stream,
-      model: PoseDetectionModel.base,
-    );
-    _poseDetector = PoseDetector(options: options);
-    print('포즈 감지기 초기화 완료 - base 모델 사용');
+    try {
+      final options = PoseDetectorOptions(
+        mode: PoseDetectionMode.stream,
+        model: PoseDetectionModel.base,
+      );
+      _poseDetector = PoseDetector(options: options);
+      print('포즈 감지기 초기화 완료 - base 모델 사용');
+    } catch (e) {
+      print('포즈 감지기 초기화 오류: $e');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -234,8 +284,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         await _controller!.initialize();
         if (!mounted) return;
 
-        _imageSize = _controller!.value.previewSize;
-        print('카메라 초기화 완료 - 프리뷰 크기: $_imageSize');
+        _imageSizeNotifier.value = _controller!.value.previewSize;
+        print('카메라 초기화 완료 - 프리뷰 크기: ${_imageSizeNotifier.value}');
 
         _controller!.startImageStream((image) {
           _processCameraImage(image);
@@ -254,6 +304,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     // 중복 처리 방지 및 프레임 스킵
     if (_isBusy) return;
 
+    // 동영상 다이얼로그가 열려있으면 카메라 피드백 중단
+    if (_isVideoDialogOpen) return;
+    
+    // 스킵 버튼이 눌려서 홈으로 이동 중이면 카메라 피드백 중단
+    if (_isMovingToNext) return;
+
     _frameCount++;
     // 프레임 스킵: 더 많은 프레임을 건너뛰어 버퍼 부족 방지
     if (_frameCount % _frameSkipThreshold != 0) {
@@ -271,22 +327,26 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
       final poses = await _poseDetector.processImage(inputImage);
 
-      if (_frameCount % 30 == 0) {
+      // 로그 출력 최소화 (60프레임마다만)
+      if (_frameCount % 60 == 0) {
         print('포즈 처리 완료: ${poses.length}개 감지 (프레임: $_frameCount)');
       }
 
-      final smoothedPoses = poses
-          .map((pose) => _landmarkSmoother.smoothPose(pose))
-          .toList();
+      // 리스트 변환 최적화 - growable: false로 고정 크기 리스트 사용
+      final smoothedPoses = List<Pose>.generate(
+        poses.length,
+        (i) => _landmarkSmoother.smoothPose(poses[i]),
+        growable: false,
+      );
 
       if (mounted) {
-        setState(() {
-          _poses = smoothedPoses;
-        });
+        // ValueNotifier로 변경 - setState 제거하여 리빌드 최소화
+        _posesNotifier.value = smoothedPoses;
         _updateFeedback();
       }
     } catch (e) {
-      if (_frameCount % 30 == 0) {
+      // 로그 출력 최소화
+      if (_frameCount % 60 == 0) {
         print('포즈 감지 오류: $e');
       }
     } finally {
@@ -367,6 +427,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     
     if (videoId == null) {
       // YouTube URL이 아니면 외부 브라우저로 열기
+      _isVideoDialogOpen = true;
       showDialog(
         context: context,
         barrierDismissible: true,
@@ -375,11 +436,15 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           content: const Text('영상을 외부 브라우저에서 열까요?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                _isVideoDialogOpen = false;
+                Navigator.of(context).pop();
+              },
               child: const Text('취소'),
             ),
             TextButton(
               onPressed: () async {
+                _isVideoDialogOpen = false;
                 final uri = Uri.parse(videoUrl);
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -392,11 +457,15 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             ),
           ],
         ),
-      );
+      ).then((_) {
+        // 다이얼로그가 닫힐 때 플래그 리셋
+        _isVideoDialogOpen = false;
+      });
       return;
     }
 
     // YouTube 플레이어 다이얼로그
+    _isVideoDialogOpen = true;
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -434,7 +503,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        _isVideoDialogOpen = false;
+                        Navigator.of(context).pop();
+                      },
                     ),
                   ],
                 ),
@@ -465,7 +537,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      _isVideoDialogOpen = false;
+                      Navigator.of(context).pop();
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -479,14 +554,41 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      // 다이얼로그가 닫힐 때 플래그 리셋 (뒤로가기 버튼 등으로 닫힐 때도 처리)
+      _isVideoDialogOpen = false;
+    });
+  }
+
+  /// 개발자 전용: 진행 상태 종료하고 홈 화면으로 이동
+  void _skipAllExercises() {
+    // 중복 호출 방지
+    if (_isMovingToNext) return;
+    _isMovingToNext = true;
+    
+    print('🚀 개발자 스킵: 진행 상태 종료하고 홈 화면으로 이동합니다.');
+    
+    // 즉시 홈 화면으로 이동 (복잡한 로직 없이)
+    Future.microtask(() {
+      if (mounted) {
+        _isMovingToNext = false;
+        context.go('/app/home');
+      }
+    });
   }
 
   /// 다음 운동으로 이동하거나 모든 운동이 완료되면 운동 탭으로 돌아가기
   void _moveToNextExercise() {
+    // 중복 호출 방지
+    if (_isMovingToNext) return;
+    _isMovingToNext = true;
+    
     // 약간의 지연 후 다음 운동으로 이동 (사용자가 완료 메시지를 볼 수 있도록)
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) {
+        _isMovingToNext = false;
+        return;
+      }
       
       // 다음 운동이 있는지 확인
       if (_currentExerciseIndex < _exercises.length - 1) {
@@ -499,6 +601,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           _selectedExercise = _exercises[_currentExerciseIndex];
           _phaseManager = PhaseManager(_exercises[_currentExerciseIndex]);
           _wasCompleted = false; // 완료 상태 리셋
+          _isMovingToNext = false; // 이동 플래그 리셋
           _lastUpdateTime = DateTime.now();
           _scoreNotifier.value = 0.0;
           _feedbacksNotifier.value = [];
@@ -531,19 +634,21 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       } else {
         // 모든 운동 완료 - 홈 화면으로 이동
         print('🎉 모든 운동 완료! 홈 화면으로 이동합니다.');
+        _isMovingToNext = false; // 플래그 리셋
         context.go('/app/home');
       }
     });
   }
 
   void _updateFeedback() {
-    if (_poses.isEmpty || _selectedExercise == null) {
+    final poses = _posesNotifier.value;
+    if (poses.isEmpty || _selectedExercise == null) {
       _feedbacksNotifier.value = [];
       _scoreNotifier.value = 0.0;
       return;
     }
 
-    final pose = _poses[0];
+    final pose = poses[0];
     final userAngles = _calculateUserAngles(pose, _selectedExercise!);
 
     if (userAngles.isEmpty) {
@@ -592,11 +697,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         }
         
         if (_phaseManager!.isCompleted) {
-          // 운동 완료 - TTS만 제공
-          ttsFeedbacks.add('🎉 운동 완료!');
-          // 운동 완료 시 다음 운동으로 이동 또는 운동 탭으로 돌아가기
-          if (!_wasCompleted) {
+          // 운동 완료 - TTS만 제공 (중복 방지)
+          // _isMovingToNext가 true면 스킵 버튼이 눌린 상태이므로 더 이상 처리하지 않음
+          if (!_wasCompleted && !_isMovingToNext && _lastSpokenFeedback != '🎉 운동 완료!') {
             _wasCompleted = true;
+            ttsFeedbacks.add('🎉 운동 완료!');
             _moveToNextExercise();
           }
         } else {
@@ -615,9 +720,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       }
       
       // 운동 완료 상태 체크 (phaseChanged가 false여도 완료될 수 있음)
-      if (_phaseManager!.isCompleted && !_wasCompleted) {
+      // 단, 개발자 스킵 버튼으로 인한 완료는 제외 (중복 호출 방지)
+      // _isMovingToNext가 true면 스킵 버튼이 눌린 상태이므로 더 이상 처리하지 않음
+      if (_phaseManager!.isCompleted && !_wasCompleted && !_isMovingToNext) {
         _wasCompleted = true;
-        ttsFeedbacks.add('🎉 운동 완료!');
+        // TTS만 제공 (중복 방지)
+        if (_lastSpokenFeedback != '🎉 운동 완료!') {
+          ttsFeedbacks.add('🎉 운동 완료!');
+        }
         _moveToNextExercise();
       }
 
@@ -829,63 +939,50 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         children: [
           Transform.scale(scaleX: -1, child: CameraPreview(_controller!)),
 
-          if (_imageSize != null && _showSkeleton)
-            Transform.scale(
-              scaleX: -1,
-              child: CustomPaint(
-                painter: PosePainter(
-                  _poses,
-                  _imageSize!,
-                  exercise: _selectedExercise,
-                ),
-                child: Container(),
-              ),
-            ),
-          
-          // 개발자 전용 스킵 버튼
-          if (_phaseManager != null && !_phaseManager!.isCompleted)
-            Positioned(
-              top: 48,
-              left: 16,
-              child: IconButton(
-                icon: const Icon(
-                  Icons.skip_next,
-                  color: Colors.orange,
-                  size: 28,
-                ),
-                onPressed: () {
-                  // 개발자 전용: 운동 완료까지 모든 단계 스킵
-                  if (_phaseManager != null) {
-                    setState(() {
-                      _wasCompleted = false;
-                      _lastUpdateTime = DateTime.now();
-                      _scoreNotifier.value = 0.0;
-                      _feedbacksNotifier.value = [];
-                      _readyFeedbackNotifier.value = null;
-                      _angleSmoother.resetAll();
-                      _landmarkSmoother.resetAll();
-                      _lastSpokenFeedback = null;
-                      _lastSpokenPhaseDescription = null;
-                      _ttsService.resetLastSpoken();
-                      
-                      // 모든 단계를 스킵하여 운동 완료까지 이동
-                      while (!_phaseManager!.isCompleted) {
-                        _phaseManager!.forceNextPhase();
-                      }
-                      
-                      // 운동 완료 처리
-                      _wasCompleted = true;
-                      _moveToNextExercise();
-                    });
-                  }
+          // ValueListenableBuilder로 스켈레톤만 선택적 리빌드
+          ValueListenableBuilder<Size?>(
+            valueListenable: _imageSizeNotifier,
+            builder: (context, imageSize, child) {
+              if (imageSize == null || !_showSkeleton) {
+                return const SizedBox.shrink();
+              }
+              return ValueListenableBuilder<List<Pose>>(
+                valueListenable: _posesNotifier,
+                builder: (context, poses, child) {
+                  return Transform.scale(
+                    scaleX: -1,
+                    child: CustomPaint(
+                      painter: PosePainter(
+                        poses,
+                        imageSize,
+                        exercise: _selectedExercise,
+                      ),
+                      child: Container(),
+                    ),
+                  );
                 },
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withValues(alpha: 0.5),
-                  padding: const EdgeInsets.all(12),
-                ),
-                tooltip: '개발자: 운동 완료까지 스킵',
+              );
+            },
+          ),
+          
+          // 개발자 전용 스킵 버튼 - 모든 운동 완료 및 홈으로 이동
+          Positioned(
+            top: 48,
+            left: 16,
+            child: IconButton(
+              icon: const Icon(
+                Icons.skip_next,
+                color: Colors.orange,
+                size: 28,
               ),
+              onPressed: _skipAllExercises,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black.withValues(alpha: 0.5),
+                padding: const EdgeInsets.all(12),
+              ),
+              tooltip: '개발자: 모든 운동 완료하고 홈으로 이동',
             ),
+          ),
 
           Positioned(
             top: 48,
@@ -936,25 +1033,30 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _poses.isEmpty
-                            ? Colors.red.withValues(alpha: 0.7)
-                            : Colors.green.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _poses.isEmpty ? '포즈 감지 안됨' : '포즈 감지됨 ✓',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    ValueListenableBuilder<List<Pose>>(
+                      valueListenable: _posesNotifier,
+                      builder: (context, poses, child) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: poses.isEmpty
+                                ? Colors.red.withValues(alpha: 0.7)
+                                : Colors.green.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            poses.isEmpty ? '포즈 감지 안됨' : '포즈 감지됨 ✓',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
                     ),
 
                     if (_selectedExercise != null) ...[
@@ -1029,24 +1131,26 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             ),
           ),
 
+          // 진행도 표시 바 (하단 배치)
           if (_phaseManager != null)
             Positioned(
-              top: 100,
+              bottom: 24,
               left: 16,
               right: 16,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  PhaseStepIndicator(phaseManager: _phaseManager),
-                  const SizedBox(width: 8),
-                  PhaseProgressWidget(phaseManager: _phaseManager),
-                ],
+              child: PhaseProgressWidget(
+                phaseManager: _phaseManager,
+                currentExerciseIndex: widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty
+                    ? _currentExerciseIndex
+                    : null,
+                totalExercises: widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty
+                    ? _exercises.length
+                    : null,
               ),
             ),
 
-          // 준비 피드백 (맨 아래 고정)
+          // 준비 피드백 (진행도 바 위에 배치)
           Positioned(
-            bottom: 24,
+            bottom: 80, // 진행도 바 위에 위치 (진행도 바 높이 + 여백)
             left: 16,
             right: 16,
             child: ValueListenableBuilder<String?>(
