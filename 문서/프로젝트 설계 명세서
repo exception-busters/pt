@@ -1,0 +1,947 @@
+
+AI 모션 캡처 기반 지능형 PT 플랫폼 구축
+목차
+1. 개요 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 3
+
+2. 프로젝트 구조 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 5
+
+3. 모듈 설계 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 11
+
+4. 파일 구조 및 데이터베이스 설계 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 23
+
+5. 요구분석 참조표 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 36
+
+6. 제약사항 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 37
+
+7. 참고사항 ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙ 38
+
+
+1. 개요
+1.1 프로젝트 목표
+AI 기반 운동 자세 분석과 영상 피드백, 자동 운동기록 관리, 맞춤형 운동/식단 계획 및 목표 달성 관리, 포인트·상점·커뮤니티 연동 등 사용자의 운동 습관을 지속적으로 개선할 수 있는 종합적 개인 맞춤 피트니스관리 앱을 개발한다.
+
+1.2 하드웨어, 소프트웨어 개발 환경
+구분	환경 / 기술 스택
+서버	Ubuntu 22.04, Node.js, PostgreSQL
+클라이언트	Flutter (Dart), Android 10+ / iOS 14+
+AI 엔진	TensorFlow Lite, Google MediaPipe Pose
+기타	Firebase Auth, AWS S3 Storage
+
+1.3 소프트웨어(서비스) 주요 기능
+•  사용자 관리: 회원가입, 로그인, 프로필, 목표 설정
+•  AI 분석: 카메라 기반 운동 인식, 자세 피드백, 반복 카운트
+•  운동 관리: 맞춤 루틴 생성, 루틴 수정 및 추천
+•  식단 관리: 식단 입력, 칼로리 분석, 맞춤 식단 추천
+•  기록/목표: 운동·식단 기록 통계, 목표 달성 시각화
+•  커뮤니티/리워드: 챌린지, 포인트, 상점, 알림
+
+1.4 설계상 제약사항
+제약 분류	제약 내용	설계 결정
+기술적	실시간 AI 처리 한계
+(프레임 속도 저하)	TensorFlow Lite로 모델 경량화
+운영적	iOS/Android 호환성	Flutter 크로스플랫폼 프레임워크 채택
+보안	개인정보 보호 (GDPR 준수 필요)	Firebase Auth 및 AES 암호화 적용
+개발 환경	하드웨어 사양 제한 (저사양 기기)	최소 사양 정의 (4GB RAM 이상)
+1.5 참조된 개발문서
+① 내부 문서
+•  요구사항 정의 및 분석 명세서
+•  유스케이스 다이어그램 및 시나리오 명세
+•  데이터베이스 ERD 설계서
+•  프로젝트 구조 설계서
+•  화면(UI) 및 기능 플로우 설계서
+
+② 외부 문서
+분류	문서명 / 자료명	주요 활용 목적
+프론트엔드	Flutter 공식 문서	크로스플랫폼 UI 개발 및
+빌드 구조
+AI 모델	TensorFlow Lite
+Developer Guide	On-device 모델 경량화 및
+추론 구조
+Google MediaPipe Pose
+API 문서	Pose Detection 기반 운동
+자세 인식
+인증·알림	Firebase Authentication / Cloud Messaging 문서	사용자 인증, 푸시 알림 기능
+백엔드	Node.js / Spring Boot REST API Reference	서버 비즈니스 로직 및 REST API 설계
+데이터베이스	Supabase 공식 문서 (https://supabase.com/docs)	PostgreSQL 기반 DB 관리,
+실시간 데이터 처리,
+호스팅 및 API 연동
+Firebase Firestore / Realtime Database 가이드	클라우드 데이터 동기화
+및 사용자별 저장소
+외부 서비스 연동	Apple HealthKit Developer Guide	iOS 연동을 통한 건강
+데이터 통합
+기타	AWS S3 Storage Guide, GDPR/개인정보보호 지침	영상/미디어 저장, 사용자
+데이터 보호 기준
+2. 프로젝트 구조
+2.1 시스템 구조 개요
+이 앱은 3-Tier 아키텍처를 적용해 계층별 역할을 분리한다.
+•  Presentation Layer는 Flutter/Dart 기반의 모바일 앱으로, 사용자의 운동 영상 촬영, 입력, 피드백 확인 등 모든 UI/UX와 실시간 인터랙션을 담당한다.
+•  Business Layer는 서버에서 동작하는 핵심 비즈니스 로직 계층이다. AI 모듈을 통한 운동 자세 인식 및 분석, 운동·식단·목표·커뮤니티 관리 서비스, 피드백 생성, 인증 관리 등이 이 계층에서 처리된다.
+•  Data Layer는 MySQL/PostgreSQL 등 RDBMS에 운동 데이터, 사용자정보, 커뮤니티, 기록 등 모든 영속 데이터를 저장한다. 영상·자세분석 데이터 등 대용량 미디어는 별도 스토리지(S3 등)에 보관하고, AI 분석 결과 데이터도 함께 관리한다.
+2.2 프로젝트 구조도
+Presentation Layer
+	• Flutter/Dart 앱
+	• 영상 촬영/실시간 업로드, 결과 피드백 UI
+	• 운동 정보 입력, 목표·통계 조회, 커뮤니티 메뉴 제공
+Business Layer
+	• AI 자세 인식/분석 모듈
+	• 사용자 인증/권한, 운동 루틴 및 기록, 식단 관리, 목표 관리
+	• 커뮤니티 서비스, 포인트·상점 시스템, 알림 모듈
+Data Layer
+	• 관계형 DB: 사용자, 운동, 기록, 식단, 커뮤니티 등
+	• 미디어 스토리지: 영상 파일, 자세 분석 데이터
+	• 외부 연동: 헬스키트, FCM(알림) 등 외부 서비스 API 연동
+
+
+
+
+
+
+
+계층 다이어그램
+테이블명	필드명	데이터 타입	제약 조건 및 설명	기본값/예시
+User	user_id	INT (PK)	기본키, 자동증가, 사용자 고유 아이디	1
+email	VARCHAR(255)	UNIQUE, NOT NULL, 로그인용 이메일	user@example.com
+password_hash	VARCHAR(255)	NOT NULL, 암호화된 비밀번호	(암호화된 문자열)
+nickname	VARCHAR(50)	NOT NULL	usernick
+join_date	DATETIME	DEFAULT CURRENT_TIMESTAMP, 가입일	2025-10-14 10:00:00
+UserProfile	user_id	INT (FK)	User.user_id 참조, 1:1 매핑	1
+age	INT	NULL 허용	28
+height	FLOAT	NULL 허용, cm 단위	175.5
+weight	FLOAT	NULL 허용, kg 단위	70.2
+gender	CHAR(1)	NULL 허용, 'M', 'F' 지정	M
+profile_image	VARCHAR(255)	NULL 허용, 프로필 사진 URL	/images/profile.png
+bio	TEXT	NULL 허용, 자기소개	운동 좋아하는 개발자
+Exercise	exercise_id	INT (PK)	기본키, 운동 고유 ID	1001
+name	VARCHAR(100)	NOT NULL, 운동 이름	푸쉬업 (Push Up)
+body_part	VARCHAR(50)	NOT NULL, 운동 부위	가슴 (Chest)
+description	TEXT	NULL 허용, 운동 설명	기본 상체 근력 운동
+.3 자료 사전
+
+3. 모듈 설계
+본 모듈 설계는 제안서에 명시된 요구사항을 기반으로 시스템을 11개의 독립적인 모듈로 분리하여 각 기능 명세를 구체화한다. 제안서의 3계층 아키텍처와 분리된 AI 추론 서버구조를 충실히 따르며, 각 모듈은 명확한 역할과 책임을 갖도록 설계한다.
+
+모듈 개요
+no	모듈명	모듈 유형	기능 설명 
+1	UserManager	Service/Controller	회원가입, 로그인 등 사용자 인증
+및 프로필을 관리합니다.
+2	WorkoutManager	Service/Controller	실시간 운동 세션을 제어하고, AI 분석을 중계하며 운동 기록을 관리합니다.
+3	AIAnalyzer	Inference Server	카메라로 입력된 사용자의 운동 자세
+정확도를 분석하고 실시간 피드백을
+생성합니다.
+4	RoutineService	Service/Controller	사용자의 레벨과 목표에 맞는 개인화된
+운동 루틴을 생성하고 추천합니다.
+5	NutritionService	Service/Controller	식단을 기록하고 영양소를 분석하며,
+목표에 맞는 음식을 추천합니다.
+6	GoalTracker	Service/Controller	챌린지, 랭킹, 뱃지 등 게이미피케이션
+요소를 통해 운동 동기를 부여합니다.
+7	Store	Service/Controller	프리미엄 운동 프로그램을 판매하고,
+사용자의 구매 및 접근 권한을
+관리합니다.
+8	Notification
+Manager	Utility/Service	운동 시간, 식단 기록 등 사용자가
+설정한 시간에 맞춰 푸시 알림을
+발송합니다.
+9	ReportGenerator	Service/Controller	누적된 데이터를 바탕으로 주간/월간 운동 및 식단 통계 리포트를
+생성합니다.
+10	DBConnector	Data Access Layer	모든 서비스 모듈과 데이터베이스 간의
+연결 및 데이터 접근을 표준화합니다.
+11	AdminModule	Service/Controller	운영자가 사용자, 콘텐츠, 통계 등을
+관리하기 위한 관리자 전용 기능을
+제공합니다.
+3.1 UserManager (회원 관리 및 인증)
+3.1.1 모듈 이름: UserManager(회원 관리 및 인증)
+3.1.2 모듈 유형: Service/Controller
+3.1.3 인터페이스:
+	- 메뉴: 회원가입, 로그인, 내 정보, 프로필 수정
+	- Endpoints: POST /auth/signup, POST /auth/signin,
+			GET /users/me, PUT /users/me
+	- 입력 형식: SignUpRequestDto, SignInRequestDto,
+			ProfileUpdateRequestDto(JSON)
+	- 출력 형식: UserProfileResponseDto(JSON),
+			JWT (JSON Web Token)
+3.1.4 모듈 내부 설계:
+	- 알고리즘:
+JWT 발급 알고리즘: 사용자 로그인 성공 시, 사용자 ID와 권한 정보를 Payload에 담아 서버의 비밀 키로 서명한 후 JWT를 생성한다.
+인증 필터 알고리즘: API 요청 수신 시, HTTP 헤더의 JWT를 추출하여 서명과 만료 시간을 검증하고, 성공 시 사용자 정보를 현재 요청의 보안 컨텍스트에 저장한다.
+	- 지역 변수:
+currentUserInfo (UserProfileDto): 로그인된 사용자의 프로필  정보를 담는 객체.
+3.1.5 오류 메시지:
+	- E4011: 유효하지 않은 토큰입니다.
+	- E4091: 이미 존재하는 이메일입니다.
+3.1.6 사용하는 파일: USERS테이블, USER_PROFILE테이블
+3.1.7 호출하는 모듈: DBConnector
+3.1.8 기능 설명: 회원가입, 로그인, 프로필 관리 등 사용자 계정과 인증을 총괄한다. JWT 기반의 인증 토큰을 관리하여 API 접근을 제어하며, 사용자가 설정한 운동 숙련도(Level)와 목적(Goal)은 다른 모듈에서 개인화 서비스를 제공하기 위한 핵심 데이터로 사용된다.
+3.2 WorkoutManager (운동 관리)
+3.2.1 모듈 이름: WorkoutManager(운동 관리)
+3.2.2 모듈 유형: Service/Controller
+3.2.3 인터페이스:
+	- 메뉴: 운동 시작, 일시정지, 재개, 종료
+	- Endpoints: POST/workouts/start, GET/workouts/stream(WebSocket), 		POST/workouts/record
+	- 입력 형식: StartWorkoutRequestDto(JSON),
+		실시간 관절 좌표 (WebSocket Stream)
+	- 출력 형식: FeedbackDto(WebSocket Stream),
+		WorkoutResultDto(JSON)
+3.2.4 모듈 내부 설계:
+	- 알고리즘:
+운동 세션 관리 알고리즘: 운동 세션의 상태를 READY, RUNNING, PAUSED, FINISHED로 정의하고, 사용자의 요청에 따라 상태를 변경하며 세션을 제어한다.
+적응형 난이도 조절 알고리즘: 최근 2세트의 수행 능력 등급이 연속 '우수'일 경우 다음 세트 목표 횟수를 증가시키고, '부족'일 경우 감소시킨다.
+	- 지역 변수:
+currentSessionState (WorkoutSession): 현재 진행 중인 운동  세션의 상태와 정보를 담는 객체.
+3.2.5 오류 메시지:
+	- E5031: AI 분석 서버에 연결할 수 없습니다.
+3.2.6 사용하는 파일: EXERCISE_RECORDS테이블
+3.2.7 호출하는 모듈: AIAnalyzer, RoutineService, DBConnector
+3.2.8 기능 설명: 실제 운동 세션을 관리하고 제어한다. 클라이언트의 영상 데이터를 AIAnalyzer로 전달하고, 반환된 피드백을 실시간으로 사용자에게 제공한다. 세트 종료 시 운동 기록을 저장하고, 이 데이터를 기반으로 '적응형 운동 추천 알고리즘'을 트리거하여 난이도를 동적으로 조절한다.
+3.3 AIAnalyzer (자세 인식 및 분석)
+3.3.1 모듈 이름: AIAnalyzer(자세 인식 및 분석)
+3.3.2 모듈 유형: Inference Server
+3.3.3 인터페이스:
+	- Endpoints: POST/analyze
+	- 입력 형식: PoseDataDto(33개 관절 좌표 배열, JSON)
+	- 출력 형식: AnalysisResultDto(정확도, 교정 메시지,
+		카운트 성공 여부, JSON)
+3.3.4 모듈 내부 설계:
+	- 알고리즘:
+코사인 유사도 계산 알고리즘: 입력된 사용자 관절 벡터와 정자세 관절 벡터 간의 코사인 유사도를 계산하여 정확도를 산출한다.
+횟수 카운팅 알고리즘: 특정 관절의 각도가 수축/이완 임계점을 순차적으로 통과하고, 평균 정확도가 기준 이상일 경우 유효한 1회로 카운트한다.
+	- 지역 변수:
+referencePoseVector (Vector[]): 현재 분석 중인 운동의 정자세 벡터 데이터.
+3.3.5 오류 메시지:
+	- E6500: 모델 추론 중 오류가 발생했습니다.
+3.3.6 사용하는 파일: Google MediaPipe (Pose)모델 파일
+3.3.7 호출하는 모듈: (없음)
+3.3.8 기능 설명: 독립된 AI 추론 서버로, WorkoutManager로부터 받은 관절 좌표 데이터를 분석하는 역할을 전담한다. 코사인 유사도알고리즘으로 자세 정확도를 정량적으로 평가하고, "허리를 펴세요"와 같은 즉각적인 피드백 메시지를 생성하여 반환한다.
+3.4 RoutineService (루틴 설정)
+3.4.1 모듈 이름: RoutineService(루틴 설정)
+3.4.2 모듈 유형: Service/Controller
+3.4.3 인터페이스:
+	- 메뉴: 내 루틴 보기, 루틴 추천받기, 루틴 수정하기
+	- Endpoints: POST/routines, PUT/routines/{id},
+		GET/routines/recommendation
+	- 입력 형식: RoutineUpdateRequestDto(JSON)
+	- 출력 형식: RoutineResponseDto(JSON)
+3.4.4 모듈 내부 설계:
+	- 알고리즘:
+초기 루틴 생성 알고리즘: 사용자의 Level과 Goal에 따라 운동 목록, 횟수, 세트 수를 조합하여 초기 루틴을 생성한다.
+보조 운동 추천 알고리즘: 사용자의 '자세 불안정성 지표'가 높은 부위를 입력받아, 사전에 정의된 '약점 보완 운동 맵'에서 해당 부위에 맞는 보조 운동을 조회하여 추천한다.
+	- 지역 변수:
+recommendedRoutine (RoutineDto): 사용자에게 추천할 최종 루틴 정보를 담는 객체
+3.4.5 오류 메시지:
+	- E4042: 존재하지 않는 운동 또는 루틴입니다.
+3.4.6 사용하는 파일: EXERCISES테이블, ROUTINES테이블
+3.4.7 호출하는 모듈: DBConnector
+3.4.8 기능 설명: 사용자의 운동 계획, 즉 루틴을 생성하고 관리한다. 사용자의 숙련도와 목표에 따라 초보자, 다이어터, 숙련자등 차별화된 루틴을 자동으로 추천한다. 또한 사용자가 직접 루틴을 수정하는 커스터마이징 기능을 제공한다.
+3.5 NutritionService (식단 관리)
+3.5.1 모듈 이름: NutritionService(식단 관리)
+3.5.2 모듈 유형: Service/Controller
+3.5.3 인터페이스:
+	- 메뉴: 식단 기록, 오늘 섭취 현황, 음식 추천받기
+	- Endpoints: POST/diets, GET/diets/recommendation
+	- 입력 형식: DietLogRequestDto(JSON)
+	- 출력 형식: DailyNutritionReportDto,
+		FoodRecommendationDto(JSON)
+3.5.4 모듈 내부 설계:
+	- 알고리즘:
+일일 권장량 계산 알고리즘: 해리스-베네딕트 방정식을 사용하여 사용자의 기초대사량과 활동대사량을 계산하고, 목표에 따라 최종 권장 칼로리를 산출한다.
+음식 추천 알고리즘: 사용자의 일일 섭취량과 목표 섭취량을 비교하여 가장 부족한 영양소를 식별하고, DB에서 해당 영양소가 풍부한 음식을 조회하여 추천한다.
+	- 지역 변수:
+dailyNutritionStatus (NutritionDto): 사용자의 오늘 섭취 영양소 현황을 담는 객체.
+3.5.5 오류 메시지:
+	- E4043: Food DB에 존재하지 않는 음식입니다.
+3.5.6 사용하는 파일:
+	- DIET_LOGS테이블
+	- FOOD_DB테이블
+3.5.7 호출하는 모듈: DBConnector
+3.5.8 기능 설명: 사용자의 식단을 기록하고 분석하여 맞춤 피드백을 제공한다. 사용자가 음식명을 입력하면 Food DB와 매칭하여 칼로리, 탄단지 정보를 계산한다. 운동 목표에 맞춰 부족한 영양소를 보충할 수 있는 음식을 추천하는 AI 식단 추천 기능을 제공한다.
+3.6 GoalTracker (챌린지 및 뱃지)
+3.6.1 모듈 이름: GoalTracker(챌린지 및 뱃지)
+3.6.2 모듈 유형: Service/Controller
+3.6.3 인터페이스:
+	- 메뉴: 챌린지, 랭킹, 내 뱃지
+	- Endpoints: POST/challenges/join, GET/ranking,
+		GET/users/me/badges
+	- 입력 형식: JoinChallengeRequestDto(JSON)
+	- 출력 형식: RankingResponseDto, BadgeListDto(JSON)
+3.6.4 모듈 내부 설계:
+	- 알고리즘:
+챌린지 달성도 체크 알고리즘: 매일 자정, 스케줄러가 진행 중인 모든 챌린지에 대해 운동 기록을 조회하여 달성 여부를 검사한다.
+랭킹 산정 알고리즘: 매주 월요일 자정, 지난주의 운동 기록을 기반으로 사용자별 총 운동 시간 등을 집계하여 순위를 산정하고 RANKING테이블에 저장한다.
+	- 지역 변수:
+userChallengeProgress (Map<ChallengeId, Progress>):       사용자가 참여 중인 챌린지의 현재 진행도를 담는 객체.
+3.6.5 오류 메시지:
+	- E4093: 이미 참여 중인 챌린지입니다.
+3.6.6 사용하는 파일: CHALLENGES테이블,
+		USER_ACHIEVEMENTS테이블, BADGES테이블
+3.6.7 호출하는 모듈: DBConnector
+3.6.8 기능 설명: 게이미피케이션 요소를 통해 사용자의 운동 동기를 부여한다. "한 달 동안 10,000칼로리 소모하기"와 같은 챌린지, "7일 연속 운동 달성"과 같은 업적 달성 시 주어지는 뱃지, 다른 사용자와 운동 성과를 비교하는 랭킹 시스템을 제공하여 재미와 성취감을 느끼며 운동을 지속하도록 유도한다.
+3.7 Store (상점 관리)
+3.7.1 모듈 이름: Store(상점 관리)
+3.7.2 모듈 유형: Service/Controller
+3.7.3 인터페이스:
+메뉴: 스토어, 구매 내역
+Endpoints: GET/store/programs, POST/store/purchase
+입력 형식: PurchaseRequestDto(JSON)
+출력 형식: ProgramListDto, PurchaseResultDto(JSON)
+3.7.4 모듈 내부 설계:
+알고리즘:
+결제 처리 및 접근 권한 부여 알고리즘: 클라이언트로부터 받은 영수증 데이터를 App Store/Google Play 서버에 검증 요청하고, 성공 시 USER_CONTENT_ACCESS테이블에 구매 기록을 추가한다.
+프리미엄 콘텐츠 접근 제어 알고리즘: 사용자가 프리미엄 콘텐츠 조회를 요청할 때마다, USER_CONTENT_ACCESS테이블에 유효한 구매 기록이 있는지 확인하여 접근을 제어한다.
+지역 변수: paymentTransaction (TransactionDto): 현재 처리 중인 결제 정보를 담는 객체.
+3.7.5 오류 메시지:
+	- E4021: 결제 처리에 실패했습니다.
+3.7.6 사용하는 파일: PROGRAMS테이블,
+		USER_CONTENT_ACCESS테이블
+3.7.7 호출하는 모듈: 외부 결제 게이트웨이, DBConnector
+3.7.8 기능 설명: 서비스의 수익 모델을 담당한다. '4주 완성 다이어트 프로그램'과 같이 전문 트레이너가 설계한 고급 운동 프로그램을 유료로 제공한다. 사용자가 콘텐츠를 구매하면 해당 계정에만 접근 권한을 부여하여 관리한다.
+3.8 NotificationManager (알림)
+3.8.1 모듈 이름: NotificationManager(알림)
+3.8.2 모듈 유형: Utility/Service
+3.8.3 인터페이스:
+	- 메뉴: 알림 설정
+	- Endpoints: POST/notifications/schedule
+	- 입력 형식: NotificationSettingDto(JSON)
+	- 출력 형식: (없음. 모바일 기기의 푸시 알림으로 표현됨)
+3.8.4 모듈 내부 설계:
+	- 알고리즘:
+푸시 알림 스케줄링 알고리즘: 사용자가 알림 시간을 설정하면, 해당 정보를 스케줄링 큐에 등록하고 지정된 시간에 FCM으로 발송 요청을 보낸다.
+이벤트 기반 알림 알고리즘: GoalTracker모듈에서 발생하는 '뱃지 획득' 같은 이벤트를 구독하여 감지 즉시 사용자에게 실시간 알림을 보낸다.
+	- 지역 변수:
+notificationPayload (FcmMessage): FCM으로 보낼 메시지의  제목, 내용, 타겟 토큰 등을 담는 객체.
+3.8.5 오류 메시지:
+	- E7001: 유효하지 않은 디바이스 토큰입니다.
+3.8.6 사용하는 파일: USER_DEVICES테이블
+3.8.7 호출하는 모듈: Firebase Cloud Messaging (FCM)
+3.8.8 기능 설명: 사용자의 지속적인 앱 사용을 유도하기 위해 푸시 알림을 관리한다. 사용자가 설정한 운동 시간이나 식단 입력 시간에 맞춰 리마인더를 보내준다. 또한, 새로운 챌린지 시작, 뱃지 획득과 같은 이벤트 발생 시 사용자에게 알림을 보내 참여를 유도한다.
+3.9 ReportGenerator (리포트 생성)
+3.9.1 모듈 이름: ReportGenerator(리포트 생성)
+3.9.2 모듈 유형: Service/Controller
+3.9.3 인터페이스:
+	- 메뉴: 리포트
+	- Endpoints: GET/reports/weekly, GET/reports/monthly
+	- 입력 형식: ReportRequestDto(JSON)
+	- 출력 형식: WeeklyReportResponseDto(JSON)
+3.9.4 모듈 내부 설계:
+	- 알고리즘:
+주간/월간 데이터 집계 알고리즘: 지정된 기간을 조건으로 DB를 조회하고, SQL의 GROUP BY, SUM(), AVG()함수를 사용하여 일별 통계 데이터를 집계한다.
+목표 달성률 시각화 데이터 생성 알고리즘: 사용자의 목표 체중과 실제 체중 변화 기록을 조회하여 달성률을 계산하고, 클라이언트의 그래프 라이브러리가 사용할 수 있는 형식으로 가공한다.
+	- 지역 변수:
+reportData (WeeklyReportDto): 생성된 리포트의 통계 데이터를 담는 객체.
+3.9.5 오류 메시지:
+	- E4044: 해당 기간의 데이터가 존재하지 않습니다.
+3.9.6 사용하는 파일: EXERCISE_RECORDS테이블, DIET_LOGS테이블
+3.9.7 호출하는 모듈: DBConnector
+3.9.8 기능 설명: 누적된 운동 및 식단 기록을 바탕으로 사용자에게 통계적 인사이트를 제공한다. 주간/월간 단위로 총 운동 시간, 소모 칼로리, 영양소 섭취 비율 등을 분석하여 그래프 형태로 시각화한다. 이를 통해 사용자는 자신의 변화를 객관적으로 파악하고 다음 목표를 설정하는 데 도움을 받는다.
+3.10 DBConnector (데이터 연결)
+3.10.1 모듈 이름: DBConnector(데이터 연결)
+3.10.2 모듈 유형: Data Access Layer
+3.10.3 인터페이스:
+	- Endpoints: 내부 CRUD (Create, Read, Update, Delete) 오퍼레이션 제공
+	- 입력 형식: (없음)
+	- 출력 형식: (없음)
+3.10.4 모듈 내부 설계:
+	- 알고리즘:
+커넥션 풀 관리 알고리즘: HikariCP와 같은 커넥션 풀 라이브러리를 사용하여 미리 생성된 DB 커넥션을 관리하고 재사용함으로써 연결 생성 비용을 최소화한다.
+JPA Repository 패턴: 각 테이블(Entity)에 대응하는 Repository 인터페이스를 정의하면, Spring Data JPA가 런타임에 구현체를 자동 생성하여 기본적인 CRUD 로직을 제공한다.
+	- 지역 변수:
+entityManager (EntityManager): JPA의 영속성 컨텍스트를 관리하는 객체.
+3.10.5 오류 메시지: (없음)
+3.10.6 사용하는 파일: PostgreSQL 데이터베이스 전체
+3.10.7 호출하는 모듈: (없음)
+3.10.8 기능 설명: 시스템의 데이터 저장소(Data Access Layer) 역할을 수행한다. 모든 서비스 모듈과 PostgreSQL데이터베이스 사이의 연결을 중계한다. 다른 모듈들이 직접 데이터베이스에 접근하는 대신, 이 모듈이 제공하는 표준화된 인터페이스를 통해 데이터를 읽고 쓰는 역할을 담당하여 시스템의 결합도를 낮추고 유지보수성을 높인다.
+3.11 AdminModule (운영자용 관리 기능)
+3.11.1 모듈 이름: AdminModule(운영자용 관리기능)
+3.11.2 모듈 유형: Service/Controller
+3.11.3 인터페이스:
+	- 메뉴: (별도의 관리자용 웹 페이지) 사용자 관리, 콘텐츠 관리, 통계 대시보드
+	- Endpoints: POST /admin/exercises, PUT /admin/users/{id}/ban
+	- 입력 형식: AddExerciseRequestDto, BanUserRequestDto(JSON)
+	- 출력 형식: UserListResponseDto, DailyStatsDto(JSON)
+3.11.4 모듈 내부 설계:
+	- 알고리즘:
+관리자 권한 확인 알고리즘 (AOP 적용): @AdminOnly어노테이션을 사용하여, 해당 어노테이션이 붙은 메소드가 실행되기 전에 사용자의 권한이 'ADMIN'인지 자동으로 검사하는 로직을 삽입한다.
+콘텐츠 관리 알고리즘: 운영자가 새로운 콘텐츠를 추가하면 해당 데이터를 DB에 저장하고, 필요시 서버 캐시를 갱신하여 모든 사용자에게 즉시 반영한다.
+	- 지역 변수:
+targetUser (User): 관리자가 현재 관리 대상으로 삼고 있는   사용자 정보를 담는 객체.
+3.11.5 오류 메시지:
+	- E4031: 관리자 권한이 필요합니다.
+3.11.6 사용하는 파일: 모든 DB 테이블
+3.11.7 호출하는 모듈: DBConnector
+3.11.8 기능 설명: 서비스 운영자가 사용자와 콘텐츠를 관리하기 위한 백엔드 기능이다. 일반 사용자에게는 노출되지 않으며, 새로운 운동 콘텐츠나 프리미엄 프로그램을 추가하고, 사용자 통계를 확인하거나 어뷰징 사용자를 제재하는 등의 운영에 필요한 모든 기능을 포함한다.
+
+4. 파일 구조 및 데이터베이스(DB) 설계
+4.1 외부 파일(데이터베이스)의 논리적 구조
+본 시스템은 사용자의 운동 루틴, 자세 인식, 식단 관리, 목표 설정, 상점, 포인트 관리, 챌린지 및 게이미피케이션 기능 등을 통합적으로 관리하기 위해 관계형 데이터베이스(Relational Database Management System, RDBMS) 구조를 채택하였다.
+데이터의 무결성과 일관성을 보장하기 위해 3차 정규화(3NF) 기반으로 테이블을 설계하였으며, 데이터 중복을 최소화하고 각 기능 모듈 간 효율적인 데이터 공유가 가능하도록 구성하였다.
+
+• 인증(Authentication) 기능은Firebase Authentication을 활용하며,
+• 사용자의 로그인/회원가입 정보는Firebase에서 관리되고,데이터베이스에는 사용자 프로필 및 활동 데이터만 저장된다.
+
+4.1.1 시스템 구조도
+4.1.2 테이블 명세서
+(1) 사용자 관리 테이블
+테이블명	주요 필드	설명
+User	user_id(PK), firebase_uid, email,   nickname, join_date	Firebase 인증 계정과  연동된 사용자 정보
+UserProfile	user_id(FK), age, height, weight, gender, profile_image, bio	사용자 신체 정보      및 프로필
+Goal	goal_id(PK), user_id(FK), goal_type, target_value, current_value,       start_date, end_date	개인 운동/건강 목표   관리
+Progress	progress_id(PK), goal_id(FK),      date, value	목표 달성률 기록 및 시각화용 데이터
+2) 운동 루틴 및 세션 관리 테이블
+테이블명	주요 필드	설명
+Exercise	exercise_id (PK), name,        body_part, description,        difficulty, video_url	운동 동작 기본 정보
+WorkoutRoutine	routine_id (PK), user_id (FK),    title, description, created_at	사용자별 운동 루틴
+RoutineExercise	routine_ex_id (PK),             routine_id (FK), exercise_id (FK),sets, reps, rest_time_sec	루틴 내 운동 구성
+WorkoutSession	session_id (PK), user_id (FK),    routine_id (FK), start_time,     end_time, total_calories	운동 세션 기록
+WorkoutRecords	record_id (PK), session_id (FK), exercise_id (FK), set_num,      reps_done, start_time, end_time,    calories_burned	세트별 운동 수행 기록 및 세션 정보
+Feedback	feedback_id (PK),              session_id (FK), exercise_id (FK), set_num, feedback_text, score, created_at	AI 분석 기반          피드백 기록          (점수 및 교정 메시지)
+PoseData	pose_id (PK), session_id (FK),   frame_index, ypoints_json	MediaPipe Pose 기반  관절 좌표 데이터(JSON)
+(3) 식단 및 영양 관리 테이블
+테이블명	주요 필드	설명
+FoodInfo	food_id(PK), name, calories, protein, carbs, fat	음식 영양소 정보
+UserMeal	meal_id(PK), user_id(FK), food_id(FK), meal_time, quantity	식단 기록 데이터
+NutritionSummary	summary_id(PK), user_id(FK), date, total_calories, total_protein, total_carbs, total_fat	일별 섭취 영양 요약
+MyFood	myfood_id(PK), user_id(FK), food_id(FK), is_favorite, added_at	사용자가 즐겨찾기한 음식 정보
+(4) 상점 및 포인트 관리 테이블
+테이블명	주요 필드	설명
+Item	item_id(PK), name, description, price_point, image_url,          is_premium	상점 아이템 및 프리미엄 프로그램 정보
+Purchase	purchase_id(PK), user_id(FK),     item_id(FK), purchase_date	인앱 구매 내역
+UserContentAccess	access_id(PK), user_id(FK),       item_id(FK), has_access,         granted_at	구매 콘텐츠 접근   권한 관리
+PointTransaction	transaction_id(PK), user_id(FK),  change_amount, reason,        created_at	포인트 적립 및     차감 기록
+(5) 챌린지 및 게이미피케이션 관리 테이블
+테이블명	주요 필드	설명
+Challenge	challenge_id(PK), title, description, goal_value, duration_days,        reward_points	챌린지 목표 및 보상 정보
+UserChallenge	user_challenge_id(PK), user_id(FK), challenge_id(FK), progress_value,  completed, joined_at	사용자 챌린지 참여  상태
+Badge	badge_id(PK), name, description,  icon_url	업적 배지 정보
+UserBadge	user_badge_id(PK), user_id(FK),    badge_id(FK), earned_at	사용자 배지 획득 내역
+Ranking	rank_id(PK), user_id(FK),           total_workouts, total_calories,     accuracy_avg, rank_position,      updated_at	사용자별 운동 랭킹  데이터
+Notification	noti_id(PK), user_id(FK), type,    message, created_at, is_read	사용자 알림 관리
+4.1.3 데이터 사전(Data Dictionary)
+1. 사용자 관리 테이블
+테이블명	컬럼명	데이터 타입	제약조건	설명
+User	user_id	integer	PK	사용자 고유ID
+firebase_uid	varchar	NOT NULL, UNIQUE	Firebase Authentication UID
+email	varchar	NOT NULL, UNIQUE	사용자 이메일
+nickname	varchar		사용자 닉네임
+join_date	timestamp		가입 일시
+UserProfile	user_id	integer	PK, FK(User.user_id)	사용자 프로필 연결
+age	integer		나이
+height	decimal		키(cm)
+weight	decimal		체중(kg)
+gender	varchar		성별
+profile_image	varchar		프로필 이미지URL
+bio	text		자기소개
+Goal	goal_id	integer	PK	목표 고유ID
+user_id	integer	FK(User.user_id)	목표 소유자
+goal_type	varchar		목표 유형(체중, 칼로리 등)
+target_value	decimal		목표 값
+current_value	decimal		현재 진행 값
+start_date	date		목표 시작일
+end_date	date		목표 종료일
+Progress	progress_id	integer	PK	진행 기록ID
+goal_id	integer	FK(Goal.goal_id)	목표 연결
+date	date		기록 날짜
+value	decimal		달성 값
+2. 운동 루틴 및 세션 관리 테이블
+
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Exercise	exercise_id	integer	PK	운동 고유ID
+name	varchar		운동 이름
+body_part	varchar		운동 부위
+description	text		운동 설명
+difficulty	varchar		난이도
+video_url	varchar		운동 영상URL
+WorkoutRoutine	routine_id	integer	PK	루틴 고유ID
+user_id	integer	FK(User.user_id)	루틴 소유자
+title	varchar		루틴 이름
+description	text		루틴 설명
+created_at	timestamp		생성일
+RoutineExercise	routine_ex_id	integer	PK	루틴 내 운동 구성ID
+routine_id	integer	FK(WorkoutRoutine.routine_id)	루틴 연결
+exercise_id	integer	FK(Exercise.exercise_id)	운동 연결
+sets	integer		세트 수
+reps	integer		반복 수
+rest_time_sec	integer		세트 간 휴식(초)
+WorkoutSession	session_id	integer	PK	운동 세션ID
+user_id	integer	FK(User.user_id)	사용자
+routine_id	integer	FK(WorkoutRoutine.routine_id)	루틴 연결
+start_time	timestamp		시작 시간
+end_time	timestamp		종료 시간
+total_calories	decimal		총 소모 칼로리
+WorkoutRecords	record_id	integer	PK	운동 기록ID
+session_id	integer	FK(WorkoutSession.session_id)	세션 연결
+exercise_id	integer	FK(Exercise.exercise_id)	운동 연결
+set_num	integer		세트 번호
+reps_done	integer		실제 수행 횟수
+start_time	timestamp		세트 시작 시간
+end_time	timestamp		세트 종료 시간
+calories_burned	decimal		세트 소모 칼로리
+Feedback	feedback_id	integer	PK	피드백ID
+session_id	integer	FK(WorkoutSession.session_id)	운동 세션 연결
+3. 식단 및 영양 관리 테이블
+테이블명	컬럼명	데이터 타입	제약조건	설명
+FoodInfo	food_id	integer	PK	음식 고유ID
+name	varchar		음식 이름
+calories	decimal		칼로리
+protein	decimal		단백질
+carbs	decimal		탄수화물
+fat	decimal		지방
+UserMeal	meal_id	integer	PK	식단 기록ID
+user_id	integer	FK(User.user_id)	사용자 연결
+food_id	integer	FK(FoodInfo.food_id)	음식 연결
+meal_time	timestamp		섭취 시간
+quantity	decimal		섭취량
+NutritionSummary	summary_id	integer	PK	요약ID
+user_id	integer	FK(User.user_id)	사용자 연결
+date	date		기록 날짜
+total_calories	decimal		일일 총 칼로리
+total_protein	decimal		일일 단백질
+total_carbs	decimal		일일 탄수화물
+total_fat	decimal		일일 지방
+MyFood	favorite_id	integer	PK	즐겨찾기ID
+user_id	integer	FK(User.user_id)	사용자 연결
+food_id	integer	FK(FoodInfo.food_id)	음식 연결
+created_at	timestamp		즐겨찾기 등록일
+4. 상점 및 포인트 관리 테이블
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Item	item_id	integer	PK	상품ID
+	name	varchar		상품명
+	description	text		상품 설명
+	price_point	decimal		가격(포인트)
+	image_url	varchar		이미지URL
+	is_premium	boolean		프리미엄 여부
+Purchase	purchase_id	integer	PK	구매 기록ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	item_id	integer	FK(Item.item_id)	아이템 연결
+	purchase_date	timestamp		구매 일시
+UserContentAccess	access_id	integer	PK	접근 권한ID
+	user_id	integer	FK(User.user_id)	사용자
+	item_id	integer	FK(Item.item_id)	아이템
+	has_access	boolean		접근 권한 여부
+	granted_at	timestamp		권한 부여일
+PointTransaction	transaction_id	integer	PK	거래ID
+	user_id	integer	FK(User.user_id)	사용자
+	change_amount	decimal		변동 포인트
+	reason	varchar		변동 사유
+	created_at	timestamp		기록 생성일
+5. 챌린지 및 게이미피케이션 관리 테이블
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Challenge	challenge_id	integer	PK	챌린지ID
+	title	varchar		챌린지 제목
+	description	text		챌린지 설명
+	goal_value	decimal		목표 달성 값
+	duration_days	integer		기간(일)
+	reward_points	decimal		보상 포인트
+UserChallenge	user_challenge_id	integer	PK	사용자 챌린지ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	challenge_id	integer	FK(Challenge.challenge_id)	챌린지 연결
+	progress_value	decimal		진행률
+	completed	boolean		완료 여부
+	joined_at	timestamp		참여일
+Badge	badge_id	integer	PK	배지ID
+	name	varchar		배지 이름
+	description	text		배지 설명
+	icon_url	varchar		아이콘URL
+UserBadge	user_badge_id	integer	PK	사용자 배지ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	badge_id	integer	FK(Badge.badge_id)	배지 연결
+	earned_at	timestamp		획득일
+Ranking	rank_id	integer	PK	랭킹ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	total_workouts	integer		총 운동 세션 수
+	total_calories	decimal		총 소모 칼로리
+	accuracy_avg	decimal		평균 정확도 점수
+	rank_position	integer		랭킹 순위
+	updated_at	timestamp		최신 갱신일
+Notification	noti_id	integer	PK	알림ID
+	user_id	integer	FK(User.user_id)	사용자
+	type	varchar		알림 유형
+	message	text		알림 메시지
+	created_at	timestamp		생성일
+	is_read	boolean		읽음 여부
+4.1.4 ER 다이어그램
+ 
+
+
+ 
+4.2 공유 자료
+공유 자료(Shared Data)는 여러 모듈에서 공통적으로 접근하며, 외래키(Foreign Key) 제약을 통해 참조 무결성을 유지한다.
+공유 자료명	주요 접근 모듈	설명
+User	전체 모듈	사용자 인증 및 식별   정보(Firebase UID 기반)
+Exercise	운동 루틴, 피드백, 챌린지	공통 운동 데이터
+FoodInfo	식단, 목표 관리	영양소 기반 분석
+Item	상점, 포인트 관리	인앱 구매 정보
+Goal / Progress	운동, 식단, 리포트	개인 목표 및 달성     데이터
+공유 자료는 읽기 전용(READ-ONLY) 접근을 기본으로 하며, 데이터 수정은 인증된 모듈에서만 가능하도록 제한하였다.
+
+4.3 데이터베이스 운영 환경 및 접근 방식
+(1) DBMS 및 인증 환경
+•  DBMS 종류: PostgreSQL
+•  인증 시스템: Firebase Authentication
+•  운영 환경: 클라우드 기반(예: Supabase, AWS RDS)
+•  접근 방식: ORM 기반(Prisma / TypeORM)
+(2) 데이터 접근 방법
+구분	접근 방식	설명
+일반 데이터	ORM 기반SQL CRUD	운동 루틴, 목표, 챌린지    등 관리
+운동 자세 데이터(PoseData)	REST API + JSON 파일	AI 분석용 프레임 데이터는   JSON 파일로 저장, DB에는 메타데이터만 저장
+이미지/영상 파일	Pre-signed URL 방식	클라이언트가S3에 직접     업로드/다운로드
+실시간 피드백	WebSocket	운동 중 실시간 자세       피드백 송수신
+결제/포인트	DB 트랜잭션 기반	ACID 보장 하에 포인트 변동 처리
+(3) 데이터 백업 및 복구 방안
+•  백업 주기: 1일1회 자동 백업
+•  백업 위치: 클라우드 저장소(암호화 저장)
+•  복구 방법: 백업 스냅샷 기반 자동 복구 절차 제공
+(4) 보안 관리
+•  사용자 비밀번호는Firebase Authentication에서 안전하게 관리
+•  DB 내 민감 데이터는AES-256 암호화
+•  DB 접근은 VPC Private Subnet 내부에서만 허용
+
+
+5. 요구 분석 참조표
+요구식별자	요구 요약	주요 관련 모듈
+FR-001	사용자별 목표관리,
+운동레벨	RoutineService,
+GoalManager
+FR-002	AI 자세 분석, 피드백	AIAnalyzer
+FR-003	영상 기반 운동 기록	WorkoutManager
+FR-004	식단 기록, 영양분 분석	NutritionService
+FR-007	알림, 메시지	Notification
+Manager
+FR-009	사용자 Level 및 Goal을 반영하여 피드백 민감도, 추천 강도, 루틴 순서를 개인화	RoutineService
+※ 문서의 요구식별자 기준
+
+6. 제약사항
+제약 분류	제약 내용	상세 설명	대응 방안
+기술적	실시간 AI 처리 제한	On-device AI inference를 사용하나, 모바일 기기 CPU/GPU 자원 한계로 고해상도 영상 처리 시 프레임 드랍이나 지연 발생 가능. 예: MediaPipe Pose 모델이 30FPS 이상에서 정확도 저하.	TensorFlow Lite 모델 최적화 (quantization 적용)와 클라우드 백업 연동 (AWS Lambda로 복잡 계산 오프로드). 테스트 시 저사양 기기(예: Android 10)에서 벤치마킹 수행.
+운영적	iOS/Android 동시 지원 및 기기 해상도 대응	Flutter 프레임워크 사용하나, iOS 14+와 Android 10+ 간 API 차이로 UI 렌더링 오류 발생 가능. 예: 카메라 해상도(720p vs 4K) 차이로 자세 분석 정확도 변동.	반응형 UI 설계 (MediaQuery 사용)와 크로스플랫폼 테스트 도구(예: Firebase Test Lab) 도입. 정기 업데이트로 OS 버전 호환성 확인.
+보안/데이터	개인정보 보호 (GDPR 준수) 및 데이터 암호화	사용자 운동 데이터(자세 좌표, 식단 기록)가 민감 정보로, 유출 시 법적 문제 발생. 예: AWS S3 저장 시 암호화 미적용으로 해킹 위험.	Firebase Auth로 인증 강화, AES-256 암호화 적용, 사용자 동의 모듈 추가. GDPR 준수 위해 데이터 최소화 원칙 (필요 시 삭제 기능) 도입 및 감사 로그 기록.
+법적/규제	데이터 보호법 준수 및 지적재산권	국내 개인정보 보호법(Korea PIPA)과 EU GDPR 준수 필요. AI 모델(TensorFlow Lite) 사용 시 라이선스 문제 발생 가능. 예: 사용자 데이터 수출 시 국제 규제 위반.	법무 검토 후 사용자 약관에 명시, 오픈소스 라이선스 확인 (MIT/Apache). 정기 컴플라이언스 감사 실시.
+경제적	예산 및 자원 한계	캡스톤 프로젝트로 AWS S3, Firebase 비용 제한. 예: 대용량 영상 저장 시 비용 초과.	무료 티어 활용 (AWS Free Tier)과 로컬 테스트 우선. 필요 시 클라우드 비용 최적화 도구(예: AWS Cost Explorer) 사용.
+환경적	기기 호환성 및 네트워크 의존성	오프라인 모드 지원 미흡으로 네트워크 불안정 지역에서 앱 사용 제한. 예: 시골 지역 네트워크 지연으로 AI 분석 실패.	오프라인 캐싱 기능 추가 (SQLite 로컬 DB 사용)와 네트워크 상태 체크 모듈 도입. 저속 네트워크 테스트 수행.
+
+
+7. 참고 사항
+•  UI/UX: Flutter 2.0 이상, 구글/애플 건강 API 연동, TTS 피드백 가능
+•  운영: 일 1회 클라우드 백업, 자동 복구, 보안(암호화, VPN, TLS1.2, SHA-256/Bcrypt 비번)
+•  확장: 웨어러블(Apple/Galaxy Watch), 유료화 정책(광고/구독), 글로벌 확장 지원 준비.
+
+
+
+
+
+
+
+요구식별자	요구 요약	주요 관련 모듈
+FR-001	사용자별 목표관리,
+운동레벨	RoutineService,
+GoalManager
+FR-002	AI 자세 분석, 피드백	AIAnalyzer
+FR-003	영상 기반 운동 기록	WorkoutManager
+FR-004	식단 기록, 영양분 분석	NutritionService
+FR-007	알림, 메시지	Notification
+Manager
+FR-009	사용자 Level 및 Goal을 반영하여 피드백 민감도, 추천 강도, 루틴 순서를 개인화	RoutineService
+
+
+no	모듈명	모듈 유형	기능 설명 
+1	UserManager	Service/Controller	회원가입, 로그인 등 사용자 인증
+및 프로필을 관리합니다.
+2	WorkoutManager	Service/Controller	실시간 운동 세션을 제어하고, AI 분석을 중계하며 운동 기록을 관리합니다.
+3	AIAnalyzer	Inference Server	카메라로 입력된 사용자의 운동 자세
+정확도를 분석하고 실시간 피드백을
+생성합니다.
+4	RoutineService	Service/Controller	사용자의 레벨과 목표에 맞는 개인화된
+운동 루틴을 생성하고 추천합니다.
+5	NutritionService	Service/Controller	식단을 기록하고 영양소를 분석하며,
+목표에 맞는 음식을 추천합니다.
+6	GoalTracker	Service/Controller	챌린지, 랭킹, 뱃지 등 게이미피케이션
+요소를 통해 운동 동기를 부여합니다.
+7	Store	Service/Controller	프리미엄 운동 프로그램을 판매하고,
+사용자의 구매 및 접근 권한을
+관리합니다.
+8	Notification
+Manager	Utility/Service	운동 시간, 식단 기록 등 사용자가
+설정한 시간에 맞춰 푸시 알림을
+발송합니다.
+9	ReportGenerator	Service/Controller	누적된 데이터를 바탕으로 주간/월간 운동 및 식단 통계 리포트를
+생성합니다.
+10	DBConnector	Data Access Layer	모든 서비스 모듈과 데이터베이스 간의
+연결 및 데이터 접근을 표준화합니다.
+11	AdminModule	Service/Controller	운영자가 사용자, 콘텐츠, 통계 등을
+관리하기 위한 관리자 전용 기능을
+제공합니다.
+테이블명	주요 필드	설명
+User	user_id(PK), firebase_uid, email,   nickname, join_date	Firebase 인증 계정과  연동된 사용자 정보
+UserProfile	user_id(FK), age, height, weight, gender, profile_image, bio	사용자 신체 정보      및 프로필
+Goal	goal_id(PK), user_id(FK), goal_type, target_value, current_value,       start_date, end_date	개인 운동/건강 목표   관리
+Progress	progress_id(PK), goal_id(FK),      date, value	목표 달성률 기록 및 시각화용 데이터
+테이블명	주요 필드	설명
+Exercise	exercise_id (PK), name,        body_part, description,        difficulty, video_url	운동 동작 기본 정보
+WorkoutRoutine	routine_id (PK), user_id (FK),    title, description, created_at	사용자별 운동 루틴
+RoutineExercise	routine_ex_id (PK),             routine_id (FK), exercise_id (FK),sets, reps, rest_time_sec	루틴 내 운동 구성
+WorkoutSession	session_id (PK), user_id (FK),    routine_id (FK), start_time,     end_time, total_calories	운동 세션 기록
+WorkoutRecords	record_id (PK), session_id (FK), exercise_id (FK), set_num,      reps_done, start_time, end_time,    calories_burned	세트별 운동 수행 기록 및 세션 정보
+Feedback	feedback_id (PK),              session_id (FK), exercise_id (FK), set_num, feedback_text, score, created_at	AI 분석 기반          피드백 기록          (점수 및 교정 메시지)
+PoseData	pose_id (PK), session_id (FK),   frame_index, ypoints_json	MediaPipe Pose 기반  관절 좌표 데이터(JSON)
+테이블명	주요 필드	설명
+FoodInfo	food_id(PK), name, calories, protein, carbs, fat	음식 영양소 정보
+UserMeal	meal_id(PK), user_id(FK), food_id(FK), meal_time, quantity	식단 기록 데이터
+NutritionSummary	summary_id(PK), user_id(FK), date, total_calories, total_protein, total_carbs, total_fat	일별 섭취 영양 요약
+MyFood	myfood_id(PK), user_id(FK), food_id(FK), is_favorite, added_at	사용자가 즐겨찾기한 음식 정보
+테이블명	주요 필드	설명
+Item	item_id(PK), name, description, price_point, image_url,          is_premium	상점 아이템 및 프리미엄 프로그램 정보
+Purchase	purchase_id(PK), user_id(FK),     item_id(FK), purchase_date	인앱 구매 내역
+UserContentAccess	access_id(PK), user_id(FK),       item_id(FK), has_access,         granted_at	구매 콘텐츠 접근   권한 관리
+PointTransaction	transaction_id(PK), user_id(FK),  change_amount, reason,        created_at	포인트 적립 및     차감 기록
+테이블명	주요 필드	설명
+Challenge	challenge_id(PK), title, description, goal_value, duration_days,        reward_points	챌린지 목표 및 보상 정보
+UserChallenge	user_challenge_id(PK), user_id(FK), challenge_id(FK), progress_value,  completed, joined_at	사용자 챌린지 참여  상태
+Badge	badge_id(PK), name, description,  icon_url	업적 배지 정보
+UserBadge	user_badge_id(PK), user_id(FK),    badge_id(FK), earned_at	사용자 배지 획득 내역
+Ranking	rank_id(PK), user_id(FK),           total_workouts, total_calories,     accuracy_avg, rank_position,      updated_at	사용자별 운동 랭킹  데이터
+Notification	noti_id(PK), user_id(FK), type,    message, created_at, is_read	사용자 알림 관리
+공유 자료명	주요 접근 모듈	설명
+User	전체 모듈	사용자 인증 및 식별   정보(Firebase UID 기반)
+Exercise	운동 루틴, 피드백, 챌린지	공통 운동 데이터
+FoodInfo	식단, 목표 관리	영양소 기반 분석
+Item	상점, 포인트 관리	인앱 구매 정보
+Goal / Progress	운동, 식단, 리포트	개인 목표 및 달성     데이터
+구분	접근 방식	설명
+일반 데이터	ORM 기반SQL CRUD	운동 루틴, 목표, 챌린지    등 관리
+운동 자세 데이터(PoseData)	REST API + JSON 파일	AI 분석용 프레임 데이터는   JSON 파일로 저장, DB에는 메타데이터만 저장
+이미지/영상 파일	Pre-signed URL 방식	클라이언트가S3에 직접     업로드/다운로드
+실시간 피드백	WebSocket	운동 중 실시간 자세       피드백 송수신
+결제/포인트	DB 트랜잭션 기반	ACID 보장 하에 포인트 변동 처리
+구분	환경 / 기술 스택
+서버	Ubuntu 22.04, Node.js, PostgreSQL
+클라이언트	Flutter (Dart), Android 10+ / iOS 14+
+AI 엔진	TensorFlow Lite, Google MediaPipe Pose
+기타	Firebase Auth, AWS S3 Storage
+분류	문서명 / 자료명	주요 활용 목적
+프론트엔드	Flutter 공식 문서	크로스플랫폼 UI 개발 및
+빌드 구조
+AI 모델	TensorFlow Lite
+Developer Guide	On-device 모델 경량화 및
+추론 구조
+Google MediaPipe Pose
+API 문서	Pose Detection 기반 운동
+자세 인식
+인증·알림	Firebase Authentication / Cloud Messaging 문서	사용자 인증, 푸시 알림 기능
+백엔드	Node.js / Spring Boot REST API Reference	서버 비즈니스 로직 및 REST API 설계
+데이터베이스	Supabase 공식 문서 (https://supabase.com/docs)	PostgreSQL 기반 DB 관리,
+실시간 데이터 처리,
+호스팅 및 API 연동
+Firebase Firestore / Realtime Database 가이드	클라우드 데이터 동기화
+및 사용자별 저장소
+외부 서비스 연동	Apple HealthKit Developer Guide	iOS 연동을 통한 건강
+데이터 통합
+기타	AWS S3 Storage Guide, GDPR/개인정보보호 지침	영상/미디어 저장, 사용자
+데이터 보호 기준
+테이블명	컬럼명	데이터 타입	제약조건	설명
+User	user_id	integer	PK	사용자 고유ID
+firebase_uid	varchar	NOT NULL, UNIQUE	Firebase Authentication UID
+email	varchar	NOT NULL, UNIQUE	사용자 이메일
+nickname	varchar		사용자 닉네임
+join_date	timestamp		가입 일시
+UserProfile	user_id	integer	PK, FK(User.user_id)	사용자 프로필 연결
+age	integer		나이
+height	decimal		키(cm)
+weight	decimal		체중(kg)
+gender	varchar		성별
+profile_image	varchar		프로필 이미지URL
+bio	text		자기소개
+Goal	goal_id	integer	PK	목표 고유ID
+user_id	integer	FK(User.user_id)	목표 소유자
+goal_type	varchar		목표 유형(체중, 칼로리 등)
+target_value	decimal		목표 값
+current_value	decimal		현재 진행 값
+start_date	date		목표 시작일
+end_date	date		목표 종료일
+Progress	progress_id	integer	PK	진행 기록ID
+goal_id	integer	FK(Goal.goal_id)	목표 연결
+date	date		기록 날짜
+value	decimal		달성 값
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Exercise	exercise_id	integer	PK	운동 고유ID
+name	varchar		운동 이름
+body_part	varchar		운동 부위
+description	text		운동 설명
+difficulty	varchar		난이도
+video_url	varchar		운동 영상URL
+WorkoutRoutine	routine_id	integer	PK	루틴 고유ID
+user_id	integer	FK(User.user_id)	루틴 소유자
+title	varchar		루틴 이름
+description	text		루틴 설명
+created_at	timestamp		생성일
+RoutineExercise	routine_ex_id	integer	PK	루틴 내 운동 구성ID
+routine_id	integer	FK(WorkoutRoutine.routine_id)	루틴 연결
+exercise_id	integer	FK(Exercise.exercise_id)	운동 연결
+sets	integer		세트 수
+reps	integer		반복 수
+rest_time_sec	integer		세트 간 휴식(초)
+WorkoutSession	session_id	integer	PK	운동 세션ID
+user_id	integer	FK(User.user_id)	사용자
+routine_id	integer	FK(WorkoutRoutine.routine_id)	루틴 연결
+start_time	timestamp		시작 시간
+end_time	timestamp		종료 시간
+total_calories	decimal		총 소모 칼로리
+WorkoutRecords	record_id	integer	PK	운동 기록ID
+session_id	integer	FK(WorkoutSession.session_id)	세션 연결
+exercise_id	integer	FK(Exercise.exercise_id)	운동 연결
+set_num	integer		세트 번호
+reps_done	integer		실제 수행 횟수
+start_time	timestamp		세트 시작 시간
+end_time	timestamp		세트 종료 시간
+calories_burned	decimal		세트 소모 칼로리
+Feedback	feedback_id	integer	PK	피드백ID
+session_id	integer	FK(WorkoutSession.session_id)	운동 세션 연결
+exercise_id	integer	FK(Exercise.exercise_id)	운동 연결
+set_num	integer		세트 번호
+feedback_text	text		AI 피드백 메시지
+score	decimal		자세 점수
+created_at	timestamp		기록 생성일
+PoseData (선택)	pose_id	integer	PK	관절 좌표ID
+session_id	integer	FK(WorkoutSession.session_id)	세션 연결
+frame_index	integer		프레임 번호
+keypoints_json	json		MediaPipe Pose 관절 좌표
+테이블명	컬럼명	데이터 타입	제약조건	설명
+FoodInfo	food_id	integer	PK	음식 고유ID
+name	varchar		음식 이름
+calories	decimal		칼로리
+protein	decimal		단백질
+carbs	decimal		탄수화물
+fat	decimal		지방
+UserMeal	meal_id	integer	PK	식단 기록ID
+user_id	integer	FK(User.user_id)	사용자 연결
+food_id	integer	FK(FoodInfo.food_id)	음식 연결
+meal_time	timestamp		섭취 시간
+quantity	decimal		섭취량
+NutritionSummary	summary_id	integer	PK	요약ID
+user_id	integer	FK(User.user_id)	사용자 연결
+date	date		기록 날짜
+total_calories	decimal		일일 총 칼로리
+total_protein	decimal		일일 단백질
+total_carbs	decimal		일일 탄수화물
+total_fat	decimal		일일 지방
+MyFood	favorite_id	integer	PK	즐겨찾기ID
+user_id	integer	FK(User.user_id)	사용자 연결
+food_id	integer	FK(FoodInfo.food_id)	음식 연결
+created_at	timestamp		즐겨찾기 등록일
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Item	item_id	integer	PK	상품ID
+	name	varchar		상품명
+	description	text		상품 설명
+	price_point	decimal		가격(포인트)
+	image_url	varchar		이미지URL
+	is_premium	boolean		프리미엄 여부
+Purchase	purchase_id	integer	PK	구매 기록ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	item_id	integer	FK(Item.item_id)	아이템 연결
+	purchase_date	timestamp		구매 일시
+UserContentAccess	access_id	integer	PK	접근 권한ID
+	user_id	integer	FK(User.user_id)	사용자
+	item_id	integer	FK(Item.item_id)	아이템
+	has_access	boolean		접근 권한 여부
+	granted_at	timestamp		권한 부여일
+PointTransaction	transaction_id	integer	PK	거래ID
+	user_id	integer	FK(User.user_id)	사용자
+	change_amount	decimal		변동 포인트
+	reason	varchar		변동 사유
+	created_at	timestamp		기록 생성일
+테이블명	컬럼명	데이터 타입	제약조건	설명
+Challenge	challenge_id	integer	PK	챌린지ID
+	title	varchar		챌린지 제목
+	description	text		챌린지 설명
+	goal_value	decimal		목표 달성 값
+	duration_days	integer		기간(일)
+	reward_points	decimal		보상 포인트
+UserChallenge	user_challenge_id	integer	PK	사용자 챌린지ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	challenge_id	integer	FK(Challenge.challenge_id)	챌린지 연결
+	progress_value	decimal		진행률
+	completed	boolean		완료 여부
+	joined_at	timestamp		참여일
+Badge	badge_id	integer	PK	배지ID
+	name	varchar		배지 이름
+	description	text		배지 설명
+	icon_url	varchar		아이콘URL
+UserBadge	user_badge_id	integer	PK	사용자 배지ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	badge_id	integer	FK(Badge.badge_id)	배지 연결
+	earned_at	timestamp		획득일
+Ranking	rank_id	integer	PK	랭킹ID
+	user_id	integer	FK(User.user_id)	사용자 연결
+	total_workouts	integer		총 운동 세션 수
+	total_calories	decimal		총 소모 칼로리
+	accuracy_avg	decimal		평균 정확도 점수
+	rank_position	integer		랭킹 순위
+	updated_at	timestamp		최신 갱신일
+Notification	noti_id	integer	PK	알림ID
+	user_id	integer	FK(User.user_id)	사용자
+	type	varchar		알림 유형
+	message	text		알림 메시지
+	created_at	timestamp		생성일
+	is_read	boolean		읽음 여부
+테이블명	필드명	데이터 타입	제약 조건 및 설명	기본값/예시
+User	user_id	INT (PK)	기본키, 자동증가, 사용자 고유 아이디	1
+email	VARCHAR(255)	UNIQUE, NOT NULL, 로그인용 이메일	user@example.com
+password_hash	VARCHAR(255)	NOT NULL, 암호화된 비밀번호	(암호화된 문자열)
+nickname	VARCHAR(50)	NOT NULL	usernick
+join_date	DATETIME	DEFAULT CURRENT_TIMESTAMP, 가입일	2025-10-14 10:00:00
+UserProfile	user_id	INT (FK)	User.user_id 참조, 1:1 매핑	1
+age	INT	NULL 허용	28
+height	FLOAT	NULL 허용, cm 단위	175.5
+weight	FLOAT	NULL 허용, kg 단위	70.2
+gender	CHAR(1)	NULL 허용, 'M', 'F' 지정	M
+profile_image	VARCHAR(255)	NULL 허용, 프로필 사진 URL	/images/profile.png
+bio	TEXT	NULL 허용, 자기소개	운동 좋아하는 개발자
+Exercise	exercise_id	INT (PK)	기본키, 운동 고유 ID	1001
+name	VARCHAR(100)	NOT NULL, 운동 이름	푸쉬업 (Push Up)
+body_part	VARCHAR(50)	NOT NULL, 운동 부위	가슴 (Chest)
+description	TEXT	NULL 허용, 운동 설명	기본 상체 근력 운동
+difficulty	VARCHAR(20)	NULL 허용, 'Beginner', 'Intermediate', 'Advanced' 등	Beginner
+video_url	VARCHAR(255)	NULL 허용, 운동 영상 주소	https://example.com/pushup.mp4
+WorkoutRoutine	routine_id	INT (PK)	기본키, 운동 루틴 ID	2001
+user_id	INT (FK)	User.user_id 참조	1
+title	VARCHAR(100)	NOT NULL, 루틴 제목	아침 스트레칭 루틴
+description	TEXT	NULL 허용, 루틴 상세 설명	아침에 하는 가벼운 스트레칭
+created_at	DATETIME	DEFAULT CURRENT_TIMESTAMP	2025-10-14 07:00:00
+WorkoutSession	session_id	INT (PK)	기본키, 운동 세션 ID	3001
+routine_id	INT (FK)	WorkoutRoutine.routine_id 참조	2001
+start_time	DATETIME	세션 시작 시간	2025-10-14 07:15:00
+end_time	DATETIME	세션 종료 시간	2025-10-14 08:00:00
+total_calories	FLOAT	NULL 허용, 세션 동안 소모 칼로리	300.5
+Diet	diet_id	INT (PK)	기본키, 식단 고유 ID	4001
+user_id	INT (FK)	User.user_id 참조	1
+date	DATE	식단 날짜	2025-10-14
+meal_type	VARCHAR(10)	식사 종류 (아침, 점심, 저녁, 간식 등)	아침
+calories	FLOAT	섭취 칼로리	600.0
+protein	FLOAT	단백질 섭취량 (g)	40.0
+fat	FLOAT	지방 섭취량 (g)	25.0
+carbohydrate	FLOAT	탄수화물 섭취량 (g)	80.0
+CommunityPost	post_id	INT (PK)	기본키, 게시글 ID	5001
+user_id	INT (FK)	작성자 User.user_id 참조	1
+content	TEXT	게시글 내용	오늘 운동 소감
+created_at	DATETIME	작성 일시	2025-10-14 15:30:00
+Feedback	feedback_id	INT (PK)	기본키, 피드백 ID	6001
+session_id	INT (FK)	WorkoutSession.session_id 참조	3001
+exercise_id	INT (FK)	Exercise.exercise_id 참조	1001
+set_num	INT	운동 세트 번호	1
+feedback_text	TEXT	교정 피드백 텍스트	자세가 조금 더 펴져야 함
+score	FLOAT	자세 점수 (0~100)	85.5
+created_at	DATETIME	피드백 생성 시간	2025-10-14 07:45:00
+Media	media_id	INT (PK)	미디어 파일 ID	7001
+owner_type	VARCHAR(50)	파일 소유 주체 유형 (User, Exercise, Session 등)	Session
+owner_id	INT	주체 ID	3001
+file_url	VARCHAR(255)	저장소 내 파일 경로	s3://fitnessapp/session343.mov
+upload_date	DATETIME	업로드 시간	2025-10-14 08:00:00
+제약 분류	제약 내용	설계 결정
+기술적	실시간 AI 처리 한계
+(프레임 속도 저하)	TensorFlow Lite로 모델 경량화
+운영적	iOS/Android 호환성	Flutter 크로스플랫폼 프레임워크 채택
+보안	개인정보 보호 (GDPR 준수 필요)	Firebase Auth 및 AES 암호화 적용
+개발 환경	하드웨어 사양 제한 (저사양 기기)	최소 사양 정의 (4GB RAM 이상)
+제약 분류	제약 내용	상세 설명	대응 방안
+기술적	실시간 AI 처리 제한	On-device AI inference를 사용하나, 모바일 기기 CPU/GPU 자원 한계로 고해상도 영상 처리 시 프레임 드랍이나 지연 발생 가능. 예: MediaPipe Pose 모델이 30FPS 이상에서 정확도 저하.	TensorFlow Lite 모델 최적화 (quantization 적용)와 클라우드 백업 연동 (AWS Lambda로 복잡 계산 오프로드). 테스트 시 저사양 기기(예: Android 10)에서 벤치마킹 수행.
+운영적	iOS/Android 동시 지원 및 기기 해상도 대응	Flutter 프레임워크 사용하나, iOS 14+와 Android 10+ 간 API 차이로 UI 렌더링 오류 발생 가능. 예: 카메라 해상도(720p vs 4K) 차이로 자세 분석 정확도 변동.	반응형 UI 설계 (MediaQuery 사용)와 크로스플랫폼 테스트 도구(예: Firebase Test Lab) 도입. 정기 업데이트로 OS 버전 호환성 확인.
+보안/데이터	개인정보 보호 (GDPR 준수) 및 데이터 암호화	사용자 운동 데이터(자세 좌표, 식단 기록)가 민감 정보로, 유출 시 법적 문제 발생. 예: AWS S3 저장 시 암호화 미적용으로 해킹 위험.	Firebase Auth로 인증 강화, AES-256 암호화 적용, 사용자 동의 모듈 추가. GDPR 준수 위해 데이터 최소화 원칙 (필요 시 삭제 기능) 도입 및 감사 로그 기록.
+법적/규제	데이터 보호법 준수 및 지적재산권	국내 개인정보 보호법(Korea PIPA)과 EU GDPR 준수 필요. AI 모델(TensorFlow Lite) 사용 시 라이선스 문제 발생 가능. 예: 사용자 데이터 수출 시 국제 규제 위반.	법무 검토 후 사용자 약관에 명시, 오픈소스 라이선스 확인 (MIT/Apache). 정기 컴플라이언스 감사 실시.
+경제적	예산 및 자원 한계	캡스톤 프로젝트로 AWS S3, Firebase 비용 제한. 예: 대용량 영상 저장 시 비용 초과.	무료 티어 활용 (AWS Free Tier)과 로컬 테스트 우선. 필요 시 클라우드 비용 최적화 도구(예: AWS Cost Explorer) 사용.
+환경적	기기 호환성 및 네트워크 의존성	오프라인 모드 지원 미흡으로 네트워크 불안정 지역에서 앱 사용 제한. 예: 시골 지역 네트워크 지연으로 AI 분석 실패.	오프라인 캐싱 기능 추가 (SQLite 로컬 DB 사용)와 네트워크 상태 체크 모듈 도입. 저속 네트워크 테스트 수행.
