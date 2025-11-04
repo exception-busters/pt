@@ -44,7 +44,6 @@ class DietProfileRepository {
     final userId = user.id;
     final profile = await _loadUserProfile(userId);
     final dietGoal = await _loadDietGoal(userId);
-    final meals = await _estimateMealsPerDay(userId);
 
     return DietProfileSnapshot(
       goalType: dietGoal.goalType ?? profile.goalType,
@@ -52,7 +51,10 @@ class DietProfileRepository {
       levelValue: profile.levelValue,
       levelLabel: profile.levelLabel,
       weightKg: profile.weightKg,
-      mealsPerDay: meals.mealsPerDay ?? profile.mealsPerDay,
+      mealsPerDay: dietGoal.mealsPerDay ??
+          profile.mealsPerDay ??
+          (await _estimateMealsPerDay(userId)).mealsPerDay ??
+          3,
     );
   }
 
@@ -89,10 +91,10 @@ class DietProfileRepository {
   Future<_PartialSnapshot> _loadDietGoal(String userId) async {
     try {
       final result = await _client
-          .from('goal')
-          .select('goal_type, target_value, end_date')
+          .from('dietgoal')
+          .select('diet_type, daily_calorie_target, meals_per_day, created_at')
           .eq('user_id', userId)
-          .order('end_date', ascending: false)
+          .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle() as Map<String, dynamic>?;
 
@@ -101,8 +103,9 @@ class DietProfileRepository {
       }
 
       return _PartialSnapshot(
-        goalType: _asString(result['goal_type']),
-        targetCalories: _asDouble(result['target_value']),
+        goalType: _asString(result['diet_type']),
+        targetCalories: _asDouble(result['daily_calorie_target']),
+        mealsPerDay: _asInt(result['meals_per_day']),
       );
     } on PostgrestException catch (error) {
       // 목표 정보가 없는 경우는 허용하고, 다른 오류만 보고한다.
@@ -131,7 +134,7 @@ class DietProfileRepository {
           .gte('meal_time', since.toIso8601String()) as List<dynamic>;
 
       if (result.isEmpty) {
-        return const _PartialSnapshot();
+        return const _PartialSnapshot(mealsPerDay: 3);
       }
 
       final mealsByDay = <DateTime, int>{};
@@ -165,10 +168,7 @@ class DietProfileRepository {
         cause: error,
       );
     } catch (error) {
-      throw DietProfileRepositoryException(
-        '식단 기록을 분석하는 중 오류가 발생했습니다.',
-        cause: error,
-      );
+      return const _PartialSnapshot(mealsPerDay: 3);
     }
   }
 }

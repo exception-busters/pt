@@ -291,23 +291,23 @@ class DietController extends StateNotifier<DietData> {
   Future<void> saveMeal(String mealType, {required String food, required String calories}) async {
     final trimmedFood = food.trim();
     final trimmedCalories = calories.trim();
-    _setMeal(
-      mealType,
-      trimmedFood.isEmpty && trimmedCalories.isEmpty
-          ? null
-          : MealData(
-              food: trimmedFood,
-              calories: trimmedCalories,
-              components: const [],
-              nutrition: NutritionSummary.zero,
-            ),
-    );
-    // TODO: Supabase 저장 연동
+    final mealData = trimmedFood.isEmpty && trimmedCalories.isEmpty
+        ? null
+        : MealData(
+            food: trimmedFood,
+            calories: trimmedCalories,
+            components: const [],
+            nutrition: NutritionSummary.zero,
+          );
+
+    _setMeal(mealType, mealData);
+    await _syncMealToSupabase(mealType, mealData);
   }
 
   Future<void> saveMealComponents(String mealType, List<MealComponent> components) async {
     if (components.isEmpty) {
       _setMeal(mealType, null);
+      await _syncMealToSupabase(mealType, null);
       return;
     }
 
@@ -324,21 +324,20 @@ class DietController extends StateNotifier<DietData> {
       (previous, element) => previous + element.nutrition,
     );
 
-    _setMeal(
-      mealType,
-      MealData(
-        food: summary,
-        calories: '${totalNutrition.calories.toStringAsFixed(0)} kcal',
-        components: normalized,
-        nutrition: totalNutrition,
-      ),
+    final mealData = MealData(
+      food: summary,
+      calories: '${totalNutrition.calories.toStringAsFixed(0)} kcal',
+      components: normalized,
+      nutrition: totalNutrition,
     );
-    // TODO: Supabase 저장 연동
+
+    _setMeal(mealType, mealData);
+    await _syncMealToSupabase(mealType, mealData);
   }
 
-  void clearMeal(String mealType) {
+  Future<void> clearMeal(String mealType) async {
     _setMeal(mealType, null);
-    // TODO: Supabase 저장 연동
+    await _syncMealToSupabase(mealType, null);
   }
 
   void _setMeal(String mealType, MealData? mealData) {
@@ -370,6 +369,61 @@ class DietController extends StateNotifier<DietData> {
 
   MealData? getMealData(String mealType) {
     return state.mealByLabel(mealType);
+  }
+
+  Future<void> _syncMealToSupabase(String mealType, MealData? mealData) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final client = Supabase.instance.client;
+    final mealTime = _mealTimeForLabel(mealType);
+    final mealTimeUtc = mealTime.toUtc().toIso8601String();
+
+    try {
+      await client
+          .from('usermeal')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('meal_time', mealTimeUtc);
+
+      if (mealData == null) {
+        return;
+      }
+
+      final calories = mealData.nutrition.calories != 0
+          ? mealData.nutrition.calories
+          : _parseCalories(mealData.calories);
+
+      await client.from('usermeal').insert({
+        'user_id': user.id,
+        'meal_time': mealTimeUtc,
+        'quantity': calories,
+        'food_id': null,
+      });
+    } catch (error) {
+      print('usermeal 동기화 실패($mealType): $error');
+    }
+  }
+
+  DateTime _mealTimeForLabel(String mealType) {
+    final now = DateTime.now();
+    final hour = switch (mealType) {
+      '아침' => 8,
+      '점심' => 13,
+      '저녁' => 19,
+      _ => now.hour,
+    };
+    return DateTime(now.year, now.month, now.day, hour, 0, 0, 0, 0);
+  }
+
+  double? _parseCalories(String value) {
+    final digits = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(value);
+    if (digits == null) {
+      return null;
+    }
+    return double.tryParse(digits.group(1)!);
   }
 }
 
@@ -1011,16 +1065,31 @@ DietGoal _mapDietGoal(String? raw) {
     case 'cut':
     case 'diet_cut':
     case 'diet':
+    case 'dieting':
+    case 'lowcarb':
+    case 'low_carb':
+    case 'keto':
+    case 'ketogenic':
+    case '다이어트':
     case '체중감량':
       return DietGoal.cut;
     case 'muscle_gain':
     case 'bulk':
     case 'bulk_up':
+    case 'highprotein':
+    case 'high_protein':
+    case '단백질강화':
     case '근육증가':
       return DietGoal.bulkUp;
     case 'maintain':
     case 'maintenance':
     case 'health':
+    case 'balanced':
+    case 'vegetarian':
+    case 'vegan':
+    case 'plantbased':
+    case 'plant_based':
+    case '일반':
     case '균형':
     case 'maintain_weight':
     case '건강유지':
