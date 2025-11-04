@@ -60,11 +60,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _passwordController.text,
         );
 
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = false;
     });
-
-    if (!mounted) return;
 
     if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(

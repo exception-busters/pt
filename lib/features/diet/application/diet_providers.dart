@@ -113,7 +113,22 @@ class DietData {
 }
 
 class DietController extends StateNotifier<DietData> {
-  DietController() : super(_getInitialData());
+  DietController(this._ref) : super(_getInitialData()) {
+    _loadDietData();
+    
+    // 인증 상태 변화 감지
+    _ref.listen(authControllerProvider, (previous, next) {
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
+        // 로그아웃 시 상태 초기화
+        state = _getInitialData();
+      } else if (previous?.isLoggedIn == false && next.isLoggedIn) {
+        // 로그인 시 해당 사용자의 다이어트 데이터 로드
+        _loadDietData();
+      }
+    });
+  }
+
+  final Ref _ref;
 
   static DietData _getInitialData() {
     final today = DateTime.now();
@@ -186,6 +201,9 @@ class DietController extends StateNotifier<DietData> {
         state = state.copyWith(dinner: mealData);
         break;
     }
+    
+    // 데이터 저장
+    _saveDietData();
   }
 
   void checkAndResetIfNewDay() {
@@ -194,6 +212,7 @@ class DietController extends StateNotifier<DietData> {
     
     if (state.date != today) {
       state = DietData(date: today);
+      _saveDietData();
     }
   }
 

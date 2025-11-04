@@ -22,13 +22,17 @@ import 'package:flutter_application_1/features/workout/presentation/workout_scre
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
 import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/onboarding_screen.dart';
-import 'package:flutter_application_1/features/onboarding/application/onboarding_providers.dart';
+import 'package:flutter_application_1/features/profile/presentation/profile_settings_screen.dart';
+import 'package:flutter_application_1/features/auth/presentation/auth_loading_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class GoRouterRefreshStream extends ChangeNotifier {
   late final StreamSubscription _sub;
   GoRouterRefreshStream(Stream<dynamic> stream) {
-    _sub = stream.asBroadcastStream().listen((_) => notifyListeners());
+    // 중복 이벤트 방지를 위한 디바운싱
+    _sub = stream.asBroadcastStream()
+        .distinct() // 중복 이벤트 제거
+        .listen((_) => notifyListeners());
   }
   @override
   void dispose() {
@@ -38,9 +42,9 @@ class GoRouterRefreshStream extends ChangeNotifier {
 }
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ref.watch(authControllerProvider.notifier);
-  final isLoggedIn = ref.watch(authControllerProvider);
-  final onboardingCompleted = ref.watch(onboardingCompletedProvider);
+  final authState = ref.watch(authControllerProvider);
+  final authNotifier = ref.read(authControllerProvider.notifier);
+  
   final defaultRoute = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
   final initialLocation =
       (defaultRoute.isEmpty || defaultRoute == '/') ? '/app/home' : defaultRoute;
@@ -52,37 +56,39 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       message: state.error?.toString() ?? '요청하신 페이지를 찾을 수 없어요.',
     ),
     redirect: (context, state) {
-      final goingToApp = state.matchedLocation.startsWith('/app');
-      final goingToOnboarding = state.matchedLocation == '/onboarding';
-      final loggingIn = state.matchedLocation == '/' || state.matchedLocation == '/login';
-      final signingUp = state.matchedLocation == '/signup';
+      // 상태 추출 (한 번만)
+      final isLoggedIn = authState.isLoggedIn;
+      final profileCompleted = authState.profileCompleted;
+      final isLoading = authState.isLoading;
+      
+      // 경로 분류 (한 번만)
+      final location = state.matchedLocation;
+      final goingToApp = location.startsWith('/app');
+      final goingToAuth = location == '/' || location == '/login' || location == '/signup';
+      final goingToOnboarding = location == '/onboarding';
 
+      // 로딩 중이면 대기 (깜빡임 방지)
+      if (isLoading) return null;
+
+      // 미로그인 + 앱 접근 → 로그인
       if (!isLoggedIn && goingToApp) {
         authNotifier.setRedirect(state.uri.toString());
         return '/';
       }
 
-      if (isLoggedIn && (loggingIn || signingUp)) {
+      // 로그인됨 + 인증 페이지 접근 → 상태 기반 리다이렉트
+      if (isLoggedIn && goingToAuth) {
         final stored = authNotifier.takeRedirect();
-        if (stored != null && stored.isNotEmpty) {
-          return stored;
-        }
+        if (stored?.isNotEmpty == true) return stored;
         
-        // 로그인 후 온보딩 완료 여부 확인
-        return onboardingCompleted.when(
-          data: (completed) => completed ? '/app/home' : '/onboarding',
-          loading: () => '/app/home',
-          error: (_, __) => '/app/home',
-        );
+        if (profileCompleted == null) return null; // 상태 확인 중
+        return profileCompleted ? '/app/home' : '/onboarding';
       }
 
-      // 로그인된 상태에서 온보딩이 완료되지 않았고 온보딩 페이지가 아닌 경우
-      if (isLoggedIn && !goingToOnboarding && goingToApp) {
-        return onboardingCompleted.when(
-          data: (completed) => completed ? null : '/onboarding',
-          loading: () => null,
-          error: (_, __) => null,
-        );
+      // 로그인됨 + 앱 접근 + 프로필 미완료 → 온보딩
+      if (isLoggedIn && goingToApp && !goingToOnboarding) {
+        if (profileCompleted == null) return null; // 상태 확인 중
+        if (!profileCompleted) return '/onboarding';
       }
 
       return null;
@@ -104,6 +110,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/loading',
+        name: 'loading',
+        builder: (context, state) => const AuthLoadingScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainDashboard(
@@ -195,6 +206,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 path: 'help',
                 name: 'help',
                 builder: (context, state) => const HelpScreen(),
+              ),
+              GoRoute(
+                path: 'settings',
+                name: 'profile-settings',
+                builder: (context, state) => const ProfileSettingsScreen(),
               ),
             ],
           ),
