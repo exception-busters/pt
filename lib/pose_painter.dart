@@ -12,6 +12,10 @@ class PosePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (poses.isEmpty) {
+      return;
+    }
+    
     // 1. 기본 선 스타일 설정 (뼈대 - 연한 회색)
     final basePaint = Paint()
       ..style = PaintingStyle.stroke
@@ -48,49 +52,49 @@ class PosePainter extends CustomPainter {
     Size size
   ) {
     // 몸통 연결
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftHip, PoseLandmarkType.rightHip, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftHip, PoseLandmarkType.rightHip, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip, 
       inputImageSize, size);
-    
+      
     // 왼팔
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist, 
       inputImageSize, size);
-    
+      
     // 오른팔
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist, 
       inputImageSize, size);
-    
+      
     // 왼다리
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle, 
       inputImageSize, size);
-    
+      
     // 오른다리
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee, 
       inputImageSize, size);
-    _drawConnection(canvas, paint, pose, 
-      PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle, 
+      _drawConnection(canvas, paint, pose, 
+        PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle, 
       inputImageSize, size);
   }
 
@@ -132,69 +136,70 @@ class PosePainter extends CustomPainter {
     }
   }
 
-  /// 각도별 고유 색상 정의
+  /// 각도별 고유 색상 정의 (캐싱됨)
   /// 같은 angle key는 어떤 운동에서든 동일한 색상 사용
-  Map<String, Color> _getAngleColors() {
-    return {
-      // Body tilt angles
-      'left_body_tilt': Colors.green.shade400,
-      'right_body_tilt': Colors.pink.shade400,
-      
-      // Elbow angles
-      'left_elbow_angle': Colors.blue.shade400,
-      'right_elbow_angle': Colors.orange.shade400,
-      
-      // Knee angles (일반)
-      'left_knee_angle': Colors.purple.shade400,
-      'right_knee_angle': Colors.teal.shade400,
-      
-      // Knee angles (특정 동작용)
-      'front_knee_angle': Colors.amber.shade600,
-      'back_knee_angle': Colors.lightGreen.shade400,
-      'knee_angle_left': Colors.cyan.shade400,
-      'knee_angle_right': Colors.lime.shade400,
-      
-      // Hip flexion
-      'left_hip_flexion': Colors.lime.shade400,
-      'right_hip_flexion': Colors.deepOrange.shade400,
-      
-      // Hip angles (일반)
-      'left_hip_angle': Colors.deepPurple.shade400,
-      'right_hip_angle': Colors.lightBlue.shade400,
-      
-      // Hip angles (특정 동작용)
-      'front_hip_angle': Colors.pink.shade300,
-      'back_hip_angle': Colors.cyan.shade300,
-      'hip_angle_left': Colors.yellow.shade600,
-      'hip_angle_right': Colors.red.shade400,
-      
-      // Shoulder angles
-      'left_shoulder_angle': Colors.deepOrange.shade300,
-      'right_shoulder_angle': Colors.teal.shade300,
-      
-      // Back and torso
-      'back_angle': Colors.indigo.shade400,
-      'torso_forward_bend': Colors.amber.shade400,
-    };
-  }
+  static final Map<String, Color> _angleColors = {
+    // Body tilt angles (몸통 기울기)
+    'left_body_tilt': Color(0xFF66BB6A),        // 밝은 녹색
+    'right_body_tilt': Color(0xFFEC407A),       // 밝은 분홍
+    
+    // Elbow angles (팔꿈치)
+    'left_elbow_angle': Color(0xFF42A5F5),      // 밝은 파랑
+    'right_elbow_angle': Color(0xFFFF7043),     // 밝은 주황
+    
+    // Knee angles - 일반 (무릎)
+    'left_knee_angle': Color(0xFFAB47BC),       // 보라
+    'right_knee_angle': Color(0xFF26A69A),      // 청록
+    
+    // Knee angles - 특정 동작용
+    'front_knee_angle': Color(0xFFFFCA28),      // 황금색
+    'back_knee_angle': Color(0xFF9CCC65),       // 연두
+    'knee_angle_left': Color(0xFF29B6F6),       // 하늘색
+    'knee_angle_right': Color(0xFFD4E157),      // 라임 그린
+    
+    // Hip flexion (고관절 굴곡)
+    'left_hip_flexion': Color(0xFFC0CA33),      // 올리브 그린 (lime 대체)
+    'right_hip_flexion': Color(0xFFFF5722),     // 딥 오렌지
+    
+    // Hip angles - 일반 (고관절)
+    'left_hip_angle': Color(0xFF7E57C2),        // 딥 퍼플
+    'right_hip_angle': Color(0xFF03A9F4),       // 라이트 블루
+    
+    // Hip angles - 특정 동작용
+    'front_hip_angle': Color(0xFFF06292),       // 연한 핑크
+    'back_hip_angle': Color(0xFF4DD0E1),        // 시안
+    'hip_angle_left': Color(0xFFFFEE58),        // 밝은 노랑
+    'hip_angle_right': Color(0xFFEF5350),       // 빨강
+    
+    // Shoulder angles (어깨)
+    'left_shoulder_angle': Color(0xFFFF6E40),   // 딥 오렌지 (연함)
+    'right_shoulder_angle': Color(0xFF4DB6AC),  // 청록 (연함)
+    
+    // Back and torso (등/상체)
+    'back_angle': Color(0xFF5C6BC0),            // 인디고
+    'torso_forward_bend': Color(0xFFFFA726),    // 오렌지
+  };
+  
+  Map<String, Color> _getAngleColors() => _angleColors;
 
-  /// 인덱스 기반 색상 생성 (정의되지 않은 각도용)
+  /// 인덱스 기반 색상 생성 (정의되지 않은 각도용) - 캐싱됨
+  static final List<Color> _fallbackColors = [
+    Colors.green.shade400,
+    Colors.pink.shade400,
+    Colors.blue.shade400,
+    Colors.orange.shade400,
+    Colors.purple.shade400,
+    Colors.teal.shade400,
+    Colors.yellow.shade600,
+    Colors.red.shade400,
+    Colors.cyan.shade400,
+    Colors.lime.shade400,
+    Colors.indigo.shade400,
+    Colors.amber.shade400,
+  ];
+  
   Color _getColorByIndex(int index) {
-    final colors = [
-      Colors.green.shade400,
-      Colors.pink.shade400,
-      Colors.blue.shade400,
-      Colors.orange.shade400,
-      Colors.purple.shade400,
-      Colors.teal.shade400,
-      Colors.yellow.shade600,
-      Colors.red.shade400,
-      Colors.cyan.shade400,
-      Colors.lime.shade400,
-      Colors.indigo.shade400,
-      Colors.amber.shade400,
-    ];
-    return colors[index % colors.length];
+    return _fallbackColors[index % _fallbackColors.length];
   }
 
   /// 각도를 구성하는 선 그리기 (랜드마크 이름으로)

@@ -6,7 +6,7 @@ class AngleSmoother {
   final int _windowSize;
   final Map<String, Queue<double>> _angleBuffers = {};
 
-  AngleSmoother({int windowSize = 5}) : _windowSize = windowSize;
+  AngleSmoother({int windowSize = 7}) : _windowSize = windowSize;  // 기본값 증가 (5 -> 7)
 
   /// 각도 값을 스무딩 처리
   /// [angleKey]: 각도 식별자 (예: 'left_body_tilt')
@@ -137,7 +137,7 @@ class AngleSmoother {
   double smoothAngleAdaptive(
     String angleKey,
     double angle, {
-    double threshold = 10.0,
+    double threshold = 5.0,  // 임계값 낮춤 (10.0 -> 5.0)
   }) {
     // 버퍼가 없으면 생성
     if (!_angleBuffers.containsKey(angleKey)) {
@@ -151,9 +151,9 @@ class AngleSmoother {
       final lastValue = buffer.last;
       final change = (angle - lastValue).abs();
 
-      // 변화가 크면 즉시 반응 (alpha = 0.7)
-      // 변화가 작으면 스무딩 (alpha = 0.2)
-      final alpha = change > threshold ? 0.7 : 0.2;
+      // 변화가 크면 즉시 반응 (alpha = 0.6) - 0.7에서 낮춤
+      // 변화가 작으면 스무딩 (alpha = 0.15) - 0.2에서 낮춤
+      final alpha = change > threshold ? 0.6 : 0.15;
       return smoothAngleExponential(angleKey, angle, alpha: alpha);
     }
 
