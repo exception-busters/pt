@@ -1,11 +1,11 @@
-import 'dart:math';
 import '../models/exercise_model.dart';
 
-// 점수 계산이 더 관대해졌습니다:
-// - tolerance 내: 100점
-// - tolerance의 2배: 100점 → 50점 (완만한 곡선)
-// - tolerance의 3배: 50점 → 10점
-// - 그 이상: 최소 10점 보장
+// 정확한 점수 계산 시스템:
+// - tolerance의 50% 내: 100점 (완벽)
+// - tolerance의 50% ~ 100%: 100점 → 80점 (선형 감점)
+// - tolerance의 100% ~ 150%: 80점 → 50점 (선형 감점)
+// - tolerance의 150% ~ 200%: 50점 → 20점 (선형 감점)
+// - tolerance의 200% 초과: 20점 → 0점 (선형 감점)
 
 /// 포즈 점수 계산기
 class PoseScorer {
@@ -28,24 +28,32 @@ class PoseScorer {
       final tolerance = ref.tolerance;
       final weight = ref.weight;
       
-      // 점수 계산 (tolerance 내면 만점, 벗어나면 관대하게 감점)
+      // 정확한 점수 계산 (엄격한 기준)
       double angleScore;
-      if (angleDiff <= tolerance) {
-        // tolerance 내: 100점
+      
+      if (angleDiff <= tolerance * 0.5) {
+        // tolerance의 50% 내: 100점 (완벽)
         angleScore = 100.0;
-      } else if (angleDiff <= tolerance * 2) {
-        // tolerance의 2배까지: 완만한 감점 (제곱근 사용)
+      } else if (angleDiff <= tolerance) {
+        // tolerance의 50% ~ 100%: 100점 → 80점 (선형 감점)
+        final excess = angleDiff - tolerance * 0.5;
+        final ratio = excess / (tolerance * 0.5);
+        angleScore = 100.0 - (20.0 * ratio);
+      } else if (angleDiff <= tolerance * 1.5) {
+        // tolerance의 100% ~ 150%: 80점 → 50점 (선형 감점)
         final excess = angleDiff - tolerance;
-        final ratio = excess / tolerance;
-        angleScore = 100.0 - (50.0 * sqrt(ratio)); // 50점까지만 감점
-      } else if (angleDiff <= tolerance * 3) {
-        // tolerance의 3배까지: 추가 감점
-        final excess = angleDiff - tolerance * 2;
-        final ratio = excess / tolerance;
-        angleScore = 50.0 - (40.0 * ratio); // 10점까지만 감점
+        final ratio = excess / (tolerance * 0.5);
+        angleScore = 80.0 - (30.0 * ratio);
+      } else if (angleDiff <= tolerance * 2.0) {
+        // tolerance의 150% ~ 200%: 50점 → 20점 (선형 감점)
+        final excess = angleDiff - tolerance * 1.5;
+        final ratio = excess / (tolerance * 0.5);
+        angleScore = 50.0 - (30.0 * ratio);
       } else {
-        // tolerance의 3배 초과: 최소 10점 유지 (0점은 너무 가혹함)
-        angleScore = 10.0;
+        // tolerance의 200% 초과: 20점 → 0점 (선형 감점)
+        final excess = angleDiff - tolerance * 2.0;
+        final ratio = excess / tolerance;
+        angleScore = (20.0 - (20.0 * ratio.clamp(0.0, 1.0))).clamp(0.0, 20.0);
       }
       
       totalScore += angleScore * weight;
@@ -74,18 +82,25 @@ class PoseScorer {
       final angleDiff = (userAngle - ref.idealMean).abs();
       final tolerance = ref.tolerance;
       
-      if (angleDiff <= tolerance) {
+      // 정확한 점수 계산 (전체 점수와 동일한 로직)
+      if (angleDiff <= tolerance * 0.5) {
         scores[angleKey] = 100.0;
-      } else if (angleDiff <= tolerance * 2) {
+      } else if (angleDiff <= tolerance) {
+        final excess = angleDiff - tolerance * 0.5;
+        final ratio = excess / (tolerance * 0.5);
+        scores[angleKey] = 100.0 - (20.0 * ratio);
+      } else if (angleDiff <= tolerance * 1.5) {
         final excess = angleDiff - tolerance;
-        final ratio = excess / tolerance;
-        scores[angleKey] = 100.0 - (50.0 * sqrt(ratio));
-      } else if (angleDiff <= tolerance * 3) {
-        final excess = angleDiff - tolerance * 2;
-        final ratio = excess / tolerance;
-        scores[angleKey] = 50.0 - (40.0 * ratio);
+        final ratio = excess / (tolerance * 0.5);
+        scores[angleKey] = 80.0 - (30.0 * ratio);
+      } else if (angleDiff <= tolerance * 2.0) {
+        final excess = angleDiff - tolerance * 1.5;
+        final ratio = excess / (tolerance * 0.5);
+        scores[angleKey] = 50.0 - (30.0 * ratio);
       } else {
-        scores[angleKey] = 10.0;
+        final excess = angleDiff - tolerance * 2.0;
+        final ratio = excess / tolerance;
+        scores[angleKey] = (20.0 - (20.0 * ratio.clamp(0.0, 1.0))).clamp(0.0, 20.0);
       }
     }
     

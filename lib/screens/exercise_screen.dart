@@ -13,6 +13,7 @@ import '../services/feedback_generator.dart';
 import '../services/phase_manager.dart';
 import '../services/angle_smoother.dart';
 import '../services/landmark_smoother.dart';
+import '../services/tts_service.dart';
 
 // Widgets
 import '../widgets/exercise_dropdown.dart';
@@ -47,7 +48,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   List<ExerciseModel> _exercises = [];
   ExerciseModel? _selectedExercise;
   PhaseManager? _phaseManager;
-  
+
   // 피드백 및 점수 (ValueNotifier로 최적화)
   final ValueNotifier<List<String>> _feedbacksNotifier = ValueNotifier([]);
   final ValueNotifier<double> _scoreNotifier = ValueNotifier(0.0);
@@ -56,19 +57,21 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   late final AngleSmoother _angleSmoother;
   late final LandmarkSmoother _landmarkSmoother;
 
+  // TTS (음성 피드백)
+  final TtsService _ttsService = TtsService();
+  String? _lastSpokenFeedback; // TTS 중복 방지용
+
   // 성능 관리 (적응형 프레임 레이트)
   int _frameCount = 0;
-  static const int _frameSkipThreshold = 2; // 30fps → 15fps
+  static const int _frameSkipThreshold = 3; // 30fps → 10fps (버퍼 부족 방지)
   DateTime _lastUpdateTime = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _angleSmoother = AngleSmoother(windowSize: 7);
-    _landmarkSmoother = LandmarkSmoother(
-      alpha: 0.25,
-      movementThreshold: 4.0,
-    );
+    _landmarkSmoother = LandmarkSmoother(alpha: 0.5, movementThreshold: 2.0);
+    _ttsService.initialize(); // TTS 초기화
     _initializePoseDetector();
     _initializeCamera();
     _loadExercises();
@@ -76,14 +79,18 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   @override
   void dispose() {
-    _controller?.stopImageStream().then((_) {
-      _controller?.dispose();
-    }).catchError((_) {
-      _controller?.dispose();
-    });
+    _controller
+        ?.stopImageStream()
+        .then((_) {
+          _controller?.dispose();
+        })
+        .catchError((_) {
+          _controller?.dispose();
+        });
     _poseDetector.close();
     _feedbacksNotifier.dispose();
     _scoreNotifier.dispose();
+    _ttsService.dispose(); // TTS 리소스 해제
     super.dispose();
   }
 
@@ -117,7 +124,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     try {
       _cameras = await availableCameras();
       print('사용 가능한 카메라: ${_cameras?.length}개');
-      
+
       if (_cameras != null && _cameras!.isNotEmpty) {
         CameraDescription? frontCamera;
         for (var camera in _cameras!) {
@@ -127,22 +134,22 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             break;
           }
         }
-        
+
         final selectedCamera = frontCamera ?? _cameras![0];
         print('선택된 카메라: ${selectedCamera.lensDirection}');
-        
+
         _controller = CameraController(selectedCamera, ResolutionPreset.low);
-        
+
         await _controller!.initialize();
         if (!mounted) return;
-        
+
         _imageSize = _controller!.value.previewSize;
         print('카메라 초기화 완료 - 프리뷰 크기: $_imageSize');
-        
+
         _controller!.startImageStream((image) {
           _processCameraImage(image);
         });
-        
+
         setState(() {
           _isCameraInitialized = true;
         });
@@ -153,27 +160,33 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   }
 
   Future<void> _processCameraImage(CameraImage image) async {
+    // 중복 처리 방지 및 프레임 스킵
     if (_isBusy) return;
-    
-    _frameCount++;
-    if (_frameCount % _frameSkipThreshold != 0) return;
-    
-    _isBusy = true;
 
-    final inputImage = _inputImageFromCameraImage(image);
-    if (inputImage == null) {
-      _isBusy = false;
-      return;
+    _frameCount++;
+    // 프레임 스킵: 더 많은 프레임을 건너뛰어 버퍼 부족 방지
+    if (_frameCount % _frameSkipThreshold != 0) {
+      return; // 이미지 버퍼는 자동으로 해제됨
     }
 
+    _isBusy = true;
+
     try {
+      final inputImage = _inputImageFromCameraImage(image);
+      if (inputImage == null) {
+        _isBusy = false;
+        return;
+      }
+
       final poses = await _poseDetector.processImage(inputImage);
 
       if (_frameCount % 30 == 0) {
         print('포즈 처리 완료: ${poses.length}개 감지 (프레임: $_frameCount)');
       }
 
-      final smoothedPoses = poses.map((pose) => _landmarkSmoother.smoothPose(pose)).toList();
+      final smoothedPoses = poses
+          .map((pose) => _landmarkSmoother.smoothPose(pose))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -185,15 +198,16 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       if (_frameCount % 30 == 0) {
         print('포즈 감지 오류: $e');
       }
+    } finally {
+      // 항상 busy 플래그 해제 (예외 발생 시에도)
+      _isBusy = false;
     }
-
-    _isBusy = false;
   }
 
   InputImage? _inputImageFromCameraImage(CameraImage image) {
     final camera = _controller!.description;
     final sensorOrientation = camera.sensorOrientation;
-    
+
     InputImageRotation? rotation;
     if (sensorOrientation == 0) {
       rotation = InputImageRotation.rotation0deg;
@@ -204,7 +218,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     } else if (sensorOrientation == 270) {
       rotation = InputImageRotation.rotation270deg;
     }
-    
+
     if (rotation == null) return null;
 
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
@@ -212,10 +226,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     final WriteBuffer allBytes = WriteBuffer();
     allBytes.putUint8List(image.planes[0].bytes);
-    
+
     final int uvWidth = image.width ~/ 2;
     final int uvHeight = image.height ~/ 2;
-    
+
     for (int i = 0; i < uvHeight * uvWidth; i++) {
       if (i < image.planes[2].bytes.length) {
         allBytes.putUint8(image.planes[2].bytes[i]);
@@ -224,9 +238,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         allBytes.putUint8(image.planes[1].bytes[i]);
       }
     }
-    
+
     final bytes = allBytes.done().buffer.asUint8List();
-    
+
     final inputImageData = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
       rotation: rotation,
@@ -243,79 +257,96 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _scoreNotifier.value = 0.0;
       return;
     }
-    
+
     final pose = _poses[0];
     final userAngles = _calculateUserAngles(pose, _selectedExercise!);
-    
+
     if (userAngles.isEmpty) {
       _feedbacksNotifier.value = ['전신이 보이도록 해주세요'];
       return;
     }
-    
+
     final score = PoseScorer.calculateScore(
       userAngles,
       _selectedExercise!.keyAngles,
     );
-    
+
     final detailedScores = PoseScorer.calculateDetailedScores(
       userAngles,
       _selectedExercise!.keyAngles,
     );
-    
+
     final feedbacks = FeedbackGenerator.generateFeedback(
       userAngles,
       detailedScores,
       _selectedExercise!.keyAngles,
       _selectedExercise!.feedbackRules,
     );
-    
+
     if (_phaseManager != null) {
       final now = DateTime.now();
       final deltaTime = now.difference(_lastUpdateTime).inMilliseconds / 1000.0;
       _lastUpdateTime = now;
-      
-      final phaseChanged = _phaseManager!.update(userAngles, score, deltaTime: deltaTime);
-      
+
+      final phaseChanged = _phaseManager!.update(
+        userAngles,
+        score,
+        deltaTime: deltaTime,
+      );
+
       if (phaseChanged) {
         if (_phaseManager!.isCompleted) {
           feedbacks.insert(0, '🎉 운동 완료!');
         } else {
-          feedbacks.insert(0, '✓ 다음 단계: ${_phaseManager!.currentPhase.phaseName}');
+          feedbacks.insert(
+            0,
+            '✓ 다음 단계: ${_phaseManager!.currentPhase.phaseName}',
+          );
         }
       }
-      
+
       if (!_phaseManager!.isReady && !_phaseManager!.isCompleted) {
-        if (_phaseManager!.isConditionMet) {
-          feedbacks.insert(0, '⏳ 준비: 자세를 2초 유지하세요 (${_phaseManager!.readyDuration.toStringAsFixed(1)}초)');
-        } else {
-          feedbacks.insert(0, '⚠️ ${_phaseManager!.currentPhase.description}');
-        }
-      } else if (_phaseManager!.isReady && !_phaseManager!.isConditionMet && !_phaseManager!.isCompleted) {
-        feedbacks.insert(0, '⚠️ 자세를 유지하세요!');
+        // 2초 준비 타이머 표시
+        feedbacks.insert(
+          0,
+          '⏳ 준비: 자세를 2초 유지하세요 (${_phaseManager!.readyDuration.toStringAsFixed(1)}초)',
+        );
+      } else if (_phaseManager!.isReady && !_phaseManager!.isCompleted) {
+        // 운동 진행 중
+        feedbacks.insert(0, '⚠️ ${_phaseManager!.currentPhase.description}');
       }
     }
-    
+
     _scoreNotifier.value = score;
     _feedbacksNotifier.value = feedbacks;
+
+    // TTS: 피드백 최상단 내용 음성 재생
+    if (feedbacks.isNotEmpty) {
+      final topFeedback = feedbacks[0];
+      // 이전 피드백과 다를 때만 재생 (중복 방지)
+      if (_lastSpokenFeedback != topFeedback) {
+        _ttsService.speak(topFeedback);
+        _lastSpokenFeedback = topFeedback;
+      }
+    } else {
+      _lastSpokenFeedback = null;
+    }
   }
 
-  Map<String, double> _calculateUserAngles(
-    Pose pose,
-    ExerciseModel exercise,
-  ) {
+  Map<String, double> _calculateUserAngles(Pose pose, ExerciseModel exercise) {
     Map<String, double> angles = {};
-    
+
     for (var entry in exercise.keyAngles.entries) {
       final angleKey = entry.key;
       final angleInfo = entry.value;
       final points = angleInfo.points;
-      
+
       if (points.length != 3) continue;
-      
+
       final point1 = _getLandmark(pose, points[0]);
       final point2 = _getLandmark(pose, points[1]);
       final point3 = _getLandmark(pose, points[2]);
-      
+
       if (point1 != null && point2 != null && point3 != null) {
         final rawAngle = AngleCalculator.calculateAngle(point1, point2, point3);
         final smoothedAngle = _angleSmoother.smoothAngleAdaptive(
@@ -326,7 +357,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         angles[angleKey] = smoothedAngle;
       }
     }
-    
+
     return angles;
   }
 
@@ -346,11 +377,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       'Left Ankle': PoseLandmarkType.leftAnkle,
       'Right Ankle': PoseLandmarkType.rightAnkle,
     };
-    
+
     if (directMap.containsKey(name)) {
       return pose.landmarks[directMap[name]];
     }
-    
+
     switch (name) {
       case 'Neck':
         final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
@@ -361,38 +392,45 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             x: (leftShoulder.x + rightShoulder.x) / 2,
             y: (leftShoulder.y + rightShoulder.y) / 2,
             z: (leftShoulder.z + rightShoulder.z) / 2,
-            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
+            likelihood:
+                (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
           );
         }
         break;
-        
+
       case 'Back':
         final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
         final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
         final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
         final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
-        
-        if (leftShoulder != null && rightShoulder != null && 
-            leftHip != null && rightHip != null) {
+
+        if (leftShoulder != null &&
+            rightShoulder != null &&
+            leftHip != null &&
+            rightHip != null) {
           final shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
           final shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
           final shoulderMidZ = (leftShoulder.z + rightShoulder.z) / 2;
-          
+
           final hipMidX = (leftHip.x + rightHip.x) / 2;
           final hipMidY = (leftHip.y + rightHip.y) / 2;
           final hipMidZ = (leftHip.z + rightHip.z) / 2;
-          
+
           return PoseLandmark(
             type: PoseLandmarkType.nose,
             x: (shoulderMidX + hipMidX) / 2,
             y: (shoulderMidY + hipMidY) / 2,
             z: (shoulderMidZ + hipMidZ) / 2,
-            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood + 
-                        leftHip.likelihood + rightHip.likelihood) / 4,
+            likelihood:
+                (leftShoulder.likelihood +
+                    rightShoulder.likelihood +
+                    leftHip.likelihood +
+                    rightHip.likelihood) /
+                4,
           );
         }
         break;
-        
+
       case 'Waist':
         final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
         final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
@@ -406,7 +444,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           );
         }
         break;
-        
+
       case 'Shoulder':
         final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
         final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
@@ -416,11 +454,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             x: (leftShoulder.x + rightShoulder.x) / 2,
             y: (leftShoulder.y + rightShoulder.y) / 2,
             z: (leftShoulder.z + rightShoulder.z) / 2,
-            likelihood: (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
+            likelihood:
+                (leftShoulder.likelihood + rightShoulder.likelihood) / 2,
           );
         }
         break;
-        
+
       case 'Hip':
         final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
         final rightHip = pose.landmarks[PoseLandmarkType.rightHip];
@@ -434,7 +473,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           );
         }
         break;
-        
+
       case 'Knee':
         final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
         final rightKnee = pose.landmarks[PoseLandmarkType.rightKnee];
@@ -449,41 +488,36 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         }
         break;
     }
-    
+
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_isCameraInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Transform.scale(
-            scaleX: -1,
-            child: CameraPreview(_controller!),
-          ),
-          
+          Transform.scale(scaleX: -1, child: CameraPreview(_controller!)),
+
           if (_imageSize != null)
             Transform.scale(
               scaleX: -1,
               child: CustomPaint(
                 painter: PosePainter(
-                  _poses, 
+                  _poses,
                   _imageSize!,
                   exercise: _selectedExercise,
                 ),
                 child: Container(),
               ),
             ),
-          
+
           Positioned(
             top: 48,
             left: 16,
@@ -501,6 +535,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                         _feedbacksNotifier.value = [];
                         _angleSmoother.resetAll();
                         _landmarkSmoother.resetAll();
+                        _lastSpokenFeedback = null; // TTS 초기화
+                        _ttsService.resetLastSpoken(); // TTS 서비스 초기화
                         if (exercise != null) {
                           _phaseManager = PhaseManager(exercise);
                           _lastUpdateTime = DateTime.now();
@@ -510,9 +546,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                       });
                     },
                   ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -536,7 +572,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                         ),
                       ),
                     ),
-                    
+
                     if (_selectedExercise != null) ...[
                       const SizedBox(width: 8),
                       ValueListenableBuilder<double>(
@@ -552,7 +588,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               ],
             ),
           ),
-          
+
           if (_phaseManager != null)
             Positioned(
               top: 150,
@@ -566,7 +602,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 ],
               ),
             ),
-          
+
           Positioned(
             bottom: 24,
             left: 16,
@@ -580,7 +616,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     return CollapsibleFeedbackPanel(feedbacks: feedbacks);
                   },
                 ),
-                
+
                 if (_phaseManager != null && _phaseManager!.isCompleted) ...[
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
@@ -617,4 +653,3 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     );
   }
 }
-
