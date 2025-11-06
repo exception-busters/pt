@@ -208,8 +208,10 @@ ${preferences}
       "notes": "한 줄 설명 또는 팁"
     },
     ...
-  ]
+ ]
 }
+
+6. 선호/제한 사항을 반드시 준수하고, dietPreference가 'vegetarian' 또는 'vegan'이면 동물성 식재료를 제외하며, dietaryRestrictions에 포함된 재료는 사용하지 마세요.
 
 응답은 반드시 위 구조의 JSON 문자열만 반환하세요.`;
 }

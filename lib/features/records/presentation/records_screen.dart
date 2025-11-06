@@ -9,7 +9,7 @@ class RecordsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('기록'),
+        title: const Text('기록(미구현)'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
       ),

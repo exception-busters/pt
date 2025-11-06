@@ -438,6 +438,8 @@ enum DietGoal { bulkUp, cut, maintain }
 
 enum DietExperience { beginner, intermediate, advanced }
 
+enum DietPreference { balanced, lowCarb, highProtein, vegetarian, vegan, keto }
+
 class DietUserProfile {
   const DietUserProfile({
     required this.goal,
@@ -445,6 +447,8 @@ class DietUserProfile {
     required this.weightKg,
     required this.mealsPerDay,
     this.targetCalories,
+    this.preference,
+    this.dietaryRestrictions = const [],
   });
 
   final DietGoal goal;
@@ -452,6 +456,8 @@ class DietUserProfile {
   final double weightKg;
   final int mealsPerDay;
   final double? targetCalories;
+  final DietPreference? preference;
+  final List<String> dietaryRestrictions;
 }
 
 class FoodItem {
@@ -1054,6 +1060,8 @@ final dietUserProfileProvider = FutureProvider<DietUserProfile>((ref) async {
       weightKg: snapshot.weightKg ?? 70,
       mealsPerDay: snapshot.mealsPerDay ?? 3,
       targetCalories: snapshot.targetCalories,
+      preference: _mapDietPreference(snapshot.dietType),
+      dietaryRestrictions: snapshot.dietaryRestrictions,
     );
   } on DietProfileRepositoryException catch (error) {
     throw DietRecommendationException(error.message);
@@ -1100,6 +1108,49 @@ DietGoal _mapDietGoal(String? raw) {
     case '건강유지':
     default:
       return DietGoal.maintain;
+  }
+}
+
+DietPreference? _mapDietPreference(String? raw) {
+  final value = raw?.toLowerCase().trim();
+  switch (value) {
+    case null:
+    case '':
+      return null;
+    case 'balanced':
+    case 'general':
+    case 'maintain':
+    case 'default':
+      return DietPreference.balanced;
+    case 'lowcarb':
+    case 'low_carb':
+    case '저탄수화물':
+    case '로우카브':
+      return DietPreference.lowCarb;
+    case 'highprotein':
+    case 'high_protein':
+    case '고단백':
+      return DietPreference.highProtein;
+    case 'vegetarian':
+    case 'vegetarianism':
+    case '채식':
+    case '채식주의':
+    case 'veg':
+    case 'veggie':
+      return DietPreference.vegetarian;
+    case 'vegan':
+    case 'plant_based':
+    case 'plant-based':
+    case 'plantbased':
+    case '플랜트베이스드':
+    case '비건':
+      return DietPreference.vegan;
+    case 'keto':
+    case 'ketogenic':
+    case '케토':
+      return DietPreference.keto;
+    default:
+      return null;
   }
 }
 
