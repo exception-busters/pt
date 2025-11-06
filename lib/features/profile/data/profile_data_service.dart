@@ -8,6 +8,11 @@ import '../../common/services/cache_service.dart';
 class ProfileDataService {
   static final SupabaseClient _client = Supabase.instance.client;
   static final CacheService _cache = CacheService();
+  static const List<String> _workoutGoalTableCandidates = [
+    'exercisegoal',
+    'workoutgoal',
+  ];
+  static String? _resolvedWorkoutGoalTable;
 
   /// 전체 프로필 데이터 저장 (온보딩 또는 수정 시)
   static Future<bool> saveCompleteProfile({
@@ -42,20 +47,21 @@ class ProfileDataService {
 
       // 2. WorkoutGoal 저장
       if (workoutGoal != null) {
+        final workoutTable = await _getWorkoutGoalTable();
         final existingWorkout = await _client
-            .from('workoutgoal')
+            .from(workoutTable)
             .select()
             .eq('user_id', userId);
 
         if (existingWorkout.isNotEmpty) {
           await _client
-              .from('workoutgoal')
-              .update(workoutGoal.toJson())
+              .from(workoutTable)
+              .update(_normalizeWorkoutGoalPayload(workoutGoal.toJson()))
               .eq('user_id', userId);
         } else {
           await _client
-              .from('workoutgoal')
-              .insert(workoutGoal.toJson());
+              .from(workoutTable)
+              .insert(_normalizeWorkoutGoalPayload(workoutGoal.toJson()));
         }
         print('✅ WorkoutGoal 저장 완료');
       }
@@ -131,7 +137,8 @@ class ProfileDataService {
       }
 
       try {
-        final workoutResults = await _client.from('workoutgoal').select().eq('user_id', userId);
+        final workoutTable = await _getWorkoutGoalTable();
+        final workoutResults = await _client.from(workoutTable).select().eq('user_id', userId);
         workoutData = workoutResults.isNotEmpty ? workoutResults.first : null;
       } catch (e) {
         print('❌ WorkoutGoal 데이터 조회 실패: $e');
@@ -216,23 +223,24 @@ class ProfileDataService {
   static Future<bool> updateWorkoutGoal(WorkoutGoalModel workoutGoal) async {
     try {
       // 1. 기존 데이터 확인
+      final workoutTable = await _getWorkoutGoalTable();
       final existing = await _client
-          .from('workoutgoal')
+          .from(workoutTable)
           .select()
           .eq('user_id', workoutGoal.userId);
 
       if (existing.isNotEmpty) {
         // 2. 기존 데이터가 있으면 업데이트
         await _client
-            .from('workoutgoal')
-            .update(workoutGoal.toJson())
+            .from(workoutTable)
+            .update(_normalizeWorkoutGoalPayload(workoutGoal.toJson()))
             .eq('user_id', workoutGoal.userId);
         print('✅ WorkoutGoal 업데이트 완료 (user_id: ${workoutGoal.userId})');
       } else {
         // 3. 기존 데이터가 없으면 삽입
         await _client
-            .from('workoutgoal')
-            .insert(workoutGoal.toJson());
+            .from(workoutTable)
+            .insert(_normalizeWorkoutGoalPayload(workoutGoal.toJson()));
         print('✅ WorkoutGoal 삽입 완료 (user_id: ${workoutGoal.userId})');
       }
 
@@ -301,4 +309,51 @@ class ProfileDataService {
   static void clearAllCache() {
     _cache.clear();
   }
+
+  static Future<String> _getWorkoutGoalTable() async {
+    if (_resolvedWorkoutGoalTable != null) {
+      return _resolvedWorkoutGoalTable!;
+    }
+
+    for (final table in _workoutGoalTableCandidates) {
+      try {
+        await _client.from(table).select('user_id').limit(1);
+        _resolvedWorkoutGoalTable = table;
+        print('🔍 WorkoutGoal 테이블 확인: $table');
+        return table;
+      } on PostgrestException catch (e) {
+        final code = e.code ?? '';
+        final message = e.message ?? '';
+        if (code == '42P01' || message.contains('relation') || message.contains('does not exist')) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        rethrow;
+      }
+    }
+
+    // 기본값 (기존 스키마와의 호환을 위해)
+    _resolvedWorkoutGoalTable = _workoutGoalTableCandidates.last;
+    return _resolvedWorkoutGoalTable!;
+  }
+
+  static Map<String, dynamic> _normalizeWorkoutGoalPayload(Map<String, dynamic> payload) {
+    if (payload['preferred_types'] is List) {
+      payload['preferred_types'] = (payload['preferred_types'] as List)
+          .map((type) => _preferredTypeMap[type] ?? type)
+          .toSet()
+          .toList();
+    }
+    return payload;
+  }
+
+  static const Map<String, String> _preferredTypeMap = {
+    '유산소': 'cardio',
+    '근력운동': 'strength',
+    '요가': 'yoga',
+    '필라테스': 'pilates',
+    '스트레칭': 'stretch',
+    'general': 'general',
+  };
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase_flutter show AuthState;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../common/data/supabase_service.dart';
 
@@ -29,9 +30,12 @@ class AuthState {
 }
 
 class AuthController extends StateNotifier<AuthState> {
-  AuthController() : super(const AuthState(isLoggedIn: false));
+  AuthController() : super(const AuthState(isLoggedIn: false)) {
+    unawaited(_initializeAuthState());
+  }
 
   final _controller = StreamController<AuthState>.broadcast();
+  StreamSubscription<supabase_flutter.AuthState>? _authSubscription;
   String? _pendingRedirect;
 
   Stream<AuthState> get stream => _controller.stream;
@@ -209,6 +213,49 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> _initializeAuthState() async {
+    final client = Supabase.instance.client;
+    final currentUser = client.auth.currentUser;
+
+    if (currentUser != null) {
+      state = state.copyWith(isLoggedIn: true, isLoading: true);
+      _controller.add(state);
+
+      await _ensureUserExistsInDatabase(currentUser);
+      final profileCompleted = await _loadProfileCompletedStatus(currentUser);
+
+      state = AuthState(
+        isLoggedIn: true,
+        profileCompleted: profileCompleted,
+        isLoading: false,
+      );
+      _controller.add(state);
+    }
+
+    await _authSubscription?.cancel();
+    _authSubscription = client.auth.onAuthStateChange.listen((data) async {
+      final event = data.event;
+      final session = data.session;
+
+      if ((event == AuthChangeEvent.signedIn || event == AuthChangeEvent.tokenRefreshed) &&
+          session?.user != null) {
+        final user = session!.user;
+        await _ensureUserExistsInDatabase(user);
+        final profileCompleted = await _loadProfileCompletedStatus(user);
+
+        state = AuthState(
+          isLoggedIn: true,
+          profileCompleted: profileCompleted,
+          isLoading: false,
+        );
+        _controller.add(state);
+      } else if (event == AuthChangeEvent.signedOut) {
+        state = const AuthState(isLoggedIn: false, isLoading: false);
+        _controller.add(state);
+      }
+    });
+  }
+
 
 
   void signOut() async {
@@ -268,6 +315,7 @@ class AuthController extends StateNotifier<AuthState> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _controller.close();
     super.dispose();
   }
