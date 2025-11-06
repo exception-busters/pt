@@ -49,3 +49,6 @@ app.*.map.json
 python_server/__pycache__/
 python_server/*.pyc
 
+# Supabase environment
+supabase/.env
+
