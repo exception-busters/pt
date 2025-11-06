@@ -10,6 +10,8 @@ class DietProfileSnapshot {
     required this.levelLabel,
     required this.weightKg,
     required this.mealsPerDay,
+    this.dietType,
+    this.dietaryRestrictions = const [],
   });
 
   final String? goalType;
@@ -18,6 +20,8 @@ class DietProfileSnapshot {
   final String? levelLabel;
   final double? weightKg;
   final int? mealsPerDay;
+  final String? dietType;
+  final List<String> dietaryRestrictions;
 }
 
 class DietProfileRepositoryException implements Exception {
@@ -57,13 +61,19 @@ class DietProfileRepository {
     }
     mealsPerDay ??= 3;
 
+    final resolvedGoalType = dietGoal.goalType ?? workoutGoal.goalType ?? profile.goalType;
+    final dietType = dietGoal.dietType ?? dietGoal.goalType;
+    final restrictions = dietGoal.dietaryRestrictions ?? const <String>[];
+
     return DietProfileSnapshot(
-      goalType: dietGoal.goalType ?? workoutGoal.goalType ?? profile.goalType,
+      goalType: resolvedGoalType,
       targetCalories: dietGoal.targetCalories ?? profile.targetCalories,
       levelValue: workoutGoal.levelValue ?? profile.levelValue,
       levelLabel: workoutGoal.levelLabel ?? profile.levelLabel,
       weightKg: profile.weightKg,
       mealsPerDay: mealsPerDay,
+      dietType: dietType,
+      dietaryRestrictions: restrictions,
     );
   }
 
@@ -148,6 +158,8 @@ class DietProfileRepository {
         goalType: _asString(result['diet_type']),
         targetCalories: _asDouble(result['daily_calorie_target']),
         mealsPerDay: _asInt(result['meals_per_day']),
+        dietType: _asString(result['diet_type']),
+        dietaryRestrictions: _asStringList(result['dietary_restrictions']),
       );
     } on PostgrestException catch (error) {
       // 목표 정보가 없는 경우는 허용하고, 다른 오류만 보고한다.
@@ -247,6 +259,8 @@ class _PartialSnapshot {
     this.levelLabel,
     this.weightKg,
     this.mealsPerDay,
+    this.dietType,
+    this.dietaryRestrictions,
   });
 
   final String? goalType;
@@ -255,6 +269,8 @@ class _PartialSnapshot {
   final String? levelLabel;
   final double? weightKg;
   final int? mealsPerDay;
+  final String? dietType;
+  final List<String>? dietaryRestrictions;
 }
 
 int? _asInt(dynamic value) {
@@ -280,6 +296,28 @@ String? _asString(dynamic value) {
   if (value == null) return null;
   if (value is String) return value.trim().isEmpty ? null : value.trim();
   return value.toString();
+}
+
+List<String>? _asStringList(dynamic value) {
+  if (value == null) return null;
+  if (value is List) {
+    final results = <String>[];
+    for (final item in value) {
+      final text = _asString(item);
+      if (text != null && text.isNotEmpty) {
+        results.add(text);
+      }
+    }
+    return results.isEmpty ? null : results;
+  }
+  if (value is String && value.trim().isNotEmpty) {
+    return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
+  }
+  return null;
 }
 
 DateTime? _asDateTime(dynamic value) {

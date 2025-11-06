@@ -57,10 +57,18 @@ class DietAIService {
         'weightKg': profile.weightKg,
         'mealsPerDay': profile.mealsPerDay,
         'targetCalories': profile.targetCalories,
+        'dietPreference': profile.preference?.name,
+        'dietaryRestrictions': profile.dietaryRestrictions,
       },
       'dietGoal': {
         'goal': profile.goal.name,
         'experience': profile.experience.name,
+        'dietPreference': profile.preference?.name,
+        'dietaryRestrictions': profile.dietaryRestrictions,
+      },
+      'preferences': {
+        'dietPreference': profile.preference?.name,
+        'dietaryRestrictions': profile.dietaryRestrictions,
       },
     };
   }
