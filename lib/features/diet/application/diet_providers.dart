@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
+import 'package:flutter_application_1/features/diet/data/diet_ai_service.dart';
 import 'package:flutter_application_1/features/diet/data/diet_profile_repository.dart';
 
 class MealData {
@@ -1038,6 +1039,10 @@ final dietProfileRepositoryProvider = Provider<DietProfileRepository>((ref) {
   return DietProfileRepository(Supabase.instance.client);
 });
 
+final dietAIServiceProvider = Provider<DietAIService>((ref) {
+  return DietAIService(Supabase.instance.client);
+});
+
 final dietUserProfileProvider = FutureProvider<DietUserProfile>((ref) async {
   final repository = ref.watch(dietProfileRepositoryProvider);
 
@@ -1144,6 +1149,13 @@ final todayDietPlanProvider = FutureProvider<DietRecommendationResult>((ref) asy
   }
 
   final profile = await ref.watch(dietUserProfileProvider.future);
+
+  final aiService = ref.watch(dietAIServiceProvider);
+  final aiPlan = await aiService.fetchRecommendation(profile: profile);
+  if (aiPlan != null && aiPlan.meals.isNotEmpty) {
+    return aiPlan;
+  }
+
   try {
     final engine = DietRecommendationEngine(
       foods: foods,

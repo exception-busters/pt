@@ -1,7 +1,11 @@
 {
-  "deno.enablePaths": [
-    "supabase/functions"
-  ],
+  "deno.enable": true,                                                                                                                                       
+           "deno.unstable": true,
+           "deno.lint": true,                                                                                                                                         
+           "deno.config": "./supabase/functions/diet-recommendation/deno.json", 
+           "deno.enablePaths": [
+            "supabase/functions"
+          ],
   "deno.lint": true,
   "deno.unstable": [
     "bare-node-builtins",
