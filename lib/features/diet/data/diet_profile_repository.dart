@@ -34,6 +34,11 @@ class DietProfileRepository {
   DietProfileRepository(this._client);
 
   final SupabaseClient _client;
+  static const List<String> _workoutGoalTableCandidates = [
+    'exercisegoal',
+    'workoutgoal',
+  ];
+  static String? _resolvedWorkoutGoalTable;
 
   Future<DietProfileSnapshot> fetchUserSnapshot() async {
     final user = _client.auth.currentUser;
@@ -43,18 +48,22 @@ class DietProfileRepository {
 
     final userId = user.id;
     final profile = await _loadUserProfile(userId);
+    final workoutGoal = await _loadWorkoutGoal(userId);
     final dietGoal = await _loadDietGoal(userId);
 
+    var mealsPerDay = dietGoal.mealsPerDay ?? profile.mealsPerDay;
+    if (mealsPerDay == null) {
+      mealsPerDay = (await _estimateMealsPerDay(userId)).mealsPerDay;
+    }
+    mealsPerDay ??= 3;
+
     return DietProfileSnapshot(
-      goalType: dietGoal.goalType ?? profile.goalType,
+      goalType: dietGoal.goalType ?? workoutGoal.goalType ?? profile.goalType,
       targetCalories: dietGoal.targetCalories ?? profile.targetCalories,
-      levelValue: profile.levelValue,
-      levelLabel: profile.levelLabel,
+      levelValue: workoutGoal.levelValue ?? profile.levelValue,
+      levelLabel: workoutGoal.levelLabel ?? profile.levelLabel,
       weightKg: profile.weightKg,
-      mealsPerDay: dietGoal.mealsPerDay ??
-          profile.mealsPerDay ??
-          (await _estimateMealsPerDay(userId)).mealsPerDay ??
-          3,
+      mealsPerDay: mealsPerDay,
     );
   }
 
@@ -62,7 +71,7 @@ class DietProfileRepository {
     try {
       final result = await _client
           .from('userprofile')
-          .select('level, weight, bio')
+          .select('weight')
           .eq('user_id', userId)
           .maybeSingle() as Map<String, dynamic>?;
 
@@ -71,8 +80,6 @@ class DietProfileRepository {
       }
 
       return _PartialSnapshot(
-        levelValue: _asInt(result['level']),
-        levelLabel: _asString(result['bio']),
         weightKg: _asDouble(result['weight']),
       );
     } on PostgrestException catch (error) {
@@ -83,6 +90,41 @@ class DietProfileRepository {
     } catch (error) {
       throw DietProfileRepositoryException(
         '사용자 프로필을 읽는 중 알 수 없는 오류가 발생했습니다.',
+        cause: error,
+      );
+    }
+  }
+
+  Future<_PartialSnapshot> _loadWorkoutGoal(String userId) async {
+    try {
+      final workoutTable = await _getWorkoutGoalTable();
+      final result = await _client
+          .from(workoutTable)
+          .select('goal_type, level')
+          .eq('user_id', userId)
+          .maybeSingle() as Map<String, dynamic>?;
+
+      if (result == null) {
+        return const _PartialSnapshot();
+      }
+
+      final rawLevel = _asString(result['level']);
+      return _PartialSnapshot(
+        goalType: _asString(result['goal_type']),
+        levelValue: _mapLevelToValue(rawLevel),
+        levelLabel: _mapLevelToLabel(rawLevel),
+      );
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST116') {
+        return const _PartialSnapshot();
+      }
+      throw DietProfileRepositoryException(
+        '운동 목표 정보를 불러오지 못했습니다.',
+        cause: error,
+      );
+    } catch (error) {
+      throw DietProfileRepositoryException(
+        '운동 목표 정보를 읽는 중 알 수 없는 오류가 발생했습니다.',
         cause: error,
       );
     }
@@ -122,6 +164,30 @@ class DietProfileRepository {
         cause: error,
       );
     }
+  }
+
+  Future<String> _getWorkoutGoalTable() async {
+    if (_resolvedWorkoutGoalTable != null) {
+      return _resolvedWorkoutGoalTable!;
+    }
+
+    for (final table in _workoutGoalTableCandidates) {
+      try {
+        await _client.from(table).select('user_id').limit(1);
+        _resolvedWorkoutGoalTable = table;
+        return table;
+      } on PostgrestException catch (error) {
+        final code = error.code ?? '';
+        final message = (error.message ?? '').toLowerCase();
+        if (code == '42P01' || message.contains('does not exist') || message.contains('relation')) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    _resolvedWorkoutGoalTable = _workoutGoalTableCandidates.last;
+    return _resolvedWorkoutGoalTable!;
   }
 
   Future<_PartialSnapshot> _estimateMealsPerDay(String userId) async {
@@ -223,4 +289,30 @@ DateTime? _asDateTime(dynamic value) {
     return DateTime.tryParse(value)?.toLocal();
   }
   return null;
+}
+
+int? _mapLevelToValue(String? raw) {
+  switch (raw) {
+    case 'beginner':
+      return 1;
+    case 'intermediate':
+      return 2;
+    case 'advanced':
+      return 3;
+    default:
+      return null;
+  }
+}
+
+String? _mapLevelToLabel(String? raw) {
+  switch (raw) {
+    case 'beginner':
+      return '초급';
+    case 'intermediate':
+      return '중급';
+    case 'advanced':
+      return '고급';
+    default:
+      return null;
+  }
 }

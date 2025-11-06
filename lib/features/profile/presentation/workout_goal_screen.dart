@@ -32,6 +32,27 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
     _loadExistingData();
   }
 
+  static const Map<String, String> _workoutTypeLabelToCode = {
+    '유산소': 'cardio',
+    '근력운동': 'strength',
+    '요가': 'yoga',
+    '필라테스': 'pilates',
+    '스트레칭': 'stretch',
+  };
+
+  String _mapWorkoutTypeCodeToLabel(String code) {
+    return _workoutTypeLabelToCode.entries
+        .firstWhere(
+          (entry) => entry.value == code,
+          orElse: () => const MapEntry('유산소', 'cardio'),
+        )
+        .key;
+  }
+
+  String _mapWorkoutTypeLabelToCode(String label) {
+    return _workoutTypeLabelToCode[label] ?? 'cardio';
+  }
+
   Future<void> _loadExistingData() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -49,7 +70,10 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
           _selectedLevel = _getLevelStringFromType(workoutGoal.level);
           _weeklyWorkoutDays = workoutGoal.weeklyDays ?? 3;
           _dailyWorkoutMinutes = workoutGoal.dailyDurationMin ?? 30;
-          _selectedWorkoutTypes = workoutGoal.preferredTypes ?? ['유산소'];
+          final rawTypes = workoutGoal.preferredTypes;
+          _selectedWorkoutTypes = rawTypes != null && rawTypes.isNotEmpty
+              ? rawTypes.map(_mapWorkoutTypeCodeToLabel).toList()
+              : ['유산소'];
         });
       }
     } catch (e) {
@@ -108,7 +132,10 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
       level: _getLevelFromString(_selectedLevel),
       weeklyDays: _weeklyWorkoutDays,
       dailyDurationMin: _dailyWorkoutMinutes,
-      preferredTypes: _selectedWorkoutTypes,
+      preferredTypes: _selectedWorkoutTypes
+          .map(_mapWorkoutTypeLabelToCode)
+          .toSet()
+          .toList(),
     );
 
     // 로딩 표시
@@ -136,11 +163,16 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
           );
           context.pop();
         } else {
+          final errorMessage = ref.read(completeUserDataProvider).error;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('저장에 실패했습니다. 다시 시도해주세요.'),
+            SnackBar(
+              content: Text(
+                errorMessage != null && errorMessage.isNotEmpty
+                    ? '저장 실패: $errorMessage'
+                    : '저장에 실패했습니다. 다시 시도해주세요.',
+              ),
               backgroundColor: Colors.red,
-            ),
+            )
           );
         }
       }
