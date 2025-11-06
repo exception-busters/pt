@@ -29,6 +29,110 @@ interface DietPlan {
   isStructured: boolean;
 }
 
+function extractTextFromResponse(result: unknown): string | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const maybeText = (result as { output_text?: unknown }).output_text;
+  if (typeof maybeText === "string" && maybeText.trim().length > 0) {
+    return maybeText;
+  }
+
+  const maybeChoices = (result as { choices?: unknown }).choices;
+  if (Array.isArray(maybeChoices)) {
+    for (const choice of maybeChoices) {
+      const content = (choice as Record<string, unknown>)?.message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          const blockText = (block as { text?: unknown }).text;
+          if (typeof blockText === "string" && blockText.trim().length > 0) {
+            return blockText;
+          }
+        }
+      }
+      const text = (choice as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim().length > 0) {
+        return text;
+      }
+    }
+  }
+
+  const outputs = (result as { output?: unknown }).output;
+  if (Array.isArray(outputs)) {
+    const textChunks: string[] = [];
+    const jsonChunks: string[] = [];
+
+    for (const item of outputs) {
+      const content = (item as { content?: unknown }).content;
+      if (!Array.isArray(content)) continue;
+
+      for (const piece of content) {
+        if (typeof piece === "string" && piece.trim().length > 0) {
+          textChunks.push(piece);
+          continue;
+        }
+
+        if (!piece || typeof piece !== "object") continue;
+        const maybePieceText = (piece as { text?: unknown }).text;
+        if (typeof maybePieceText === "string" && maybePieceText.trim().length > 0) {
+          textChunks.push(maybePieceText);
+          continue;
+        }
+
+        const value = (piece as Record<string, unknown>).text as {
+          value?: unknown;
+        } | undefined;
+        if (value && typeof value.value === "string" && value.value.trim().length > 0) {
+          textChunks.push(value.value);
+          continue;
+        }
+
+        const jsonValue = (piece as { json?: unknown }).json;
+        if (jsonValue !== undefined) {
+          try {
+            jsonChunks.push(typeof jsonValue === "string"
+              ? jsonValue
+              : JSON.stringify(jsonValue));
+          } catch (_error) {
+            jsonChunks.push(String(jsonValue));
+          }
+        }
+      }
+    }
+
+    if (jsonChunks.length > 0) {
+      return jsonChunks.join("\n");
+    }
+    if (textChunks.length > 0) {
+      return textChunks.join("\n");
+    }
+  }
+
+  return null;
+}
+
+function stripCodeFences(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("```")) {
+    return text;
+  }
+
+  const lines = trimmed.split("\n");
+  if (lines.length === 0) {
+    return text;
+  }
+
+  lines.shift(); // drop opening ```... line
+
+  const lastLine = lines[lines.length - 1];
+  if (lastLine !== undefined && lastLine.trim() === "```") {
+    lines.pop();
+  }
+
+  return lines.join("\n").trim();
+}
+
 function unauthorized(body: string | Record<string, unknown>) {
   return new Response(
     typeof body === "string" ? body : JSON.stringify(body),
@@ -48,7 +152,21 @@ function badRequest(message: string) {
 
 function serverError(message: string, details?: unknown) {
   console.error(message, details);
-  return new Response(JSON.stringify({ error: message }), {
+
+  let detailText: string | undefined;
+  if (details instanceof Error) {
+    detailText = `${details.name}: ${details.message}`;
+  } else if (typeof details === "string") {
+    detailText = details;
+  } else if (details) {
+    try {
+      detailText = JSON.stringify(details);
+    } catch (_error) {
+      detailText = String(details);
+    }
+  }
+
+  return new Response(JSON.stringify({ error: message, details: detailText }), {
     status: 500,
     headers: { "Content-Type": "application/json" },
   });
@@ -104,7 +222,7 @@ async function callOpenAI(prompt: string): Promise<DietPlan> {
       "Authorization": `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       input: prompt,
       max_output_tokens: 800,
     }),
@@ -116,13 +234,15 @@ async function callOpenAI(prompt: string): Promise<DietPlan> {
   }
 
   const result = await response.json();
-  const text: unknown = result?.output_text ??
-    result?.choices?.[0]?.message?.content?.[0]?.text ??
-    "";
+  let text = extractTextFromResponse(result);
 
   if (typeof text !== "string" || text.trim().length === 0) {
-    throw new Error("OpenAI 응답에 텍스트가 없습니다.");
+    throw new Error(
+      `OpenAI 응답에 텍스트가 없습니다. result=${JSON.stringify(result)}`,
+    );
   }
+
+  text = stripCodeFences(text);
 
   let parsed: unknown = null;
   try {
