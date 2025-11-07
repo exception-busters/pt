@@ -38,7 +38,7 @@ class SupabaseWorkoutRoutine {
     };
   }
 
-  // Insert용 (routine_id 제외)
+  // Insert용(routine_id 제외)
   Map<String, dynamic> toInsertJson() {
     return {
       'user_id': userId,

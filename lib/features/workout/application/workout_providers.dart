@@ -386,14 +386,14 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
         exerciseData.add({
           'exercise_id': supabaseExercise.exerciseId!,
           'sets': 3, // 기본값
-          'reps': (exercise.duration ~/ 5).clamp(5, 20), // duration 기반 reps 계산 (5-20 범위)
+          'reps': (exercise.duration ~/ 5).clamp(5, 20), // 운동 소요 시간을 활용해 반복 수 계산(5~20 범위)
           'rest_time_sec': 60, // 기본값
         });
       }
 
       print('📊 운동 데이터 준비 완료: ${exerciseData.length}개');
 
-      // 2. 단순 INSERT를 사용한 루틴 생성
+      // 2. 단순 삽입 방식을 사용해 루틴 생성
       final insertedRoutine = await _service.createCompleteRoutine(
         title: title,
         description: description ?? '사용자가 생성한 운동 루틴',
@@ -446,7 +446,7 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
         exerciseData.add({
           'exercise_id': supabaseExercise.exerciseId!,
           'sets': 3, // 기본값
-          'reps': (exercise.duration ~/ 5).clamp(5, 20), // duration 기반 reps 계산 (5-20 범위)
+          'reps': (exercise.duration ~/ 5).clamp(5, 20), // 운동 소요 시간을 활용해 반복 수 계산(5~20 범위)
           'rest_time_sec': 60, // 기본값
         });
       }

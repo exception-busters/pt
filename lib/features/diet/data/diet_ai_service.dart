@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../application/diet_providers.dart';
 
-/// Calls the Supabase Edge Function to generate an AI based diet plan.
+/// Supabase Edge Function으 AI 기반 식단 계획을 생성합니다.
 class DietAIService {
   DietAIService(this._client);
 

@@ -100,7 +100,7 @@ class OnboardingDebugWidget extends ConsumerWidget {
           
           const SizedBox(height: 8),
           
-          // 버튼들을 세로로 배치하여 overflow 방지
+          // 버튼을 세로로 배치해 오버플로우를 방지
           Column(
             children: [
               Row(

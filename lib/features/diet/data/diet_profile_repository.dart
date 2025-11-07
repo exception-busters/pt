@@ -1,7 +1,7 @@
 import 'package:postgrest/postgrest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Stores raw diet-related preferences fetched from Supabase.
+/// Supabase에서 가져온 식단 관련 선호 데이터를 원본 형태로 보관합니다.
 class DietProfileSnapshot {
   const DietProfileSnapshot({
     required this.goalType,

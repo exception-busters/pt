@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🏋️ AI 자세 교정 앱 (Pose Detection App)
 
 **실시간 포즈 감지와 AI 기반 운동 자세 교정 Flutter 애플리케이션**
@@ -246,11 +245,11 @@ flutter run
 
 기여는 언제나 환영합니다!
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. 프로젝트를 포크하세요
+2. 기능 브랜치를 생성하세요 (`git checkout -b feature/AmazingFeature`)
+3. 변경 사항을 커밋하세요 (`git commit -m 'Add some AmazingFeature'`)
+4. 브랜치에 푸시하세요 (`git push origin feature/AmazingFeature`)
+5. Pull Request를 열어 주세요
 
 ---
 
@@ -267,19 +266,19 @@ flutter run
 
 ---
 
-**Made with ❤️ using Flutter & Google ML Kit**
-=======
-# AI 기반 모바일 PT 앱 (Flutter)
+**Flutter와 Google ML Kit으로 ❤️를 담아 만들었습니다.**
+
+## 📘 모바일 PT 앱 확장 개요 (추가 안내)
 
 스마트폰 카메라와 AI로 실시간 자세 인식/피드백을 제공하고, 개인화 루틴/식단/기록을 통합 관리하는 크로스플랫폼 앱입니다.
 
 프로젝트 핵심 요약과 아키텍처/요구사항/로드맵은 `문서/문서_요약.md`에 통합되어 있습니다.
 
-## Prerequisites
-- Flutter SDK (stable), Dart SDK `^3.9.2` 호환
-- Android 10+/iOS 14+ 디바이스 또는 에뮬레이터
+### 사전 준비 사항
+- Flutter SDK(안정 채널), Dart SDK `^3.9.2` 호환 버전
+- Android 10+ 또는 iOS 14+ 디바이스/에뮬레이터
 
-## Quick Start
+### 빠른 시작
 1) 의존성 설치
 ```
 flutter pub get
@@ -298,7 +297,7 @@ flutter analyze
 flutter test
 ```
 
-## 프로젝트 구조(계획)
+### 프로젝트 구조(계획)
 - 상태관리: Riverpod, 라우팅: GoRouter
 - 폴더링(요약):
   - `lib/core` – 상수/에러/네트워크/스토리지
@@ -307,10 +306,9 @@ flutter test
 
 현 시점 코드는 단일 파일 목업(`lib/main.dart`)이며, 단계적으로 위 구조로 리팩터링 예정입니다.
 
-## 서버/AI 연동(개요)
-- 서버: Spring Boot + PostgreSQL (REST API)
-- 인증: Firebase Auth(JWT), 통신: HTTPS(TLS1.2+)
-- AI: On-device TFLite + MediaPipe Pose(33 랜드마크), 필요 시 경량 서버 추론 폴백
+### 서버/AI 연동 개요
+- 서버: Spring Boot + PostgreSQL 기반 REST API
+- 인증: Firebase Auth(JWT), 통신: HTTPS(TLS 1.2 이상)
+- AI: 온디바이스 TFLite + MediaPipe Pose(33 랜드마크), 필요 시 경량 서버 추론 폴백
 
 엔드포인트/스키마/성능 목표 등 상세는 `문서/문서_요약.md`의 4, 6, 8장을 참고하세요.
->>>>>>> d6a771ae2c2e5c4f1369adad149eda49e2059679

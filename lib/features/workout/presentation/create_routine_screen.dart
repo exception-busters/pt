@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 class CreateRoutineScreen extends ConsumerStatefulWidget {
   final WorkoutRoutine? editingRoutine;
-  final dynamic editingSupabaseRoutine; // SupabaseWorkoutRoutine
+  final dynamic editingSupabaseRoutine; // Supabase 루틴 모델(SupabaseWorkoutRoutine)
 
   const CreateRoutineScreen({super.key, this.editingRoutine, this.editingSupabaseRoutine});
 
@@ -28,7 +28,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
       _selectedExercises = List.from(widget.editingRoutine!.exercises);
     } else if (widget.editingSupabaseRoutine != null) {
       _nameController.text = widget.editingSupabaseRoutine.title;
-      // Supabase 루틴의 운동들을 Exercise 객체로 변환
+      // Supabase 루틴의 운동 정보를 Exercise 객체로 변환
       _selectedExercises = _convertSupabaseExercisesToExercises(widget.editingSupabaseRoutine);
     }
   }
@@ -48,7 +48,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
             id: exerciseData['exercise_id'].toString(),
             name: exerciseData['name'] ?? '운동명 없음',
             description: exerciseData['description'] ?? '운동 설명이 없습니다.',
-            duration: ((routineExercise['reps'] ?? 10) * 5).clamp(30, 120), // reps 기반으로 duration 추정
+            duration: ((routineExercise['reps'] ?? 10) * 5).clamp(30, 120), // 반복 횟수를 기반으로 duration 추정
             category: exerciseData['body_part'] ?? '기타',
           );
           exercises.add(exercise);
@@ -411,7 +411,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                     margin: const EdgeInsets.symmetric(vertical: 16),
                   ),
 
-                  // 오른쪽: 선택된 운동 (ReorderableList)
+                  // 오른쪽 영역: 선택된 운동 목록(순서 재배열 리스트)
                   Expanded(
                     flex: 1,
                     child: Column(

@@ -22,7 +22,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
   TimeOfDay _lunchTime = const TimeOfDay(hour: 12, minute: 0);
   TimeOfDay _dinnerTime = const TimeOfDay(hour: 18, minute: 30);
   
-  int _waterReminderInterval = 2; // hours
+  int _waterReminderInterval = 2; // 시간 단위
 
   void _saveSettings() {
     ScaffoldMessenger.of(context).showSnackBar(

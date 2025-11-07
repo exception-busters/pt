@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:go_router/go_router.dart';
-import '../application/auth_providers.dart'; // AuthController import
+import '../application/auth_providers.dart'; // AuthController 가져오기
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});

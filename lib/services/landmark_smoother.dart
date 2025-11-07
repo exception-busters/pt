@@ -2,7 +2,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math';
 
 /// 랜드마크 좌표 스무딩 서비스
-/// - Exponential Moving Average (EMA) 사용
+/// - 지수 이동 평균(EMA) 방식 사용
 /// - 임계값 기반 필터링으로 미세한 떨림 제거
 /// - 자연스러운 움직임 유지
 class LandmarkSmoother {

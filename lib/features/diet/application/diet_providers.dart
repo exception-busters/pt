@@ -432,7 +432,7 @@ final dietControllerProvider = StateNotifierProvider<DietController, DietData>(
   (ref) => DietController(ref),
 );
 
-// --- Today diet recommendation ------------------------------------------------
+// --- 오늘의 식단 추천 ------------------------------------------------
 
 enum DietGoal { bulkUp, cut, maintain }
 
@@ -933,7 +933,7 @@ class _FoodSelector {
         .toList()
       ..sort((a, b) => b.fatDensity.compareTo(a.fatDensity));
 
-    // Fallback if lists are too small
+    // 추천 목록이 너무 짧을 때 사용할 예비 처리
     if (proteinFoods.length < 5) {
       proteinFoods = foods.where((item) => item.protein > 0).toList()
         ..sort((a, b) => b.protein.compareTo(a.protein));

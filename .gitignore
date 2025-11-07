@@ -1,4 +1,4 @@
-# Miscellaneous
+# 기타
 *.class
 *.log
 *.pyc
@@ -12,18 +12,17 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ 관련
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code 폴더에는 실행/작업 설정이 있으므로
+# 형상 관리에 포함하고 싶다면 아래 주석을 해제하세요.
 #.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter/Dart/Pub 관련
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -32,23 +31,27 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+android/app/build/
+node_modules/
 .flutter-plugins-dependencies
 /coverage/
-# Symbolication related
+
+# 심볼리케이션 관련
 app.*.symbols
 
-# Obfuscation related
+# 난독화 관련
 app.*.map.json
+*.apk
+*.aab
 
-# Android Studio will place build artifacts here
+# Android Studio 빌드 산출물 경로
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-# Python server
+# Python 서버
 python_server/__pycache__/
 python_server/*.pyc
 
-# Supabase environment
+# Supabase 환경 변수
 supabase/.env
-

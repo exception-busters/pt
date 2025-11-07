@@ -6,10 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// Models
+// 모델
 import '../models/exercise_model.dart';
 
-// Services
+// 서비스
 import '../services/exercise_loader.dart';
 import '../services/exercise_mapper.dart';
 import '../services/pose_scorer.dart';
@@ -21,7 +21,7 @@ import '../services/angle_smoother.dart';
 import '../services/landmark_smoother.dart';
 import '../services/tts_service.dart';
 
-// Widgets
+// 위젯
 import '../widgets/phase_progress_widget.dart';
 import '../widgets/compact_score_display.dart';
 import '../pose_painter.dart';
@@ -402,7 +402,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     return InputImage.fromBytes(bytes: bytes, metadata: inputImageData);
   }
 
-  /// YouTube URL에서 video ID 추출
+  /// YouTube URL에서 영상 ID 추출
   String? _extractYouTubeVideoId(String url) {
     // 다양한 YouTube URL 형식 지원
     final patterns = [

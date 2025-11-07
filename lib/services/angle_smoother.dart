@@ -8,7 +8,7 @@ class AngleSmoother {
 
   AngleSmoother({int windowSize = 7}) : _windowSize = windowSize;  // 기본값 증가 (5 -> 7)
 
-  /// 지수 이동 평균 (Exponential Moving Average) - 내부 전용
+  /// 지수 이동 평균(EMA) - 내부 전용
   /// alpha가 클수록 최근 값에 더 민감
   double _smoothAngleExponential(
     String angleKey,
