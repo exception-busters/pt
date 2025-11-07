@@ -24,5 +24,6 @@
   ],
   "[typescript]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
-  }
+  },
+  "cmake.sourceDirectory": "C:/KDT/PT/flutter_application_1/linux"
 }
