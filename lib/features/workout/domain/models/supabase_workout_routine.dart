@@ -24,7 +24,7 @@ class SupabaseWorkoutRoutine {
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'] as String)
           : null,
-      routineExercises: json['routineexercise'] as List<dynamic>?,
+      routineExercises: json['routine_exercise'] as List<dynamic>?,
     );
   }
 
