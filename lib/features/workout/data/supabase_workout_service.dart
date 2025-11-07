@@ -43,7 +43,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .insert(routine.toInsertJson())
           .select()
           .single();
@@ -84,7 +84,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('routineexercise')
+          .from('routine_exercise')
           .insert(routineExercise.toInsertJson())
           .select()
           .single();
@@ -320,10 +320,10 @@ class SupabaseWorkoutService {
 
       // 현재 로그인한 사용자의 루틴만 조회
       final response = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .select('''
             *,
-            routineexercise (
+            routine_exercise (
               *,
               exercise (
                 *
@@ -457,7 +457,7 @@ class SupabaseWorkoutService {
 
       print('📝 루틴 데이터 삽입 중...');
       final routineResponse = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .insert(routineData)
           .select()
           .single();
@@ -486,7 +486,7 @@ class SupabaseWorkoutService {
         print('📝 운동 ${i + 1}/${exercises.length} 삽입 중: $routineExerciseData');
         
         final exerciseResponse = await _supabase
-            .from('routineexercise')
+            .from('routine_exercise')
             .insert(routineExerciseData)
             .select()
             .single();
@@ -537,7 +537,7 @@ class SupabaseWorkoutService {
       };
 
       final routineResponse = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .insert(routineData)
           .select()
           .single();
@@ -561,7 +561,7 @@ class SupabaseWorkoutService {
           };
 
           await _supabase
-              .from('routineexercise')
+              .from('routine_exercise')
               .insert(routineExerciseData);
 
           print('✅ 운동 ${i + 1} 추가 성공');
@@ -597,7 +597,7 @@ class SupabaseWorkoutService {
 
       // 현재 사용자의 루틴인지 먼저 확인
       final routineCheck = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .select('user_id')
           .eq('routine_id', routineId)
           .eq('user_id', currentUser.id)
@@ -610,7 +610,7 @@ class SupabaseWorkoutService {
 
       // 1단계: WorkoutRoutine 업데이트
       await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .update({
             'title': title,
             'description': description ?? '',
@@ -622,7 +622,7 @@ class SupabaseWorkoutService {
 
       // 2단계: 기존 RoutineExercise 삭제
       await _supabase
-          .from('routineexercise')
+          .from('routine_exercise')
           .delete()
           .eq('routine_id', routineId);
 
@@ -642,7 +642,7 @@ class SupabaseWorkoutService {
           };
 
           await _supabase
-              .from('routineexercise')
+              .from('routine_exercise')
               .insert(routineExerciseData);
 
           print('✅ 운동 ${i + 1} 추가 성공');
@@ -672,7 +672,7 @@ class SupabaseWorkoutService {
 
       // 현재 사용자의 루틴인지 먼저 확인
       final routineCheck = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .select('user_id')
           .eq('routine_id', routineId)
           .eq('user_id', currentUser.id) // 현재 사용자의 루틴인지 확인
@@ -685,7 +685,7 @@ class SupabaseWorkoutService {
 
       // 현재 사용자의 루틴만 삭제
       await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .delete()
           .eq('routine_id', routineId)
           .eq('user_id', currentUser.id); // 이중 보안
@@ -725,7 +725,7 @@ class SupabaseWorkoutService {
       };
 
       final routineResponse = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .insert(routineData)
           .select()
           .single();
@@ -743,7 +743,7 @@ class SupabaseWorkoutService {
       };
 
       await _supabase
-          .from('routineexercise')
+          .from('routine_exercise')
           .insert(exerciseData);
 
       print('✅ 테스트 운동 추가 완료');
@@ -788,7 +788,7 @@ class SupabaseWorkoutService {
   Future<bool> _checkRoutineExists(int routineId) async {
     try {
       final response = await _supabase
-          .from('workoutroutine')
+          .from('routine')
           .select('routine_id')
           .eq('routine_id', routineId)
           .maybeSingle();
