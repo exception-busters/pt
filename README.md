@@ -312,3 +312,9 @@ flutter test
 - AI: 온디바이스 TFLite + MediaPipe Pose(33 랜드마크), 필요 시 경량 서버 추론 폴백
 
 엔드포인트/스키마/성능 목표 등 상세는 `문서/문서_요약.md`의 4, 6, 8장을 참고하세요.
+
+### OpenAI 루틴 추천 사용법
+- AI 운동 루틴 추천은 OpenAI Chat Completions API(gpt-4o-mini)를 호출해 세트/횟수 기반 루틴을 만듭니다.
+- 실행 시 API 키를 런타임 정의 값으로 전달하세요:  
+  `flutter run --dart-define=OPENAI_API_KEY=sk-xxxx`
+- 키를 지정하지 않으면 자동으로 로컬 템플릿(세트/횟수 포함)으로 폴백합니다.

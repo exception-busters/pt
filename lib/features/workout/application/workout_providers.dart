@@ -1,12 +1,29 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../data/supabase_workout_service.dart';
 import '../domain/models/supabase_exercise.dart';
 import '../domain/models/supabase_workout_routine.dart';
 import '../domain/models/supabase_routine_exercise.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../profile/application/complete_profile_providers.dart';
+import '../../profile/domain/models/workout_goal_model.dart';
+import '../../profile/domain/models/user_profile_model.dart';
+
+const bool _enableWorkoutAi = bool.fromEnvironment(
+  'ENABLE_WORKOUT_AI',
+  defaultValue: true,
+);
+
+const String _openAiApiKey = String.fromEnvironment(
+  'OPENAI_API_KEY',
+  defaultValue: '',
+);
+const bool _hasOpenAiKey = _openAiApiKey != '';
+
+const String _workoutRecommendationFunction = 'workout-recommendation';
 
 class Exercise {
   final String id;
@@ -14,6 +31,9 @@ class Exercise {
   final String description;
   final int duration; // 초 단위
   final String category;
+  final int? sets;
+  final int? reps;
+  final int? restSeconds;
 
   Exercise({
     required this.id,
@@ -21,7 +41,61 @@ class Exercise {
     required this.description,
     required this.duration,
     required this.category,
+    this.sets,
+    this.reps,
+    this.restSeconds,
   });
+
+  /// 세트/횟수/휴식 정보를 사용자 친화적인 문자열로 반환
+  String get volumeSummary {
+    if (sets != null && reps != null) {
+      final restPart = restSeconds != null ? ' • 휴식 ${restSeconds}초' : '';
+      return '${sets}세트 × ${reps}회$restPart';
+    }
+    if (duration >= 60) {
+      final minutes = duration ~/ 60;
+      final seconds = duration % 60;
+      return seconds > 0 ? '${minutes}분 ${seconds}초' : '${minutes}분';
+    }
+    return '${duration}초';
+  }
+
+  int get estimatedDurationSeconds {
+    if (duration > 0) {
+      return duration;
+    }
+    if (sets != null && reps != null) {
+      final approxPerRepSec = 4; // 한 동작당 대략 4초
+      final work = sets! * reps! * approxPerRepSec;
+      final estimatedRest = restSeconds != null && sets! > 1
+          ? restSeconds! * (sets! - 1)
+          : 0;
+      return work + estimatedRest;
+    }
+    return 0;
+  }
+
+  Exercise copyWith({
+    String? id,
+    String? name,
+    String? description,
+    int? duration,
+    String? category,
+    int? sets,
+    int? reps,
+    int? restSeconds,
+  }) {
+    return Exercise(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      duration: duration ?? this.duration,
+      category: category ?? this.category,
+      sets: sets ?? this.sets,
+      reps: reps ?? this.reps,
+      restSeconds: restSeconds ?? this.restSeconds,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -30,6 +104,9 @@ class Exercise {
       'description': description,
       'duration': duration,
       'category': category,
+      if (sets != null) 'sets': sets,
+      if (reps != null) 'reps': reps,
+      if (restSeconds != null) 'restSeconds': restSeconds,
     };
   }
 
@@ -40,6 +117,9 @@ class Exercise {
       description: json['description'],
       duration: json['duration'],
       category: json['category'],
+      sets: json['sets'],
+      reps: json['reps'],
+      restSeconds: json['restSeconds'],
     );
   }
 }
@@ -57,7 +137,7 @@ class WorkoutRoutine {
     required this.createdAt,
   });
 
-  int get totalDuration => exercises.fold(0, (sum, exercise) => sum + exercise.duration);
+  int get totalDuration => exercises.fold(0, (sum, exercise) => sum + exercise.estimatedDurationSeconds);
 
   String get formattedDuration {
     final minutes = totalDuration ~/ 60;
@@ -174,87 +254,572 @@ final workoutRoutineControllerProvider = StateNotifierProvider<WorkoutRoutineCon
   (ref) => WorkoutRoutineController(ref),
 );
 
-// AI 추천 루틴 생성기
 class AIRecommendedRoutines {
+  static final List<_RoutineTemplate> _templates = [
+    _RoutineTemplate(
+      id: 'ai_beginner',
+      name: '🤖 AI 추천: 초보자 전신 운동',
+      blocks: [
+        _RoutineBlock(keyword: '스쿼트', sets: 3, reps: 12, restSeconds: 60),
+        _RoutineBlock(keyword: '푸쉬업', sets: 3, reps: 10, restSeconds: 60),
+        _RoutineBlock(keyword: '플랭크', sets: 3, reps: 40, estimatedDuration: 40, restSeconds: 45),
+      ],
+    ),
+    _RoutineTemplate(
+      id: 'ai_core',
+      name: '🤖 AI 추천: 코어 강화 집중',
+      blocks: [
+        _RoutineBlock(keyword: '플랭크', sets: 4, reps: 45, estimatedDuration: 45, restSeconds: 30),
+        _RoutineBlock(keyword: '데드버그', sets: 3, reps: 12, restSeconds: 45),
+        _RoutineBlock(keyword: '버드독', sets: 3, reps: 16, restSeconds: 40),
+      ],
+    ),
+    _RoutineTemplate(
+      id: 'ai_lower',
+      name: '🤖 AI 추천: 하체 근력 강화',
+      blocks: [
+        _RoutineBlock(keyword: '스쿼트', sets: 4, reps: 10, restSeconds: 70),
+        _RoutineBlock(keyword: '런지', sets: 3, reps: 12, restSeconds: 60),
+        _RoutineBlock(keyword: '데드리프트', sets: 3, reps: 10, restSeconds: 80),
+      ],
+    ),
+    _RoutineTemplate(
+      id: 'ai_hiit',
+      name: '🤖 AI 추천: 고강도 인터벌',
+      blocks: [
+        _RoutineBlock(keyword: '버피', sets: 4, reps: 12, restSeconds: 45),
+        _RoutineBlock(keyword: '마운틴 클라이머', sets: 4, reps: 30, restSeconds: 30),
+        _RoutineBlock(keyword: '점프 스쿼트', sets: 4, reps: 15, restSeconds: 60),
+      ],
+    ),
+  ];
+
   static List<WorkoutRoutine> getRecommendedRoutines(List<Exercise> availableExercises) {
     final now = DateTime.now();
-    
-    // 운동 이름으로 찾는 헬퍼 함수
-    Exercise? findExerciseByName(String name) {
-      try {
-        return availableExercises.firstWhere((e) => e.name.contains(name));
-      } catch (e) {
-        return null;
-      }
-    }
-    
-    return [
-      // 초보자용 루틴
-      WorkoutRoutine(
-        id: 'ai_beginner',
-        name: '🤖 AI 추천: 초보자 전신 운동',
-        exercises: [
-          findExerciseByName('스쿼트'),
-          findExerciseByName('푸쉬업'),
-          findExerciseByName('플랭크'),
-        ].where((e) => e != null).cast<Exercise>().toList(),
+    final catalog = availableExercises;
+
+    return _templates.map((template) {
+      final usedExerciseIds = <String>{};
+      final exercises = template.blocks
+          .map((block) => _materializeExercise(block, catalog, usedExerciseIds))
+          .whereType<Exercise>()
+          .toList();
+
+      return WorkoutRoutine(
+        id: template.id,
+        name: template.name,
+        exercises: exercises,
         createdAt: now,
-      ),
-      
-      // 코어 집중 루틴
-      WorkoutRoutine(
-        id: 'ai_core',
-        name: '🤖 AI 추천: 코어 강화 집중',
-        exercises: [
-          findExerciseByName('플랭크'),
-          findExerciseByName('데드리프트'),
-        ].where((e) => e != null).cast<Exercise>().toList(),
-        createdAt: now,
-      ),
-      
-      // 하체 집중 루틴
-      WorkoutRoutine(
-        id: 'ai_lower',
-        name: '🤖 AI 추천: 하체 근력 강화',
-        exercises: [
-          findExerciseByName('스쿼트'),
-          findExerciseByName('런지'),
-          findExerciseByName('데드리프트'),
-        ].where((e) => e != null).cast<Exercise>().toList(),
-        createdAt: now,
-      ),
-      
-      // 고강도 루틴
-      WorkoutRoutine(
-        id: 'ai_hiit',
-        name: '🤖 AI 추천: 고강도 인터벌',
-        exercises: availableExercises.take(3).toList(), // 처음 3개 운동 사용
-        createdAt: now,
-      ),
-    ];
+      );
+    }).where((routine) => routine.exercises.isNotEmpty).toList();
   }
-  
-  // 사용자 레벨에 따른 추천 루틴 (추후 프로필 연동 가능)
+
+  static Exercise? _materializeExercise(
+    _RoutineBlock block,
+    List<Exercise> catalog,
+    Set<String> usedExerciseIds,
+  ) {
+    Exercise? base;
+    try {
+      base = catalog.firstWhere(
+        (exercise) =>
+            !usedExerciseIds.contains(exercise.id) &&
+            exercise.name.contains(block.keyword),
+      );
+    } catch (_) {
+      base = null;
+    }
+
+    base ??= _pickFallbackExercise(catalog, usedExerciseIds);
+
+    if (base == null) {
+      // 등록된 운동이 하나도 없으면 추천에서 제외
+      return null;
+    }
+
+    usedExerciseIds.add(base.id);
+
+    final duration = block.estimatedDuration ?? (block.sets * block.reps * 4);
+
+    return base.copyWith(
+      duration: duration,
+      sets: block.sets,
+      reps: block.reps,
+      restSeconds: block.restSeconds,
+    );
+  }
+
+  static Exercise? _pickFallbackExercise(
+    List<Exercise> catalog,
+    Set<String> usedExerciseIds,
+  ) {
+    if (catalog.isEmpty) return null;
+
+    try {
+      return catalog.firstWhere(
+        (exercise) => !usedExerciseIds.contains(exercise.id),
+      );
+    } catch (_) {
+      // 모든 운동을 이미 사용했다면 첫 번째 운동을 재사용
+      return catalog.first;
+    }
+  }
+
   static List<WorkoutRoutine> getPersonalizedRoutines(String userLevel, List<Exercise> availableExercises) {
-    final allRoutines = getRecommendedRoutines(availableExercises);
-    
+    final routines = getRecommendedRoutines(availableExercises);
+
+    if (routines.isEmpty) return routines;
+
     switch (userLevel.toLowerCase()) {
       case '초급':
-        return [allRoutines[0], allRoutines[1]]; // 초보자, 코어
+        return routines.take(2).toList();
       case '중급':
-        return [allRoutines[1], allRoutines[2]]; // 코어, 하체
+        return routines.skip(1).take(2).toList();
       case '고급':
-        return [allRoutines[2], allRoutines[3]]; // 하체, 고강도
+        return routines.skip(2).take(2).toList();
       default:
-        return allRoutines.take(2).toList(); // 기본적으로 처음 2개
+        return routines.take(2).toList();
     }
   }
 }
 
-final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref) async {
-  final exercisesAsync = await ref.watch(databaseExercisesProvider.future);
-  return AIRecommendedRoutines.getRecommendedRoutines(exercisesAsync);
+class _RoutineTemplate {
+  final String id;
+  final String name;
+  final List<_RoutineBlock> blocks;
+
+  const _RoutineTemplate({
+    required this.id,
+    required this.name,
+    required this.blocks,
+  });
+}
+
+class _RoutineBlock {
+  final String keyword;
+  final int sets;
+  final int reps;
+  final int? restSeconds;
+  final int? estimatedDuration;
+
+  const _RoutineBlock({
+    required this.keyword,
+    required this.sets,
+    required this.reps,
+    this.restSeconds,
+    this.estimatedDuration,
+  });
+}
+
+class MissingOpenAiKeyException implements Exception {
+  const MissingOpenAiKeyException();
+
+  @override
+  String toString() => 'OPENAI_API_KEY가 설정되지 않아 OpenAI 추천을 사용할 수 없습니다.';
+}
+
+class OpenAiRoutineService {
+  OpenAiRoutineService({http.Client? client}) : _client = client ?? http.Client();
+
+  final http.Client _client;
+  static const _defaultModel = 'gpt-4o-mini';
+  static const _apiKey = _openAiApiKey;
+
+  Future<List<WorkoutRoutine>> generateRoutines({
+    required List<Exercise> availableExercises,
+    int routineCount = 3,
+    String goal = '전신 강화',
+  }) async {
+    if (_apiKey.isEmpty) {
+      throw const MissingOpenAiKeyException();
+    }
+
+    final catalogSummary = availableExercises.take(20).map((exercise) {
+      return {
+        'id': exercise.id,
+        'name': exercise.name,
+        'category': exercise.category,
+        'description': exercise.description,
+      };
+    }).toList();
+
+    final requestBody = {
+      'model': _defaultModel,
+      'temperature': 0.4,
+      'response_format': {
+        'type': 'json_schema',
+        'json_schema': {
+          'name': 'routine_response',
+          'schema': {
+            'type': 'object',
+            'properties': {
+              'routines': {
+                'type': 'array',
+                'items': {
+                  'type': 'object',
+                  'properties': {
+                    'id': {'type': 'string'},
+                    'name': {'type': 'string'},
+                    'blocks': {
+                      'type': 'array',
+                      'items': {
+                        'type': 'object',
+                        'properties': {
+                          'exercise_id': {'type': 'string'},
+                          'display_name': {'type': 'string'},
+                          'sets': {'type': 'integer'},
+                          'reps': {'type': 'integer'},
+                          'rest_seconds': {'type': 'integer'},
+                          'estimated_duration_sec': {'type': 'integer'},
+                          'notes': {'type': 'string'},
+                        },
+                        'required': ['sets', 'reps'],
+                      },
+                      'minItems': 3,
+                      'maxItems': 5,
+                    },
+                  },
+                  'required': ['name', 'blocks'],
+                },
+                'minItems': routineCount,
+                'maxItems': routineCount,
+              },
+            },
+            'required': ['routines'],
+          },
+        },
+      },
+      'messages': [
+        {
+          'role': 'system',
+          'content': '당신은 한국어로 답변하는 전문 피트니스 코치입니다. '
+              '사용 가능한 운동 목록을 참고하여 세트/횟수 기반의 루틴을 JSON 형식으로만 반환하세요.',
+        },
+        {
+          'role': 'user',
+          'content': jsonEncode({
+            'goal': goal,
+            'routine_count': routineCount,
+            'catalog': catalogSummary,
+          }),
+        },
+      ],
+    };
+
+    final response = await _client.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_apiKey',
+      },
+      body: jsonEncode(requestBody),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('OpenAI 응답 오류 (${response.statusCode}): ${response.body}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final choices = decoded['choices'] as List<dynamic>?;
+    if (choices == null || choices.isEmpty) {
+      return [];
+    }
+
+    final content = choices.first['message']['content'];
+    final routinesJson = _parseContent(content);
+    return WorkoutRoutineMapper.fromJson(routinesJson, availableExercises);
+  }
+
+  Map<String, dynamic> _parseContent(dynamic content) {
+    if (content is String) {
+      return jsonDecode(content) as Map<String, dynamic>;
+    }
+
+    if (content is List) {
+      final buffer = StringBuffer();
+      for (final chunk in content) {
+        if (chunk is Map<String, dynamic> && chunk['type'] == 'text') {
+          buffer.write(chunk['text'] ?? '');
+        }
+      }
+      return jsonDecode(buffer.toString()) as Map<String, dynamic>;
+    }
+
+    throw const FormatException('지원하지 않는 OpenAI 응답 형식입니다.');
+  }
+
+  void dispose() {
+    _client.close();
+  }
+}
+
+class WorkoutRoutineMapper {
+  static List<WorkoutRoutine> fromJson(
+    Map<String, dynamic> json,
+    List<Exercise> catalogList,
+  ) {
+    final routines = json['routines'] as List<dynamic>? ?? [];
+    final catalog = {for (final exercise in catalogList) exercise.id: exercise};
+
+    return routines
+        .map((routine) => _mapRoutine(routine, catalog))
+        .whereType<WorkoutRoutine>()
+        .toList();
+  }
+
+  static WorkoutRoutine? _mapRoutine(
+    dynamic routineJson,
+    Map<String, Exercise> catalog,
+  ) {
+    if (routineJson is! Map<String, dynamic>) return null;
+    final blocks = routineJson['blocks'] as List<dynamic>?;
+    if (blocks == null || blocks.isEmpty) return null;
+
+    final exercises = blocks
+        .map((block) => _mapBlock(block, catalog))
+        .whereType<Exercise>()
+        .toList();
+
+    if (exercises.isEmpty) return null;
+
+    final name = routineJson['name'] as String? ?? 'AI 루틴';
+    final id = routineJson['id']?.toString() ??
+        'openai_${name.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+
+    return WorkoutRoutine(
+      id: id,
+      name: name,
+      exercises: exercises,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  static Exercise? _mapBlock(
+    dynamic blockJson,
+    Map<String, Exercise> catalog,
+  ) {
+    if (blockJson is! Map<String, dynamic>) return null;
+
+    final exerciseId = blockJson['exercise_id']?.toString();
+    final sets = (blockJson['sets'] as num?)?.toInt() ?? 3;
+    final reps = (blockJson['reps'] as num?)?.toInt() ?? 12;
+    final restSeconds = (blockJson['rest_seconds'] as num?)?.toInt();
+    final duration = (blockJson['estimated_duration_sec'] as num?)?.toInt() ??
+        (sets * reps * 4);
+    final notes = blockJson['notes'] as String?;
+    final displayName =
+        blockJson['display_name'] as String? ?? blockJson['name'] as String?;
+
+    Exercise? base = exerciseId != null ? catalog[exerciseId] : null;
+
+    if (base == null && displayName != null) {
+      base = _findExerciseByName(displayName, catalog);
+    }
+
+    if (base == null) {
+      // 등록되지 않은 운동은 추천에서 제외
+      return null;
+    }
+
+    return base.copyWith(
+      duration: duration,
+      description: notes ?? base.description,
+      sets: sets,
+      reps: reps,
+      restSeconds: restSeconds,
+    );
+  }
+
+  static Exercise? _findExerciseByName(
+    String name,
+    Map<String, Exercise> catalog,
+  ) {
+    final normalized = name.trim().toLowerCase();
+    try {
+      return catalog.values.firstWhere(
+        (exercise) => exercise.name.toLowerCase().contains(normalized),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+final openAiRoutineServiceProvider = Provider<OpenAiRoutineService>((ref) {
+  final service = OpenAiRoutineService();
+  ref.onDispose(service.dispose);
+  return service;
 });
+
+final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref) async {
+  final exercises = await ref.watch(databaseExercisesProvider.future);
+  final workoutGoal = ref.watch(workoutGoalModelProvider);
+  final userProfile = ref.watch(userProfileModelProvider);
+
+  if (_enableWorkoutAi) {
+    try {
+      final routines = await _fetchWorkoutAiRoutines(
+        exercises: exercises,
+        workoutGoal: workoutGoal,
+        userProfile: userProfile,
+      );
+      if (routines.isNotEmpty) {
+        return routines;
+      }
+      print('⚠️ workout-recommendation에서 빈 루틴을 받았습니다. 로컬 템플릿으로 폴백합니다.');
+    } catch (e) {
+      print('Supabase Edge Function workout-recommendation 호출 실패: $e');
+    }
+
+    if (_hasOpenAiKey) {
+      final openAiService = ref.watch(openAiRoutineServiceProvider);
+      try {
+        final routines = await openAiService.generateRoutines(
+          availableExercises: exercises,
+        );
+        if (routines.isNotEmpty) {
+          return routines;
+        }
+      } catch (e) {
+        print('OpenAI 추천 루틴 생성 실패: $e');
+      }
+    } else {
+      print('⚠️ OPENAI_API_KEY가 없어 OpenAI 백업을 건너뜁니다.');
+    }
+  } else {
+    print('ℹ️ ENABLE_WORKOUT_AI=false 설정으로 AI 추천을 건너뜁니다.');
+  }
+
+  return AIRecommendedRoutines.getRecommendedRoutines(exercises);
+});
+
+Future<List<WorkoutRoutine>> _fetchWorkoutAiRoutines({
+  required List<Exercise> exercises,
+  WorkoutGoalModel? workoutGoal,
+  UserProfileModel? userProfile,
+}) async {
+  final client = Supabase.instance.client;
+  final payload = _buildWorkoutAiPayload(
+    userId: client.auth.currentUser?.id,
+    workoutGoal: workoutGoal,
+    userProfile: userProfile,
+    exercises: exercises,
+  );
+  print('🛰 workout-recommendation 호출 payload: ${jsonEncode(payload)}');
+
+  final response = await client.functions.invoke(
+    _workoutRecommendationFunction,
+    body: payload,
+  );
+  print(
+    '🛰 workout-recommendation 응답 status=${response.status} data=${response.data}',
+  );
+
+  final responseJson = _normalizeFunctionResponse(response.data);
+  if (responseJson == null) {
+    throw const FormatException('workout-recommendation 응답을 파싱할 수 없습니다.');
+  }
+
+  return WorkoutRoutineMapper.fromJson(responseJson, exercises);
+}
+
+Map<String, dynamic> _buildWorkoutAiPayload({
+  required String? userId,
+  WorkoutGoalModel? workoutGoal,
+  UserProfileModel? userProfile,
+  required List<Exercise> exercises,
+}) {
+  final userPayload = <String, dynamic>{};
+  _putIfNotNull(userPayload, 'id', userId);
+
+  final goalPayload = <String, dynamic>{};
+  _putIfNotNull(goalPayload, 'goal_type', workoutGoal?.goalType?.name);
+  _putIfNotNull(goalPayload, 'level', workoutGoal?.level?.name);
+  _putIfNotNull(goalPayload, 'weekly_days', workoutGoal?.weeklyDays);
+  _putIfNotNull(goalPayload, 'daily_minutes', workoutGoal?.dailyDurationMin);
+
+  final preferencesPayload = <String, dynamic>{};
+  _putIfNotNull(preferencesPayload, 'preferred_types', workoutGoal?.preferredTypes);
+
+  final profilePayload = <String, dynamic>{};
+  _putIfNotNull(profilePayload, 'gender', userProfile?.gender?.name);
+  _putIfNotNull(profilePayload, 'age', userProfile?.age);
+  _putIfNotNull(profilePayload, 'height_cm', userProfile?.height);
+  _putIfNotNull(profilePayload, 'weight_kg', userProfile?.weight);
+
+  final catalogPayload = _buildCatalogPayload(exercises);
+
+  final payload = <String, dynamic>{
+    'user': userPayload.isEmpty ? null : userPayload,
+    'goal': goalPayload.isEmpty ? null : goalPayload,
+    'preferences': preferencesPayload.isEmpty ? null : preferencesPayload,
+    'profile': profilePayload.isEmpty ? null : profilePayload,
+    'catalog': catalogPayload,
+    'options': {
+      'routine_count': 3,
+      'language': 'ko',
+      'source': 'app',
+    },
+  };
+
+  payload.removeWhere((key, value) {
+    if (value == null) return true;
+    if (value is Map && value.isEmpty) return true;
+    if (value is List && value.isEmpty) return true;
+    return false;
+  });
+
+  return payload;
+}
+
+List<Map<String, dynamic>> _buildCatalogPayload(List<Exercise> exercises) {
+  final catalog = <Map<String, dynamic>>[];
+  for (final exercise in exercises) {
+    final entry = <String, dynamic>{};
+    final exerciseId = int.tryParse(exercise.id);
+    _putIfNotNull(entry, 'exercise_id', exerciseId);
+    _putIfNotNull(entry, 'name', exercise.name);
+    _putIfNotNull(entry, 'category', exercise.category);
+    _putIfNotNull(entry, 'description', exercise.description);
+    _putIfNotNull(entry, 'estimated_duration_sec', exercise.estimatedDurationSeconds);
+
+    if (entry.isNotEmpty) {
+      catalog.add(entry);
+    }
+  }
+  return catalog;
+}
+
+Map<String, dynamic>? _normalizeFunctionResponse(dynamic data) {
+  Map<String, dynamic>? map;
+  if (data is Map<String, dynamic>) {
+    map = data;
+  } else if (data is String && data.isNotEmpty) {
+    final decoded = jsonDecode(data);
+    if (decoded is Map<String, dynamic>) {
+      map = decoded;
+    }
+  }
+
+  if (map == null) {
+    return null;
+  }
+
+  if (!map.containsKey('routines') && map['data'] is Map<String, dynamic>) {
+    final nested = map['data'] as Map<String, dynamic>;
+    if (nested.containsKey('routines')) {
+      map = nested;
+    }
+  }
+
+  return map;
+}
+
+void _putIfNotNull(Map<String, dynamic> target, String key, dynamic value) {
+  if (value == null) return;
+  if (value is Iterable && value.isEmpty) return;
+  target[key] = value;
+}
 
 // Supabase 연동 프로바이더들
 final supabaseWorkoutServiceProvider = Provider<SupabaseWorkoutService>((ref) => SupabaseWorkoutService());
@@ -385,9 +950,9 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
         // 운동 데이터 추가
         exerciseData.add({
           'exercise_id': supabaseExercise.exerciseId!,
-          'sets': 3, // 기본값
-          'reps': (exercise.duration ~/ 5).clamp(5, 20), // 운동 소요 시간을 활용해 반복 수 계산(5~20 범위)
-          'rest_time_sec': 60, // 기본값
+          'sets': exercise.sets ?? 3,
+          'reps': exercise.reps ?? (exercise.duration ~/ 5).clamp(5, 20),
+          'rest_time_sec': exercise.restSeconds ?? 60,
         });
       }
 
@@ -445,9 +1010,9 @@ class SupabaseRoutineNotifier extends StateNotifier<AsyncValue<List<SupabaseWork
         // 운동 데이터 추가
         exerciseData.add({
           'exercise_id': supabaseExercise.exerciseId!,
-          'sets': 3, // 기본값
-          'reps': (exercise.duration ~/ 5).clamp(5, 20), // 운동 소요 시간을 활용해 반복 수 계산(5~20 범위)
-          'rest_time_sec': 60, // 기본값
+          'sets': exercise.sets ?? 3,
+          'reps': exercise.reps ?? (exercise.duration ~/ 5).clamp(5, 20),
+          'rest_time_sec': exercise.restSeconds ?? 60,
         });
       }
 

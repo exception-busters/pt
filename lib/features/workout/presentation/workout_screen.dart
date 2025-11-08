@@ -644,13 +644,27 @@ class _AIRecoRoutCard extends StatelessWidget {
                       color: mainButtonColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      exercise.name,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: mainButtonColor,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          exercise.name,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: mainButtonColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          exercise.volumeSummary,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }).toList()

@@ -44,12 +44,22 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
       for (final routineExercise in supabaseRoutine.routineExercises) {
         if (routineExercise != null && routineExercise['exercise'] != null) {
           final exerciseData = routineExercise['exercise'];
+          final sets = routineExercise['sets'] as int?;
+          final reps = routineExercise['reps'] as int?;
+          final restSeconds = routineExercise['rest_time_sec'] as int?;
+          final estimatedDuration = reps != null && sets != null
+              ? sets * reps * 4
+              : ((reps ?? 10) * 5).clamp(30, 180);
+
           final exercise = Exercise(
             id: exerciseData['exercise_id'].toString(),
             name: exerciseData['name'] ?? '운동명 없음',
             description: exerciseData['description'] ?? '운동 설명이 없습니다.',
-            duration: ((routineExercise['reps'] ?? 10) * 5).clamp(30, 120), // 반복 횟수를 기반으로 duration 추정
+            duration: estimatedDuration,
             category: exerciseData['body_part'] ?? '기타',
+            sets: sets,
+            reps: reps,
+            restSeconds: restSeconds,
           );
           exercises.add(exercise);
           print('✅ 운동 변환 완료: ${exercise.name}');
@@ -368,7 +378,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                               ),
                                             ),
                                             subtitle: Text(
-                                              '${exercise.description}\n${exercise.duration}초 • ${exercise.category}',
+                                              '${exercise.description}\n${exercise.volumeSummary} • ${exercise.category}',
                                               style: const TextStyle(color: subTextColor),
                                             ),
                                           ),
@@ -534,7 +544,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                                           ),
                                                           const SizedBox(height: 2),
                                                           Text(
-                                                            '${exercise.duration}초',
+                                                        exercise.volumeSummary,
                                                             style: const TextStyle(
                                                               color: subTextColor,
                                                               fontSize: 12,

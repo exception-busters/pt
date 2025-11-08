@@ -1,0 +1,55 @@
+OpenAiRoutineService.generateRoutines가 Supabase에서 불러온 availableExercises 리스트 중 앞에서 최대 20개만 골라 id/name/category/description을 추린 뒤 OpenAI에  
+    넘깁니다(lib/features/workout/application/workout_providers.dart:391-407). 별도의 JSON 파일에 20개가 고정돼 있는 것이 아니라, 런타임에 가져온 운동 목록을 그대로  
+    잘라 쓰는 구조예요.
+  - 그 availableExercises는 databaseExercisesProvider가 SupabaseWorkoutService.getAllExercises()를 호출해 exercise 테이블에서 읽어옵니다(lib/features/workout/        
+    002 스탠딩 니업, 003 스쿼트 3개뿐입니다(assets/exercise_reference.json:5-12, README.md:97-105). Supabase exercise 테이블도 이 데이터를 기준으로 시드되어 있다면,  
+    OpenAI로 전달되는 “20개 카탈로그”도 실제로는 이 3개만 포함됩니다.
+  - 더 많은 항목을 보내고 싶다면 Supabase exercise 테이블에 운동을 추가하거나, assets/exercise_reference.json을 확장한 뒤 테이블에 반영하면 됩니다. 그렇게만 해두면   
+    availableExercises.take(20)가 새 목록을 자동으로 사용하니 코드 수정은 필요 없어요.
+
+
+› 근데 ai 추천 운동에는 3개의 운동 외에도 다른 운동들이 많은데? 그래서 없는 운동을 실행시키면 스탠딩 사이드 크런치가 나와
+
+
+• Explored
+  └ Read workout_providers.dart, exercise_screen.dart, exercise_mapper.dart, workout_screen.dart
+                                                                                                                                                                      
+• I'll explain how numeric parsing of exercise IDs causes custom exercises to be skipped, leading to fallback loading the default exercise set where “standing side   
+  crunch” appears first. I'll highlight how AI recommended routines show extra names due to fallback templates and external API data, and recommend updating the      
+  Supabase exercise table or adjusting the code to support string IDs, with references to workout_screen.dart and relevant data files.                                
+                                                                                                                                                                      
+─ Worked for 39s ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• - AIRecommendedRoutines 하드코딩 템플릿이 스쿼트/플랭크/런지/버피...처럼 3개 외의 키워드를 포함하고 있어서 카드에는 다양한 운동명이 뜹니다(lib/features/workout/    
+    application/workout_providers.dart:240-320). 템플릿은 현재 Supabase exercise 테이블에서 가져온 availableExercises 목록에서 block.keyword를 contains로 검색해 매칭 
+    하고, 없으면 id: custom_...인 가짜 운동 객체를 만들어 반환합니다(workout_providers.dart:303-337).                                                                 
+    경로로 떨어지면서 assets/exercise_reference.json의 첫번째 항목인 스탠딩 사이드 크런치만 보여 주는 것입니다(lib/screens/exercise_screen.dart:118-167).
+  - 실제로 런타임에 AI가 사용할 수 있는 운동 카탈로그는 Supabase exercise 테이블에서 읽은 리스트뿐이며, 현재 JSON/README 기준으로는 001 스탠딩 사이드 크런치, 002     
+    스탠딩 니업, 003 스쿼트 세 개뿐입니다(assets/exercise_reference.json:5-12, README.md:97-105). OpenAI 호출 시에도 이 목록 상위 20개만 요약해서 모델에 넘기므로     
+    (workout_providers.dart:391-407) 그 외 운동은 모델이 제안해도 매핑할 데이터가 없습니다.
+  - 따라서 카드에 표시되는 운동이 실제로 실행 가능하려면, Supabase exercise 테이블과 assets/exercise_reference.json에 해당 운동을 추가해 exercise_id가 생기도록 하거  
+    나, 반대로 코드 측에서 custom_* ID도 처리하도록 workout_screen.dart와 ExerciseScreen을 수정해야 합니다. 현재 상태에서는 ID가 없는 항목은 모두 장착되지 않고 기본 3
+    개 중 첫 번째 운동 화면으로 돌아가는 것이 정상 동작입니다.
+
+
+› ID를 처리하면 버피 같은 운동도 추가돼서 실행된다는거지? 근데 자세를 분석하는 표본 모델이 없는 게 문제라서
+
+
+• - ID만 숫자로 바꿔 넘기도록 workout_screen.dart:250-276과 exercise_screen.dart:118-167 흐름을 고치면, custom_* 운동도 루틴 실행 화면으로 전달돼 버피 같은 동작을 표 
+    시하고 단계/타이머를 돌릴 수는 있습니다.                                                                                                                          
+  - 하지만 포즈 분석은 ExerciseScreen이 ExerciseMapper.loadExerciseFromExerciseId → ExerciseLoader.getExerciseById로 assets/exercise_reference.json의 정답 데이터를 찾    아야만 동작합니다(lib/services/exercise_mapper.dart:5-34, lib/services/exercise_loader.dart:4-48). JSON에 버피 같은 항목이 없으면 관절 각도 기준·단계 정보가 전혀 
+    없으므로, 화면은 뜨더라도 포즈 스코어링/피드백이 불가능합니다.                                                                                                    
+  - 즉, ID 파싱을 완화하면 UI에서 “버피”를 실행하는 것처럼 보이게 만들 수는 있지만, 실제로 자세 교정 기능을 쓰려면 해당 운동의 포즈 레퍼런스(관절 각도, 단계,         
+    tolerance 등)를 assets/exercise_reference.json에 추가하고 Supabase exercise 테이블에도 동일한 exercise_id로 등록해 두어야 해요. 그래야 루틴→운동 실행→포즈 분석 전
+    체 파이프라인이 연결됩니다.                                                                                                                                       
+ 
+ ID를 처리하면 버피 같은 운동도 추가돼서 실행된다는거지? 근데 자세를 분석하는 표본 모델이 없는 게 문제라서
+
+
+• - ID만 숫자로 바꿔 넘기도록 workout_screen.dart:250-276과 exercise_screen.dart:118-167 흐름을 고치면, custom_* 운동도 루틴 실행 화면으로 전달돼 버피 같은 동작을 표 
+    시하고 단계/타이머를 돌릴 수는 있습니다.                                                                                                                          
+  - 하지만 포즈 분석은 ExerciseScreen이 ExerciseMapper.loadExerciseFromExerciseId → ExerciseLoader.getExerciseById로 assets/exercise_reference.json의 정답 데이터를 찾    아야만 동작합니다(lib/services/exercise_mapper.dart:5-34, lib/services/exercise_loader.dart:4-48). JSON에 버피 같은 항목이 없으면 관절 각도 기준·단계 정보가 전혀 
+    없으므로, 화면은 뜨더라도 포즈 스코어링/피드백이 불가능합니다.                                                                                                    
+  - 즉, ID 파싱을 완화하면 UI에서 “버피”를 실행하는 것처럼 보이게 만들 수는 있지만, 실제로 자세 교정 기능을 쓰려면 해당 운동의 포즈 레퍼런스(관절 각도, 단계,         
+    tolerance 등)를 assets/exercise_reference.json에 추가하고 Supabase exercise 테이블에도 동일한 exercise_id로 등록해 두어야 해요. 그래야 루틴→운동 실행→포즈 분석 전
+    체 파이프라인이 연결됩니다. 
