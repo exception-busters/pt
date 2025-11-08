@@ -784,6 +784,56 @@ class SupabaseWorkoutService {
     }
   }
 
+  Future<List<WorkoutSessionLog>> getRecentCompletedSessions({
+    int daysBack = 60,
+    int limit = 100,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      print('❌ 최근 세션 조회 실패: 사용자 인증 정보가 없습니다.');
+      return [];
+    }
+
+    try {
+      final since = DateTime.now().subtract(Duration(days: daysBack));
+      final response = await _supabase
+          .from('workoutsession')
+          .select('''
+            session_id,
+            user_id,
+            routine_id,
+            start_time,
+            end_time,
+            total_calories,
+            session_status,
+            routine:routine_id (
+              routine_id,
+              title
+            )
+          ''')
+          .eq('user_id', currentUser.id)
+          .eq('session_status', 'completed')
+          .gte('start_time', since.toIso8601String())
+          .order('start_time', ascending: false)
+          .limit(limit);
+
+      return (response as List)
+          .map((json) => WorkoutSessionLog(
+                session: SupabaseWorkoutSession.fromJson(
+                  json as Map<String, dynamic>,
+                ),
+                routineTitle:
+                    (json['routine'] as Map<String, dynamic>?)?['title']
+                        as String?,
+              ))
+          .toList();
+    } catch (e, stackTrace) {
+      print('❌ 최근 운동 세션 조회 실패: $e');
+      print(stackTrace);
+      return [];
+    }
+  }
+
   // 유틸리티 메서드들
   Future<bool> _checkRoutineExists(int routineId) async {
     try {
@@ -826,4 +876,14 @@ class SupabaseWorkoutService {
       return false;
     }
   }
+}
+
+class WorkoutSessionLog {
+  const WorkoutSessionLog({
+    required this.session,
+    this.routineTitle,
+  });
+
+  final SupabaseWorkoutSession session;
+  final String? routineTitle;
 }
