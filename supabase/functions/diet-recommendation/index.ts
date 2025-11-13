@@ -29,6 +29,13 @@ interface DietPlan {
   isStructured: boolean;
 }
 
+type OpenAIResponseChoice = {
+  message?: {
+    content?: unknown;
+  };
+  text?: unknown;
+};
+
 function extractTextFromResponse(result: unknown): string | null {
   if (!result || typeof result !== "object") {
     return null;
@@ -42,7 +49,8 @@ function extractTextFromResponse(result: unknown): string | null {
   const maybeChoices = (result as { choices?: unknown }).choices;
   if (Array.isArray(maybeChoices)) {
     for (const choice of maybeChoices) {
-      const content = (choice as Record<string, unknown>)?.message?.content;
+      const message = (choice as OpenAIResponseChoice).message;
+      const content = message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
           const blockText = (block as { text?: unknown }).text;
@@ -51,7 +59,7 @@ function extractTextFromResponse(result: unknown): string | null {
           }
         }
       }
-      const text = (choice as { text?: unknown }).text;
+      const text = (choice as OpenAIResponseChoice).text;
       if (typeof text === "string" && text.trim().length > 0) {
         return text;
       }
