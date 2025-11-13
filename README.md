@@ -59,17 +59,19 @@ pose_detection_app/
 
 ## 🚀 시작하기
 
-### 1. 사전 요구사항
+### 1. 사전 준비
+- Flutter SDK/Dart SDK 3.9.2 이상 (`flutter doctor`로 점검)
+- Node.js 18+ 및 `npx` 사용 가능 환경 (Supabase CLI 실행용)
+- Android Studio 또는 VS Code, 실기기/에뮬레이터(iOS는 macOS 필요)
 
+환경 점검 예시:
 ```bash
 flutter doctor
+node -v
+npx supabase --version
 ```
 
-- Flutter SDK 3.9.2 이상
-- Android Studio 또는 VS Code
-- Android 기기 또는 에뮬레이터
-
-### 2. 의존성 설치
+### 2. Flutter 의존성 설치
 
 ```bash
 flutter pub get
@@ -78,7 +80,10 @@ flutter pub get
 ### 3. 앱 실행
 
 ```bash
-flutter run
+flutter run          # 연결된 디바이스 자동 선택
+flutter run -d chrome   # 웹
+flutter run -d android  # 안드로이드
+flutter run -d ios      # iOS (macOS 필요)
 ```
 
 ### 4. (선택) 정답 데이터 추출
@@ -91,6 +96,47 @@ python scripts/extract_reference_data.py \
   --output assets/exercise_reference.json \
   --exercise-id "001-1-1-01"
 ```
+
+---
+
+## ☁️ Supabase Edge Function 실행/배포
+
+Edge Function을 수정하거나 새 환경에서 돌려야 할 때 필요한 최신 절차입니다.
+
+### 1. 프로젝트 연결 (최초 1회)
+```bash
+npx supabase link --project-ref wkmnnzndtggrlrzjlncn
+```
+CLI가 프로필을 묻는다면 기본값(`supabase`)을 사용하면 됩니다.
+
+### 2. 함수 비밀값 설정/갱신
+새 환경 초기 설정 또는 키 교체 시 사용합니다.
+```bash
+npx supabase secrets set \
+  OPENAI_API_KEY="새로운 OpenAI 키" \
+  SUPABASE_URL="<프로젝트 전용 URL>" \
+  SUPABASE_ANON_KEY="<프로젝트 ANON 키>"
+```
+서비스 롤 키 등 추가 항목이 있다면 동일 명령에 이어서 지정합니다.
+
+### 3. 로컬에서 함수 테스트
+`.env`에 저장된 값을 이용해 Edge Function을 로컬 서버로 실행합니다.
+```bash
+npx supabase functions serve diet-recommendation --env-file supabase/.env
+```
+에뮬레이터/디바이스에서 해당 함수 엔드포인트를 호출하면 콘솔에 로그가 출력됩니다.
+
+### 4. 함수 배포
+Edge Function 소스를 바꿀 때마다 재배포가 필요합니다.
+```bash
+npx supabase functions deploy diet-recommendation
+```
+배포가 끝난 뒤 앱에서 함수를 다시 호출해 정상 동작을 확인하세요.
+
+### 5. 문제 해결 팁
+- 함수 호출이 500을 반환하면 `npx supabase functions serve ...` 상태에서 로그를 확인하거나, 배포 환경에서는 Supabase 대시보드 Function Logs에서 원인을 파악합니다.
+- 새로운 비밀값을 설정했으면 곧바로 `deploy` 명령으로 함수를 재배포해야 적용됩니다.
+- OpenAI 응답 형식 변화로 JSON 파싱 오류가 날 경우 로그 메시지를 바탕으로 프롬프트를 수정하거나 가드를 추가합니다.
 
 ---
 
