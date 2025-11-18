@@ -390,36 +390,88 @@ class DietController extends StateNotifier<DietData> {
   Future<void> _syncMealToSupabase(String mealType, MealData? mealData) async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
+      print('⚠️ [Diet Sync] 사용자가 로그인되지 않음');
       return;
     }
 
     final client = Supabase.instance.client;
-    final mealTime = _mealTimeForLabel(mealType);
-    final mealTimeUtc = mealTime.toUtc().toIso8601String();
+    final today = DateTime.now();
+    final mealDate = DateTime(today.year, today.month, today.day);
+    final mealTypeValue = _mealTypeToDbValue(mealType);
 
     try {
+      print('🔄 [Diet Sync] Supabase 동기화 시작 - $mealType');
+
+      // 1. 기존 식단 기록 삭제 (해당 날짜, 해당 끼니)
       await client
-          .from('usermeal')
+          .from('meal_record')
           .delete()
           .eq('user_id', user.id)
-          .eq('meal_time', mealTimeUtc);
+          .eq('meal_date', mealDate.toIso8601String().split('T')[0])
+          .eq('meal_type', mealTypeValue);
 
-      if (mealData == null) {
+      print('🗑️ [Diet Sync] 기존 기록 삭제 완료');
+
+      // 2. mealData가 null이면 삭제만 하고 종료
+      if (mealData == null || mealData.components.isEmpty) {
+        print('✅ [Diet Sync] 식단이 비어있어 삭제만 수행');
         return;
       }
 
-      final calories = mealData.nutrition.calories != 0
-          ? mealData.nutrition.calories
-          : _parseCalories(mealData.calories);
-
-      await client.from('usermeal').insert({
+      // 3. 새 식단 기록 삽입
+      final totalNutrition = mealData.nutrition;
+      final mealRecordResponse = await client.from('meal_record').insert({
         'user_id': user.id,
-        'meal_time': mealTimeUtc,
-        'quantity': calories,
-        'food_id': null,
-      });
-    } catch (error) {
-      print('usermeal 동기화 실패($mealType): $error');
+        'meal_date': mealDate.toIso8601String().split('T')[0],
+        'meal_type': mealTypeValue,
+        'calories': totalNutrition.calories,
+        'carbs': totalNutrition.carbs,
+        'protein': totalNutrition.protein,
+        'fat': totalNutrition.fat,
+      }).select('meal_record_id').single();
+
+      final mealRecordId = mealRecordResponse['meal_record_id'] as int;
+      print('✅ [Diet Sync] meal_record 삽입 완료 - ID: $mealRecordId');
+
+      // 4. 식단 구성요소 삽입
+      if (mealData.components.isNotEmpty) {
+        final componentInserts = mealData.components.map((component) {
+          return {
+            'meal_record_id': mealRecordId,
+            'food_code': component.food.code,
+            'food_name': component.food.name,
+            'food_category': component.food.category,
+            'grams': component.grams,
+            'calories': component.nutrition.calories,
+            'protein': component.nutrition.protein,
+            'carbs': component.nutrition.carbs,
+            'fat': component.nutrition.fat,
+            'fiber': component.food.fiber,
+            'sodium': component.food.sodium,
+          };
+        }).toList();
+
+        await client.from('meal_component').insert(componentInserts);
+        print('✅ [Diet Sync] meal_component ${componentInserts.length}개 삽입 완료');
+      }
+
+      print('🎉 [Diet Sync] Supabase 동기화 성공 - $mealType');
+    } catch (error, stackTrace) {
+      print('❌ [Diet Sync] Supabase 동기화 실패($mealType): $error');
+      print('Stack trace: $stackTrace');
+    }
+  }
+
+  String _mealTypeToDbValue(String mealType) {
+    switch (mealType) {
+      case '아침':
+        return 'breakfast';
+      case '점심':
+        return 'lunch';
+      case '저녁':
+        return 'dinner';
+      default:
+        return 'breakfast';
     }
   }
 

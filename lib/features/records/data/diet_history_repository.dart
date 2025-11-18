@@ -8,49 +8,79 @@ import '../domain/records_models.dart';
 class DietHistoryRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Supabase usermeal 테이블에서 식단 기록 가져오기
+  /// Supabase meal_record 테이블에서 식단 기록 가져오기
   Future<List<DailyRecord>> _loadFromSupabase({
     required String userId,
     required int daysBack,
   }) async {
     try {
       final cutoff = DateTime.now().subtract(Duration(days: daysBack));
+      final cutoffDate = cutoff.toIso8601String().split('T')[0];
 
       print('📡 [Diet] Supabase에서 식단 기록 가져오기 시작 - user_id: $userId');
 
-      final response = await _supabase
-          .from('usermeal')
-          .select()
+      // 1. meal_record 테이블에서 식단 기록 가져오기
+      final mealRecords = await _supabase
+          .from('meal_record')
+          .select('meal_record_id, meal_date, meal_type, calories, carbs, protein, fat')
           .eq('user_id', userId)
-          .gte('meal_date', cutoff.toIso8601String())
+          .gte('meal_date', cutoffDate)
           .order('meal_date', ascending: false);
 
-      print('📡 [Diet] Supabase 응답: ${response.length}개 기록');
+      print('📡 [Diet] Supabase meal_record 응답: ${mealRecords.length}개 기록');
 
-      // 날짜별로 그룹화
-      final Map<String, List<Map<String, dynamic>>> groupedByDate = {};
-      for (final meal in response) {
-        final dateStr = meal['meal_date'] as String;
-        final date = DateTime.parse(dateStr);
-        final dateKey = truncateToDate(date).toIso8601String().split('T')[0];
-
-        groupedByDate.putIfAbsent(dateKey, () => []).add(meal);
+      if (mealRecords.isEmpty) {
+        print('ℹ️ [Diet] Supabase에 저장된 식단 기록이 없습니다');
+        return const [];
       }
 
-      // DailyRecord로 변환
+      // 2. 모든 meal_record_id 수집
+      final mealRecordIds = mealRecords
+          .map((record) => record['meal_record_id'] as int)
+          .toList();
+
+      // 3. meal_component 테이블에서 구성요소 가져오기
+      final components = await _supabase
+          .from('meal_component')
+          .select('meal_record_id, food_code, food_name, food_category, grams, calories, carbs, protein, fat')
+          .inFilter('meal_record_id', mealRecordIds);
+
+      print('📡 [Diet] Supabase meal_component 응답: ${components.length}개 구성요소');
+
+      // 4. meal_record_id별로 components 그룹화
+      final Map<int, List<Map<String, dynamic>>> componentsByMealId = {};
+      for (final component in components) {
+        final mealRecordId = component['meal_record_id'] as int;
+        componentsByMealId.putIfAbsent(mealRecordId, () => []).add(component);
+      }
+
+      // 5. 날짜별로 그룹화
+      final Map<String, List<DietRecordEntry>> groupedByDate = {};
+      for (final mealRecord in mealRecords) {
+        final dateStr = mealRecord['meal_date'] as String;
+        final mealType = mealRecord['meal_type'] as String;
+        final mealRecordId = mealRecord['meal_record_id'] as int;
+
+        final mealComponents = componentsByMealId[mealRecordId] ?? [];
+        final description = _buildDescriptionFromComponents(mealComponents);
+
+        final dietEntry = DietRecordEntry(
+          mealLabel: _getMealLabel(mealType),
+          description: description,
+          calories: (mealRecord['calories'] as num?)?.round() ?? 0,
+          carbs: (mealRecord['carbs'] as num?)?.round() ?? 0,
+          protein: (mealRecord['protein'] as num?)?.round() ?? 0,
+          fat: (mealRecord['fat'] as num?)?.round() ?? 0,
+        );
+
+        groupedByDate.putIfAbsent(dateStr, () => []).add(dietEntry);
+      }
+
+      // 6. DailyRecord로 변환
       final records = <DailyRecord>[];
       for (final entry in groupedByDate.entries) {
         final date = DateTime.parse(entry.key);
-        final meals = entry.value.map((mealData) {
-          return DietRecordEntry(
-            mealLabel: _getMealLabel(mealData['meal_type'] as String),
-            description: _buildDescriptionFromSupabase(mealData),
-            calories: (mealData['calories'] as num?)?.round() ?? 0,
-            carbs: (mealData['carbs'] as num?)?.round() ?? 0,
-            protein: (mealData['protein'] as num?)?.round() ?? 0,
-            fat: (mealData['fat'] as num?)?.round() ?? 0,
-          );
-        }).toList();
+        final meals = entry.value;
 
         if (meals.isNotEmpty) {
           records.add(DailyRecord(
@@ -60,10 +90,14 @@ class DietHistoryRepository {
         }
       }
 
+      // 날짜 내림차순 정렬
+      records.sort((a, b) => b.date.compareTo(a.date));
+
       print('✅ [Diet] Supabase에서 ${records.length}일치 식단 기록 로드 완료');
       return records;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ [Diet] Supabase 식단 기록 로드 실패: $e');
+      print('Stack trace: $stackTrace');
       return const [];
     }
   }
@@ -81,25 +115,21 @@ class DietHistoryRepository {
     }
   }
 
-  String _buildDescriptionFromSupabase(Map<String, dynamic> mealData) {
-    final components = mealData['components'];
-    if (components is List && components.isNotEmpty) {
-      final items = components
-          .whereType<Map<String, dynamic>>()
-          .map((item) {
-        final food = item['food'] as Map<String, dynamic>? ?? const {};
-        final name = (food['name'] as String?)?.trim();
-        final grams = (item['grams'] as num?)?.toDouble();
-        if (name == null || name.isEmpty) return null;
-        final gramsText = grams != null ? '${grams.toStringAsFixed(0)}g' : '';
-        return gramsText.isEmpty ? name : '$name $gramsText';
-      }).whereType<String>().toList();
-
-      if (items.isNotEmpty) {
-        return items.join(', ');
-      }
+  String _buildDescriptionFromComponents(List<Map<String, dynamic>> components) {
+    if (components.isEmpty) {
+      return '식단 정보 없음';
     }
-    return mealData['meal_type'] as String? ?? '';
+
+    final items = components.map((component) {
+      final name = (component['food_name'] as String?)?.trim() ?? '음식';
+      final grams = (component['grams'] as num?)?.toDouble();
+      if (grams != null && grams > 0) {
+        return '$name ${grams.toStringAsFixed(0)}g';
+      }
+      return name;
+    }).toList();
+
+    return items.join(', ');
   }
 
   Future<List<DailyRecord>> loadRecentDietRecords({

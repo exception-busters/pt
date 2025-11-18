@@ -27,7 +27,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
   Future<void> _loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       final genderStr = prefs.getString(_getUserDataKey('user_gender'));
       final age = prefs.getInt(_getUserDataKey('user_age'));
       final weight = prefs.getDouble(_getUserDataKey('user_weight'));
@@ -35,6 +35,9 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
       final workoutGoalStr = prefs.getString(_getUserDataKey('user_workout_goal'));
       final workoutLevelStr = prefs.getString(_getUserDataKey('user_workout_level'));
       final experienceDurationStr = prefs.getString(_getUserDataKey('user_experience_duration'));
+      final dietGoalStr = prefs.getString(_getUserDataKey('user_diet_goal'));
+      final mealsPerDayStr = prefs.getString(_getUserDataKey('user_meals_per_day'));
+      final targetCalories = prefs.getInt(_getUserDataKey('user_target_calories'));
 
       final workoutGoal = workoutGoalStr != null
           ? WorkoutGoal.values.firstWhere(
@@ -51,6 +54,9 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
         workoutGoal: workoutGoal == WorkoutGoal.fitnessImprovement ? WorkoutGoal.healthMaintenance : workoutGoal,
         workoutLevel: workoutLevelStr != null ? WorkoutLevel.values.firstWhere((l) => l.name == workoutLevelStr, orElse: () => WorkoutLevel.beginner) : null,
         experienceDuration: experienceDurationStr != null ? ExperienceDuration.values.firstWhere((e) => e.name == experienceDurationStr, orElse: () => ExperienceDuration.lessThan6Months) : null,
+        dietGoal: dietGoalStr != null ? DietGoal.values.firstWhere((d) => d.name == dietGoalStr, orElse: () => DietGoal.healthMaintenance) : null,
+        mealsPerDay: mealsPerDayStr != null ? MealsPerDay.values.firstWhere((m) => m.name == mealsPerDayStr, orElse: () => MealsPerDay.three) : null,
+        targetCalories: targetCalories,
       );
     } catch (e) {
       print('사용자 데이터 로드 실패: $e');
@@ -70,6 +76,9 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
         await prefs.remove(_getUserDataKey('user_workout_goal'));
         await prefs.remove(_getUserDataKey('user_workout_level'));
         await prefs.remove(_getUserDataKey('user_experience_duration'));
+        await prefs.remove(_getUserDataKey('user_diet_goal'));
+        await prefs.remove(_getUserDataKey('user_meals_per_day'));
+        await prefs.remove(_getUserDataKey('user_target_calories'));
       }
     } catch (e) {
       print('사용자별 데이터 삭제 실패: $e');
@@ -102,6 +111,18 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
 
   void updateExperienceDuration(ExperienceDuration duration) {
     state = state.copyWith(experienceDuration: duration);
+  }
+
+  void updateDietGoal(DietGoal goal) {
+    state = state.copyWith(dietGoal: goal);
+  }
+
+  void updateMealsPerDay(MealsPerDay meals) {
+    state = state.copyWith(mealsPerDay: meals);
+  }
+
+  void updateTargetCalories(int calories) {
+    state = state.copyWith(targetCalories: calories);
   }
 
   Future<void> saveOnboardingData() async {
@@ -142,6 +163,15 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
           }
           if (state.experienceDuration != null) {
             await prefs.setString(_getUserDataKey('user_experience_duration'), state.experienceDuration!.name);
+          }
+          if (state.dietGoal != null) {
+            await prefs.setString(_getUserDataKey('user_diet_goal'), state.dietGoal!.name);
+          }
+          if (state.mealsPerDay != null) {
+            await prefs.setString(_getUserDataKey('user_meals_per_day'), state.mealsPerDay!.name);
+          }
+          if (state.targetCalories != null) {
+            await prefs.setInt(_getUserDataKey('user_target_calories'), state.targetCalories!);
           }
 
           print('✅ 로컬 캐시에도 저장 완료');

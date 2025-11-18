@@ -5,6 +5,7 @@ import 'package:flutter_application_1/features/onboarding/application/onboarding
 import 'package:flutter_application_1/features/onboarding/domain/models/onboarding_data.dart';
 import 'package:flutter_application_1/features/onboarding/presentation/widgets/number_picker_widget.dart';
 import 'package:flutter_application_1/features/profile/application/profile_providers.dart';
+import 'package:flutter_application_1/features/profile/application/complete_profile_providers.dart';
 import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,7 +27,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 4) {
+    if (_currentPage < 5) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -54,12 +55,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               child: Row(
-                children: List.generate(5, (index) {
+                children: List.generate(6, (index) {
                   return Expanded(
                     child: Container(
                       height: 4,
                       margin: EdgeInsets.only(
-                        right: index < 4 ? 8 : 0,
+                        right: index < 5 ? 8 : 0,
                       ),
                       decoration: BoxDecoration(
                         color: index <= _currentPage ? mainButtonColor : borderColor,
@@ -84,6 +85,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   _WelcomeScreen(onNext: _nextPage),
                   _GenderSelectionScreen(onNext: _nextPage),
                   _PersonalInfoScreen(onNext: _nextPage),
+                  _DietPreferencesScreen(onNext: _nextPage),
                   _WorkoutPreferencesScreen(onNext: _nextPage),
                   _CompletionScreen(),
                 ],
@@ -302,11 +304,29 @@ class _PersonalInfoScreenState extends ConsumerState<_PersonalInfoScreen> {
   int height = 170;
 
   @override
+  void initState() {
+    super.initState();
+    // 초기값을 provider에 자동으로 저장
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final onboardingData = ref.read(onboardingProvider);
+      if (onboardingData.age == null) {
+        ref.read(onboardingProvider.notifier).updateAge(age);
+      }
+      if (onboardingData.weight == null) {
+        ref.read(onboardingProvider.notifier).updateWeight(weight.toDouble());
+      }
+      if (onboardingData.height == null) {
+        ref.read(onboardingProvider.notifier).updateHeight(height.toDouble());
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final onboardingData = ref.watch(onboardingProvider);
-    
-    final bool canProceed = onboardingData.age != null && 
-                           onboardingData.weight != null && 
+
+    final bool canProceed = onboardingData.age != null &&
+                           onboardingData.weight != null &&
                            onboardingData.height != null;
 
     return Padding(
@@ -399,7 +419,210 @@ class _PersonalInfoScreenState extends ConsumerState<_PersonalInfoScreen> {
   }
 }
 
-// 4. 운동 목적 및 수준 선택 화면
+// 4. 식단 목표 선택 화면
+class _DietPreferencesScreen extends ConsumerWidget {
+  final VoidCallback onNext;
+
+  const _DietPreferencesScreen({required this.onNext});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboardingData = ref.watch(onboardingProvider);
+
+    final bool canProceed = onboardingData.dietGoal != null &&
+                           onboardingData.mealsPerDay != null;
+
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          const Text(
+            '식단 목표를 선택해주세요',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: mainButtonColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '목표에 맞는 식단을 AI가 추천해드립니다',
+            style: TextStyle(
+              fontSize: 16,
+              color: subTextColor,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 48),
+
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 식단 목표 선택
+                  const Text(
+                    '식단 목표',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...DietGoal.values.map((goal) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: RadioListTile<DietGoal>(
+                        title: Text(
+                          goal.displayName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        value: goal,
+                        groupValue: onboardingData.dietGoal,
+                        onChanged: (value) {
+                          if (value != null) {
+                            ref.read(onboardingProvider.notifier).updateDietGoal(value);
+                          }
+                        },
+                        activeColor: mainButtonColor,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: onboardingData.dietGoal == goal
+                                ? mainButtonColor
+                                : borderColor,
+                          ),
+                        ),
+                        tileColor: onboardingData.dietGoal == goal
+                            ? mainButtonColor.withOpacity(0.1)
+                            : Colors.transparent,
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 32),
+
+                  // 하루 식사 횟수 선택
+                  const Text(
+                    '하루 식사 횟수',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...MealsPerDay.values.map((meals) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: RadioListTile<MealsPerDay>(
+                        title: Text(
+                          meals.displayName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        value: meals,
+                        groupValue: onboardingData.mealsPerDay,
+                        onChanged: (value) {
+                          if (value != null) {
+                            ref.read(onboardingProvider.notifier).updateMealsPerDay(value);
+                          }
+                        },
+                        activeColor: mainButtonColor,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: onboardingData.mealsPerDay == meals
+                                ? mainButtonColor
+                                : borderColor,
+                          ),
+                        ),
+                        tileColor: onboardingData.mealsPerDay == meals
+                            ? mainButtonColor.withOpacity(0.1)
+                            : Colors.transparent,
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 32),
+
+                  // 목표 칼로리 (선택사항)
+                  const Text(
+                    '목표 칼로리 (선택사항)',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '입력하지 않으면 체중과 목표를 기반으로 자동 계산됩니다',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: subTextColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '예) 2000',
+                      suffixText: 'kcal',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      final calories = int.tryParse(value);
+                      if (calories != null) {
+                        ref.read(onboardingProvider.notifier).updateTargetCalories(calories);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: canProceed ? onNext : null,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                '다음',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 5. 운동 목적 및 수준 선택 화면
 class _WorkoutPreferencesScreen extends ConsumerWidget {
   final VoidCallback onNext;
 
@@ -605,7 +828,7 @@ class _WorkoutPreferencesScreen extends ConsumerWidget {
   }
 }
 
-// 5. 완료 화면
+// 6. 완료 화면
 class _CompletionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -676,20 +899,23 @@ class _CompletionScreen extends ConsumerWidget {
                 try {
                   // 온보딩 데이터 저장 (서버에 profile_completed = true 업데이트 포함)
                   await ref.read(onboardingProvider.notifier).saveOnboardingData();
-                  
+
                   // AuthController의 상태 즉시 업데이트 (DB 재조회 없이)
                   ref.read(authControllerProvider.notifier).updateProfileCompleted(true);
-                  
+
+                  // ⭐ 프로필 데이터 즉시 새로고침 (운동 목표, 식단 목표 등)
+                  await ref.read(completeUserDataProvider.notifier).loadUserData();
+
                   // 관련 프로바이더들 새로고침 (서버 상태 동기화)
                   ref.invalidate(userProfileProvider);
                   ref.invalidate(userProfileControllerProvider);
-                  
-                  print('🎉 온보딩 완료! 서버 상태 업데이트 및 AuthController 상태 업데이트 완료');
-                  
+
+                  print('🎉 온보딩 완료! 서버 상태 업데이트 및 프로필 데이터 새로고침 완료');
+
                   if (context.mounted) {
                     // 로딩 다이얼로그 닫기
                     Navigator.of(context).pop();
-                    
+
                     // 온보딩 화면을 완전히 제거하고 홈 화면으로 이동
                     context.go('/app/home');
                   }

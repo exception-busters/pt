@@ -3,6 +3,7 @@ import '../domain/models/onboarding_data.dart' as onboarding;
 import '../../common/data/supabase_service.dart';
 import '../../profile/domain/models/user_profile_model.dart' as profile;
 import '../../profile/domain/models/workout_goal_model.dart' as workout;
+import '../../profile/domain/models/diet_goal_model.dart' as diet;
 import '../../profile/data/profile_data_service.dart';
 
 class OnboardingService {
@@ -46,12 +47,27 @@ class OnboardingService {
         preferredTypes: ['general'], // 기본값
       );
 
+      // 식단 목표 생성
+      diet.DietGoalModel? dietGoal;
+      if (data.dietGoal != null || data.mealsPerDay != null) {
+        dietGoal = diet.DietGoalModel(
+          userId: currentUser.id,
+          dailyCalorieTarget: data.targetCalories,
+          dietType: data.dietGoal != null
+              ? _mapDietGoal(data.dietGoal!)
+              : null,
+          mealsPerDay: data.mealsPerDay?.value,
+          dailyWaterMl: 2000, // 기본값 (2L)
+          dietaryRestrictions: const [],
+        );
+      }
+
       // 새로운 ProfileDataService를 사용하여 저장
       final success = await ProfileDataService.saveCompleteProfile(
         userId: currentUser.id,
         userProfile: userProfile,
         workoutGoal: workoutGoal,
-        // dietGoal은 온보딩에서 설정하지 않으므로 null
+        dietGoal: dietGoal,
       );
 
       if (success) {
@@ -208,6 +224,18 @@ class OnboardingService {
         return onboarding.WorkoutLevel.intermediate;
       case workout.WorkoutLevel.advanced:
         return onboarding.WorkoutLevel.advanced;
+    }
+  }
+
+  // 온보딩 DietGoal을 새로운 DietType으로 매핑
+  diet.DietType _mapDietGoal(onboarding.DietGoal goal) {
+    switch (goal) {
+      case onboarding.DietGoal.weightLoss:
+        return diet.DietType.lowCarb; // 체중 감량 → 저탄수화물
+      case onboarding.DietGoal.muscleGain:
+        return diet.DietType.highProtein; // 근육 증가 → 고단백
+      case onboarding.DietGoal.healthMaintenance:
+        return diet.DietType.balanced; // 건강 유지 → 균형잡힌 식단
     }
   }
 }

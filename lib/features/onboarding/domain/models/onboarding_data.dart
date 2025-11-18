@@ -11,6 +11,10 @@ enum ExperienceDuration {
   moreThanTwoYears    // 2년 이상
 }
 
+enum DietGoal { weightLoss, muscleGain, healthMaintenance }
+
+enum MealsPerDay { two, three, four, five }
+
 class OnboardingData {
   final Gender? gender;
   final int? age;
@@ -19,6 +23,9 @@ class OnboardingData {
   final WorkoutGoal? workoutGoal;
   final WorkoutLevel? workoutLevel;
   final ExperienceDuration? experienceDuration;
+  final DietGoal? dietGoal;
+  final MealsPerDay? mealsPerDay;
+  final int? targetCalories;
 
   const OnboardingData({
     this.gender,
@@ -28,6 +35,9 @@ class OnboardingData {
     this.workoutGoal,
     this.workoutLevel,
     this.experienceDuration,
+    this.dietGoal,
+    this.mealsPerDay,
+    this.targetCalories,
   });
 
   OnboardingData copyWith({
@@ -38,6 +48,9 @@ class OnboardingData {
     WorkoutGoal? workoutGoal,
     WorkoutLevel? workoutLevel,
     ExperienceDuration? experienceDuration,
+    DietGoal? dietGoal,
+    MealsPerDay? mealsPerDay,
+    int? targetCalories,
   }) {
     return OnboardingData(
       gender: gender ?? this.gender,
@@ -47,6 +60,9 @@ class OnboardingData {
       workoutGoal: workoutGoal ?? this.workoutGoal,
       workoutLevel: workoutLevel ?? this.workoutLevel,
       experienceDuration: experienceDuration ?? this.experienceDuration,
+      dietGoal: dietGoal ?? this.dietGoal,
+      mealsPerDay: mealsPerDay ?? this.mealsPerDay,
+      targetCalories: targetCalories ?? this.targetCalories,
     );
   }
 
@@ -59,6 +75,9 @@ class OnboardingData {
       'workout_goal': workoutGoal?.name,
       'workout_level': workoutLevel?.name,
       'experience_duration': experienceDuration?.name,
+      'diet_goal': dietGoal?.name,
+      'meals_per_day': mealsPerDay?.value,
+      'target_calories': targetCalories,
     };
   }
 
@@ -69,7 +88,9 @@ class OnboardingData {
         height != null &&
         workoutGoal != null &&
         workoutLevel != null &&
-        experienceDuration != null;
+        experienceDuration != null &&
+        dietGoal != null &&
+        mealsPerDay != null;
   }
 }
 
@@ -123,6 +144,47 @@ extension ExperienceDurationExtension on ExperienceDuration {
         return '1~2년';
       case ExperienceDuration.moreThanTwoYears:
         return '2년 이상';
+    }
+  }
+}
+
+extension DietGoalExtension on DietGoal {
+  String get displayName {
+    switch (this) {
+      case DietGoal.weightLoss:
+        return '체중 감량';
+      case DietGoal.muscleGain:
+        return '근육 증가';
+      case DietGoal.healthMaintenance:
+        return '건강 유지';
+    }
+  }
+}
+
+extension MealsPerDayExtension on MealsPerDay {
+  String get displayName {
+    switch (this) {
+      case MealsPerDay.two:
+        return '하루 2끼';
+      case MealsPerDay.three:
+        return '하루 3끼';
+      case MealsPerDay.four:
+        return '하루 4끼';
+      case MealsPerDay.five:
+        return '하루 5끼';
+    }
+  }
+
+  int get value {
+    switch (this) {
+      case MealsPerDay.two:
+        return 2;
+      case MealsPerDay.three:
+        return 3;
+      case MealsPerDay.four:
+        return 4;
+      case MealsPerDay.five:
+        return 5;
     }
   }
 }
