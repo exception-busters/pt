@@ -644,6 +644,26 @@ class _CompletionScreen extends ConsumerWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () async {
+                // ⭐ 사용자 로그인 상태 확인 (중요!)
+                final authState = ref.read(authControllerProvider);
+                if (!authState.isLoggedIn) {
+                  print('❌ 사용자가 로그인되지 않았습니다. 로그인 페이지로 이동합니다.');
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('로그인이 필요합니다. 다시 로그인해주세요.'),
+                        backgroundColor: Colors.red,
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+
+                    // 로그인 페이지로 이동
+                    context.go('/');
+                  }
+                  return;
+                }
+
                 // 로딩 표시
                 showDialog(
                   context: context,

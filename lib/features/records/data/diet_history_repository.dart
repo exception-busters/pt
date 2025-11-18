@@ -6,22 +6,164 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/records_models.dart';
 
 class DietHistoryRepository {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// Supabase usermeal 테이블에서 식단 기록 가져오기
+  Future<List<DailyRecord>> _loadFromSupabase({
+    required String userId,
+    required int daysBack,
+  }) async {
+    try {
+      final cutoff = DateTime.now().subtract(Duration(days: daysBack));
+
+      print('📡 [Diet] Supabase에서 식단 기록 가져오기 시작 - user_id: $userId');
+
+      final response = await _supabase
+          .from('usermeal')
+          .select()
+          .eq('user_id', userId)
+          .gte('meal_date', cutoff.toIso8601String())
+          .order('meal_date', ascending: false);
+
+      print('📡 [Diet] Supabase 응답: ${response.length}개 기록');
+
+      // 날짜별로 그룹화
+      final Map<String, List<Map<String, dynamic>>> groupedByDate = {};
+      for (final meal in response) {
+        final dateStr = meal['meal_date'] as String;
+        final date = DateTime.parse(dateStr);
+        final dateKey = truncateToDate(date).toIso8601String().split('T')[0];
+
+        groupedByDate.putIfAbsent(dateKey, () => []).add(meal);
+      }
+
+      // DailyRecord로 변환
+      final records = <DailyRecord>[];
+      for (final entry in groupedByDate.entries) {
+        final date = DateTime.parse(entry.key);
+        final meals = entry.value.map((mealData) {
+          return DietRecordEntry(
+            mealLabel: _getMealLabel(mealData['meal_type'] as String),
+            description: _buildDescriptionFromSupabase(mealData),
+            calories: (mealData['calories'] as num?)?.round() ?? 0,
+            carbs: (mealData['carbs'] as num?)?.round() ?? 0,
+            protein: (mealData['protein'] as num?)?.round() ?? 0,
+            fat: (mealData['fat'] as num?)?.round() ?? 0,
+          );
+        }).toList();
+
+        if (meals.isNotEmpty) {
+          records.add(DailyRecord(
+            date: truncateToDate(date),
+            diets: meals,
+          ));
+        }
+      }
+
+      print('✅ [Diet] Supabase에서 ${records.length}일치 식단 기록 로드 완료');
+      return records;
+    } catch (e) {
+      print('❌ [Diet] Supabase 식단 기록 로드 실패: $e');
+      return const [];
+    }
+  }
+
+  String _getMealLabel(String mealType) {
+    switch (mealType) {
+      case 'breakfast':
+        return '아침';
+      case 'lunch':
+        return '점심';
+      case 'dinner':
+        return '저녁';
+      default:
+        return mealType;
+    }
+  }
+
+  String _buildDescriptionFromSupabase(Map<String, dynamic> mealData) {
+    final components = mealData['components'];
+    if (components is List && components.isNotEmpty) {
+      final items = components
+          .whereType<Map<String, dynamic>>()
+          .map((item) {
+        final food = item['food'] as Map<String, dynamic>? ?? const {};
+        final name = (food['name'] as String?)?.trim();
+        final grams = (item['grams'] as num?)?.toDouble();
+        if (name == null || name.isEmpty) return null;
+        final gramsText = grams != null ? '${grams.toStringAsFixed(0)}g' : '';
+        return gramsText.isEmpty ? name : '$name $gramsText';
+      }).whereType<String>().toList();
+
+      if (items.isNotEmpty) {
+        return items.join(', ');
+      }
+    }
+    return mealData['meal_type'] as String? ?? '';
+  }
+
   Future<List<DailyRecord>> loadRecentDietRecords({
     int daysBack = 60,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    final prefix =
-        userId != null ? 'diet_data_${userId}_' : 'diet_data_default_';
+    final userId = _supabase.auth.currentUser?.id;
+
+    if (userId == null) {
+      print('⚠️ [Diet] 사용자가 로그인되지 않았습니다');
+      return const [];
+    }
 
     print('🔍 [Diet] 식단 데이터 로드 - user_id: $userId');
-    print('🔍 [Diet] SharedPreferences prefix: $prefix');
+
+    // ⭐ 1. Supabase에서 먼저 데이터 가져오기 (새 기기 대응)
+    final supabaseRecords = await _loadFromSupabase(
+      userId: userId,
+      daysBack: daysBack,
+    );
+
+    // 2. 로컬 캐시에서도 데이터 가져오기 (백업용)
+    final localRecords = await _loadFromLocal(
+      userId: userId,
+      daysBack: daysBack,
+    );
+
+    // 3. 두 소스 병합 (Supabase 우선, 중복 제거)
+    final mergedMap = <String, DailyRecord>{};
+
+    // Supabase 데이터 먼저 추가
+    for (final record in supabaseRecords) {
+      final key = record.date.toIso8601String().split('T')[0];
+      mergedMap[key] = record;
+    }
+
+    // 로컬 데이터는 Supabase에 없는 것만 추가
+    for (final record in localRecords) {
+      final key = record.date.toIso8601String().split('T')[0];
+      if (!mergedMap.containsKey(key)) {
+        mergedMap[key] = record;
+      }
+    }
+
+    final mergedRecords = mergedMap.values.toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    print('✅ [Diet] 총 ${mergedRecords.length}일치 식단 기록 로드 완료 (Supabase: ${supabaseRecords.length}, 로컬: ${localRecords.length})');
+
+    return mergedRecords;
+  }
+
+  /// 로컬 캐시에서 식단 기록 가져오기
+  Future<List<DailyRecord>> _loadFromLocal({
+    required String userId,
+    required int daysBack,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final prefix = 'diet_data_${userId}_';
+
+    print('💾 [Diet] 로컬 캐시에서 식단 기록 가져오기');
 
     final keys = prefs.getKeys().where((key) => key.startsWith(prefix)).toList();
-    print('🔍 [Diet] 찾은 식단 키 개수: ${keys.length}');
-    if (keys.isNotEmpty) {
-      print('🔍 [Diet] 식단 키 목록: ${keys.take(3).join(", ")}...');
-    }
+    print('💾 [Diet] 찾은 식단 키 개수: ${keys.length}');
+
     if (keys.isEmpty) {
       return const [];
     }
@@ -51,11 +193,12 @@ class DietHistoryRepository {
           ),
         );
       } catch (error) {
-        print('식단 기록 파싱 실패 ($key): $error');
+        print('💾 [Diet] 로컬 식단 기록 파싱 실패 ($key): $error');
       }
     }
 
     records.sort((a, b) => b.date.compareTo(a.date));
+    print('💾 [Diet] 로컬에서 ${records.length}일치 식단 기록 로드 완료');
     return records;
   }
 

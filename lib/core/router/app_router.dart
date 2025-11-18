@@ -77,11 +77,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/';
       }
 
+      // ⭐ 미로그인 + 온보딩 접근 → 로그인 (중요!)
+      if (!isLoggedIn && goingToOnboarding) {
+        print('⚠️ 로그인되지 않은 사용자가 온보딩에 접근 시도 → 로그인 페이지로 리다이렉트');
+        return '/';
+      }
+
       // 로그인됨 + 인증 페이지 접근 → 상태 기반 리다이렉트
       if (isLoggedIn && goingToAuth) {
         final stored = authNotifier.takeRedirect();
         if (stored?.isNotEmpty == true) return stored;
-        
+
         if (profileCompleted == null) return null; // 상태 확인 중
         return profileCompleted ? '/app/home' : '/onboarding';
       }
