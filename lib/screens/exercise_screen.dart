@@ -24,6 +24,7 @@ import '../services/tts_service.dart';
 // 위젯
 import '../widgets/phase_progress_widget.dart';
 import '../widgets/compact_score_display.dart';
+import '../widgets/exercise_guide_dialog.dart';
 import '../pose_painter.dart';
 import '../angle_calculator.dart';
 
@@ -209,39 +210,61 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         }
       });
       
-      // 첫 운동 시작 전 영상 재생
-      if (exercises.isNotEmpty && widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty) {
-        final firstExerciseId = widget.exerciseIds![0];
-        final videoUrl = videoUrls[firstExerciseId];
-        if (videoUrl != null && !_hasShownVideo) {
-          _hasShownVideo = true;
-          // 약간의 지연 후 영상 재생 다이얼로그 표시
-          Future.delayed(const Duration(milliseconds: 300), () {
+      // 가이드 화면 → 영상 → 운동 시작 흐름
+      if (exercises.isNotEmpty) {
+        // 약간의 지연 후 가이드 또는 영상 표시
+        Future.delayed(const Duration(milliseconds: 300), () async {
+          if (!mounted) return;
+
+          // 1. 가이드 화면 표시 여부 확인
+          final shouldShowGuide = await ExerciseGuideDialog.shouldShowGuide();
+
+          if (shouldShowGuide) {
+            // 가이드 화면 표시
             if (mounted) {
-              _showVideoDialog(videoUrl);
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => ExerciseGuideDialog(
+                  onComplete: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              );
             }
-          });
-        } else {
-          // 영상이 없으면 첫 단계 설명 읽기
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted && _phaseManager != null && _selectedExercise != null) {
-              final phaseDescription = _phaseManager!.currentPhase.description;
-              _ttsService.speak(phaseDescription);
-              _lastSpokenPhaseDescription = phaseDescription;
+          }
+
+          // 2. 가이드 완료 후 영상 재생 또는 단계 설명
+          if (mounted && widget.exerciseIds != null && widget.exerciseIds!.isNotEmpty) {
+            final firstExerciseId = widget.exerciseIds![0];
+            final videoUrl = videoUrls[firstExerciseId];
+            if (videoUrl != null && !_hasShownVideo) {
+              _hasShownVideo = true;
+              // 영상 재생 다이얼로그 표시
+              if (mounted) {
+                _showVideoDialog(videoUrl);
+              }
+            } else {
+              // 영상이 없으면 첫 단계 설명 읽기
+              Future.delayed(const Duration(milliseconds: 200), () {
+                if (mounted && _phaseManager != null && _selectedExercise != null) {
+                  final phaseDescription = _phaseManager!.currentPhase.description;
+                  _ttsService.speak(phaseDescription);
+                  _lastSpokenPhaseDescription = phaseDescription;
+                }
+              });
             }
-          });
-        }
-      } else {
-        // 첫 단계 설명 읽기 (약간의 지연 후)
-        if (exercises.isNotEmpty) {
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted && _phaseManager != null && _selectedExercise != null) {
-              final phaseDescription = _phaseManager!.currentPhase.description;
-              _ttsService.speak(phaseDescription);
-              _lastSpokenPhaseDescription = phaseDescription;
-            }
-          });
-        }
+          } else {
+            // 첫 단계 설명 읽기
+            Future.delayed(const Duration(milliseconds: 200), () {
+              if (mounted && _phaseManager != null && _selectedExercise != null) {
+                final phaseDescription = _phaseManager!.currentPhase.description;
+                _ttsService.speak(phaseDescription);
+                _lastSpokenPhaseDescription = phaseDescription;
+              }
+            });
+          }
+        });
       }
     } catch (e) {
       print('운동 데이터 로드 실패: $e');
@@ -937,7 +960,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Transform.scale(scaleX: -1, child: CameraPreview(_controller!)),
+          CameraPreview(_controller!),
 
           // ValueListenableBuilder로 스켈레톤만 선택적 리빌드
           ValueListenableBuilder<Size?>(
@@ -949,16 +972,13 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               return ValueListenableBuilder<List<Pose>>(
                 valueListenable: _posesNotifier,
                 builder: (context, poses, child) {
-                  return Transform.scale(
-                    scaleX: -1,
-                    child: CustomPaint(
-                      painter: PosePainter(
-                        poses,
-                        imageSize,
-                        exercise: _selectedExercise,
-                      ),
-                      child: Container(),
+                  return CustomPaint(
+                    painter: PosePainter(
+                      poses,
+                      imageSize,
+                      exercise: _selectedExercise,
                     ),
+                    child: Container(),
                   );
                 },
               );

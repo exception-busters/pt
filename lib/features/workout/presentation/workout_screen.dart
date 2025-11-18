@@ -200,16 +200,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     int weekday,
     List<dynamic> routines,
   ) async {
-    if (routines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('먼저 루틴을 하나 이상 생성해주세요.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
+    // 루틴이 없어도 다이얼로그를 열어서 루틴 만들기 버튼을 보여줌
     final routine = await showModalBottomSheet<dynamic>(
       context: context,
       builder: (context) => _RoutinePickerSheet(routines: routines),
@@ -1473,9 +1464,56 @@ class _RoutinePickerSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (routines.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text('등록된 루틴이 없습니다.'),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.fitness_center,
+                      size: 64,
+                      color: subTextColor,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '등록된 루틴이 없습니다.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: subTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '새로운 루틴을 만들어 시작해보세요!',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: subTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const CreateRoutineScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_circle_outline),
+                      label: const Text('루틴 만들기'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: mainButtonColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               )
             else
               SizedBox(
