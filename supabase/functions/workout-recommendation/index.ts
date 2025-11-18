@@ -197,7 +197,7 @@ async function generateRoutinesWithOpenAI(payload: WorkoutRequest): Promise<Rout
   }
 
   const prompt = buildOpenAiPrompt(payload, catalog)
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -205,8 +205,18 @@ async function generateRoutinesWithOpenAI(payload: WorkoutRequest): Promise<Rout
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
-      input: prompt,
-      max_output_tokens: 900,
+      messages: [
+        {
+          role: "system",
+          content: "당신은 한국어 트레이너입니다. 사용자 정보를 참고해 개인 맞춤 운동 루틴을 JSON으로 생성하세요."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 900,
+      temperature: 0.7,
     }),
   })
 
@@ -515,6 +525,13 @@ function extractTextFromResponse(result: unknown): string | null {
     for (const choice of choices) {
       const message = (choice as OpenAIChoice).message
       const content = message?.content
+
+      // Handle string content (standard chat completions format)
+      if (typeof content === "string" && content.trim().length > 0) {
+        return content
+      }
+
+      // Handle array content
       if (Array.isArray(content)) {
         for (const block of content) {
           const text = (block as { text?: unknown }).text

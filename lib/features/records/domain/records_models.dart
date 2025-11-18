@@ -57,6 +57,10 @@ class WorkoutRecordEntry {
     this.duration,
     this.calories = 0,
     this.startedAt,
+    this.completionMethod,
+    this.manualNotes,
+    this.perceivedIntensity,
+    this.isUserReported,
   });
 
   final int? sessionId;
@@ -64,6 +68,10 @@ class WorkoutRecordEntry {
   final Duration? duration;
   final int calories;
   final DateTime? startedAt;
+  final String? completionMethod;  // 'app' or 'manual'
+  final String? manualNotes;       // 메모
+  final int? perceivedIntensity;   // RPE 1-10
+  final bool? isUserReported;      // 사용자 직접 입력 여부
 }
 
 class DietRecordEntry {
@@ -71,11 +79,17 @@ class DietRecordEntry {
     required this.mealLabel,
     required this.description,
     this.calories = 0,
+    this.carbs = 0,      // 탄수화물 (g)
+    this.protein = 0,    // 단백질 (g)
+    this.fat = 0,        // 지방 (g)
   });
 
   final String mealLabel;
   final String description;
   final int calories;
+  final int carbs;     // 탄수화물 (g)
+  final int protein;   // 단백질 (g)
+  final int fat;       // 지방 (g)
 }
 
 class RecordsHistory {

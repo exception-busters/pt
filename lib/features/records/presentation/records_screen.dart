@@ -87,8 +87,8 @@ class _RecordsBody extends StatelessWidget {
   final ValueChanged<bool> onToggleWorkout;
   final ValueChanged<bool> onToggleDiet;
 
-  static const _workoutColor = Color(0xFF4CAF50);
-  static const _dietColor = Color(0xFFFF7043);
+  static const _workoutColor = mainButtonColor;
+  static const _dietColor = mainButtonColor;
 
   @override
   Widget build(BuildContext context) {
@@ -171,8 +171,8 @@ class _CalendarSection extends StatelessWidget {
   final bool showDiet;
   final void Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
 
-  static const _workoutColor = Color(0xFF4CAF50);
-  static const _dietColor = Color(0xFFFF7043);
+  static const _workoutColor = mainButtonColor;
+  static const _dietColor = mainButtonColor;
 
   @override
   Widget build(BuildContext context) {
@@ -309,15 +309,19 @@ class _FilterChips extends StatelessWidget {
           selected: showWorkout,
           label: const Text('운동'),
           onSelected: onToggleWorkout,
-          selectedColor: Colors.green.shade100,
+          selectedColor: Colors.grey.shade200,
           checkmarkColor: mainButtonColor,
+          labelStyle: const TextStyle(color: mainButtonColor),
+          backgroundColor: Colors.white,
         ),
         FilterChip(
           selected: showDiet,
           label: const Text('식단'),
           onSelected: onToggleDiet,
-          selectedColor: Colors.orange.shade100,
+          selectedColor: Colors.grey.shade200,
           checkmarkColor: mainButtonColor,
+          labelStyle: const TextStyle(color: mainButtonColor),
+          backgroundColor: Colors.white,
         ),
       ],
     );

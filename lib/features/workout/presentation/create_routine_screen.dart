@@ -7,8 +7,16 @@ import 'package:go_router/go_router.dart';
 class CreateRoutineScreen extends ConsumerStatefulWidget {
   final WorkoutRoutine? editingRoutine;
   final dynamic editingSupabaseRoutine; // Supabase 루틴 모델(SupabaseWorkoutRoutine)
+  final String? initialRoutineName; // AI 루틴 등록용
+  final List<Exercise>? initialExercises; // AI 루틴 등록용
 
-  const CreateRoutineScreen({super.key, this.editingRoutine, this.editingSupabaseRoutine});
+  const CreateRoutineScreen({
+    super.key,
+    this.editingRoutine,
+    this.editingSupabaseRoutine,
+    this.initialRoutineName,
+    this.initialExercises,
+  });
 
   @override
   ConsumerState<CreateRoutineScreen> createState() =>
@@ -30,6 +38,10 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
       _nameController.text = widget.editingSupabaseRoutine.title;
       // Supabase 루틴의 운동 정보를 Exercise 객체로 변환
       _selectedExercises = _convertSupabaseExercisesToExercises(widget.editingSupabaseRoutine);
+    } else if (widget.initialRoutineName != null && widget.initialExercises != null) {
+      // AI 루틴을 수정 후 등록하는 경우
+      _nameController.text = widget.initialRoutineName!;
+      _selectedExercises = List.from(widget.initialExercises!);
     }
   }
 
@@ -98,9 +110,25 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
     }
   }
 
-  void _addExercise(Exercise exercise) {
+  Future<void> _addExercise(Exercise exercise) async {
+    // 세트/횟수 설정 다이얼로그 표시
+    final result = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (context) => _ExerciseSettingsDialog(exercise: exercise),
+    );
+
+    if (result == null) return;
+
+    // 설정된 값으로 운동 추가
+    final updatedExercise = exercise.copyWith(
+      sets: result['sets'],
+      reps: result['reps'],
+      restSeconds: result['rest'],
+      duration: (result['sets']! * result['reps']! * 4) + (result['rest']! * (result['sets']! - 1)),
+    );
+
     setState(() {
-      _selectedExercises.add(exercise);
+      _selectedExercises.add(updatedExercise);
     });
   }
 
@@ -378,7 +406,7 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
                                               ),
                                             ),
                                             subtitle: Text(
-                                              '${exercise.description}\n${exercise.volumeSummary} • ${exercise.category}',
+                                              '${exercise.description}\n${exercise.category}',
                                               style: const TextStyle(color: subTextColor),
                                             ),
                                           ),
@@ -621,6 +649,204 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ExerciseSettingsDialog extends StatefulWidget {
+  final Exercise exercise;
+
+  const _ExerciseSettingsDialog({required this.exercise});
+
+  @override
+  State<_ExerciseSettingsDialog> createState() => _ExerciseSettingsDialogState();
+}
+
+class _ExerciseSettingsDialogState extends State<_ExerciseSettingsDialog> {
+  late int _sets;
+  late int _reps;
+  late int _rest;
+
+  @override
+  void initState() {
+    super.initState();
+    _sets = widget.exercise.sets ?? 3;
+    _reps = widget.exercise.reps ?? 12;
+    _rest = widget.exercise.restSeconds ?? 60;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.exercise.name,
+        style: const TextStyle(color: mainButtonColor),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 세트 수 설정
+            Row(
+              children: [
+                const Expanded(
+                  flex: 2,
+                  child: Text(
+                    '세트',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          if (_sets > 1) setState(() => _sets--);
+                        },
+                        icon: const Icon(Icons.remove_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                      Container(
+                        width: 50,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$_sets',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          if (_sets < 10) setState(() => _sets++);
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+
+            // 횟수 설정
+            Row(
+              children: [
+                const Expanded(
+                  flex: 2,
+                  child: Text(
+                    '횟수',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          if (_reps > 1) setState(() => _reps--);
+                        },
+                        icon: const Icon(Icons.remove_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                      Container(
+                        width: 50,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$_reps',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          if (_reps < 50) setState(() => _reps++);
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+
+            // 휴식 시간 설정
+            Row(
+              children: [
+                const Expanded(
+                  flex: 2,
+                  child: Text(
+                    '휴식(초)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          if (_rest > 10) setState(() => _rest -= 10);
+                        },
+                        icon: const Icon(Icons.remove_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                      Container(
+                        width: 50,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$_rest',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          if (_rest < 300) setState(() => _rest += 10);
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                        color: mainButtonColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop({
+              'sets': _sets,
+              'reps': _reps,
+              'rest': _rest,
+            });
+          },
+          child: const Text('추가'),
+        ),
+      ],
     );
   }
 }

@@ -55,3 +55,6 @@ python_server/*.pyc
 
 # Supabase 환경 변수
 supabase/.env
+
+# Flutter 환경 변수 파일
+.env.json

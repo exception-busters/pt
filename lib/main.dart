@@ -31,9 +31,18 @@ class PTApp extends ConsumerWidget {
       title: 'PT 앱',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: mainButtonColor,
-          brightness: Brightness.light,
+        colorScheme: const ColorScheme.light(
+          primary: mainButtonColor,
+          secondary: mainButtonColor,
+          tertiary: mainButtonColor,
+          surface: backgroundColor,
+          background: backgroundColor,
+          error: Colors.red,
+          onPrimary: backgroundColor,
+          onSecondary: backgroundColor,
+          onSurface: mainButtonColor,
+          onBackground: mainButtonColor,
+          onError: backgroundColor,
         ),
         scaffoldBackgroundColor: backgroundColor,
         appBarTheme: const AppBarTheme(

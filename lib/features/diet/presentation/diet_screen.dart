@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/features/diet/application/diet_providers.dart';
 
 class DietScreen extends ConsumerWidget {
@@ -15,8 +16,8 @@ class DietScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('식단'),
-        backgroundColor: const Color(0xFFE8F5E8),
-        foregroundColor: const Color(0xFF4A6741),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -68,13 +69,13 @@ class _ManualMealSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF4A6741),
+            color: mainButtonColor,
           ),
         ),
         const SizedBox(height: 6),
         const Text(
           '아침, 점심, 저녁 식단을 직접 입력하고 아래의 AI 추천 식단을 참고해 적용할 수 있어요.',
-          style: TextStyle(color: Color(0xFF6B7B6B)),
+          style: TextStyle(color: subTextColor),
         ),
         const SizedBox(height: 20),
         for (final meal in _meals) ...[
@@ -120,7 +121,7 @@ class _MealInputCard extends ConsumerWidget {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,14 +131,14 @@ class _MealInputCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(config.icon, color: const Color(0xFF4A6741)),
+                  Icon(config.icon, color: mainButtonColor),
                   const SizedBox(width: 8),
                   Text(
                     config.label,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF4A6741),
+                      color: mainButtonColor,
                     ),
                   ),
                 ],
@@ -147,7 +148,7 @@ class _MealInputCard extends ConsumerWidget {
                   mealData!.calories,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF4A6741),
+                    color: mainButtonColor,
                   ),
                 ),
             ],
@@ -167,7 +168,7 @@ class _MealInputCard extends ConsumerWidget {
                           '${component.food.name} ${component.grams.toStringAsFixed(0)}g',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        backgroundColor: const Color(0xFFE8F5E8),
+                        backgroundColor: backgroundColor,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     if (remainingCount > 0)
@@ -176,7 +177,7 @@ class _MealInputCard extends ConsumerWidget {
                           '+$remainingCount',
                           style: const TextStyle(fontSize: 12),
                         ),
-                        backgroundColor: const Color(0xFFE8F5E8),
+                        backgroundColor: backgroundColor,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                   ],
@@ -184,14 +185,14 @@ class _MealInputCard extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(
                   '단백질 ${nutrition.protein.toStringAsFixed(1)}g · 탄수화물 ${nutrition.carbs.toStringAsFixed(1)}g · 지방 ${nutrition.fat.toStringAsFixed(1)}g',
-                  style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF6B7B6B)),
+                  style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
                 ),
               ],
             )
           else
             Text(
               '등록된 식단이 없습니다.',
-              style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF6B7B6B)),
+              style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
             ),
           const SizedBox(height: 12),
           SizedBox(
@@ -296,7 +297,7 @@ class _DietRecommendationSectionState extends ConsumerState<_DietRecommendationS
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+              colors: [mainButtonColor, secondaryButtonColor],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -373,13 +374,13 @@ class _DietRecommendationSectionState extends ConsumerState<_DietRecommendationS
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF4A6741),
+            color: mainButtonColor,
           ),
         ),
         const SizedBox(height: 8),
         const Text(
           '아래 추천 항목을 원하는 끼니에 적용하거나, 섭취량(g)을 조정해 나만의 식단으로 바꿀 수 있어요.',
-          style: TextStyle(color: Color(0xFF6B7B6B)),
+          style: TextStyle(color: subTextColor),
         ),
         const SizedBox(height: 16),
         for (final meal in plan.meals) ...[
@@ -566,14 +567,14 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
                 widget.meal.label,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
               Text(
                 '총 ${totals.calories.toStringAsFixed(0)} kcal',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF4A6741),
+                  color: mainButtonColor,
                 ),
               ),
             ],
@@ -581,7 +582,7 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
           const SizedBox(height: 6),
           Text(
             '단백질 ${totals.protein.toStringAsFixed(1)}g · 탄수화물 ${totals.carbs.toStringAsFixed(1)}g · 지방 ${totals.fat.toStringAsFixed(1)}g',
-            style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF7A8B7A)),
+            style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
           ),
           const SizedBox(height: 16),
           for (var i = 0; i < _items.length; i++) ...[
@@ -730,7 +731,7 @@ class _MealEditorSheetState extends ConsumerState<_MealEditorSheet> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF4A6741),
+                      color: mainButtonColor,
                     ),
                   ),
                   IconButton(
@@ -744,7 +745,7 @@ class _MealEditorSheetState extends ConsumerState<_MealEditorSheet> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F1),
+                    color: backgroundColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -770,7 +771,7 @@ class _MealEditorSheetState extends ConsumerState<_MealEditorSheet> {
                                       item.food.category,
                                       style: const TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFF6B7B6B),
+                                        color: subTextColor,
                                       ),
                                     ),
                                   ],
@@ -795,7 +796,7 @@ class _MealEditorSheetState extends ConsumerState<_MealEditorSheet> {
                       const SizedBox(height: 8),
                       Text(
                         '총 ${_total.calories.toStringAsFixed(0)} kcal · 단백질 ${_total.protein.toStringAsFixed(1)}g · 탄수화물 ${_total.carbs.toStringAsFixed(1)}g · 지방 ${_total.fat.toStringAsFixed(1)}g',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF4A6741)),
+                        style: const TextStyle(fontSize: 12, color: mainButtonColor),
                       ),
                     ],
                   ),
@@ -989,13 +990,13 @@ class _EditableMealItemRow extends StatelessWidget {
               Text(
                 item.food.category,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF8C9A8C),
+                  color: subTextColor,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 '단백질 ${item.nutrition.protein.toStringAsFixed(1)}g · 탄수화물 ${item.nutrition.carbs.toStringAsFixed(1)}g · 지방 ${item.nutrition.fat.toStringAsFixed(1)}g',
-                style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF7A8B7A)),
+                style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
               ),
             ],
           ),
@@ -1056,12 +1057,12 @@ class _DietErrorView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.restaurant_menu, size: 64, color: Color(0xFF9ACD32)),
+        const Icon(Icons.restaurant_menu, size: 64, color: subTextColor),
         const SizedBox(height: 16),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16, color: Color(0xFF4A6741)),
+          style: const TextStyle(fontSize: 16, color: mainButtonColor),
         ),
         const SizedBox(height: 16),
         ElevatedButton(

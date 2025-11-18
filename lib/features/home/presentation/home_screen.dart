@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
-import 'package:flutter_application_1/features/onboarding/presentation/widgets/onboarding_debug_widget.dart';
+import 'package:flutter_application_1/features/profile/application/complete_profile_providers.dart';
+import 'package:flutter_application_1/features/records/application/records_providers.dart';
 import 'package:go_router/go_router.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final workoutGoal = ref.watch(workoutGoalModelProvider);
+    final dietGoal = ref.watch(dietGoalModelProvider);
+    final recordsHistoryAsync = ref.watch(recordsHistoryProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('홈'),
@@ -72,29 +78,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildGoalCard(
-                      '운동',
-                      '30분',
-                      Icons.fitness_center,
-                      mainButtonColor,
-                      '60%',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildGoalCard(
-                      '칼로리',
-                      '1,200kcal',
-                      Icons.local_fire_department,
-                      secondaryButtonColor,
-                      '80%',
-                    ),
-                  ),
-                ],
-              ),
+              _buildGoalSection(workoutGoal, dietGoal, recordsHistoryAsync),
               const SizedBox(height: 24),
               const Text(
                 '빠른 액션',
@@ -126,10 +110,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              
-              // 개발 중에만 표시되는 디버그 위젯
-              const SizedBox(height: 24),
-              const OnboardingDebugWidget(),
             ],
           ),
         ),
@@ -137,7 +117,96 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGoalCard(String title, String value, IconData icon, Color color, String progress) {
+  Widget _buildGoalSection(
+    dynamic workoutGoal,
+    dynamic dietGoal,
+    AsyncValue recordsHistoryAsync,
+  ) {
+    return recordsHistoryAsync.when(
+      data: (recordsHistory) {
+        // 오늘의 운동 목표 계산
+        final dailyMinutes = workoutGoal?.dailyDurationMin ?? 30;
+
+        // 오늘 날짜의 기록 가져오기
+        final todayRecord = recordsHistory.recordFor(DateTime.now());
+
+        // 오늘 운동한 시간 계산 (분)
+        final todayWorkoutMinutes = todayRecord?.totalWorkoutMinutes ?? 0;
+
+        final workoutProgress = dailyMinutes > 0
+            ? ((todayWorkoutMinutes / dailyMinutes) * 100).clamp(0, 100).toInt()
+            : 0;
+
+        // 오늘의 칼로리 목표 계산
+        final targetCalories = dietGoal?.dailyCalorieTarget ?? 2000;
+
+        // 오늘 섭취한 칼로리
+        final todayCalories = todayRecord?.totalDietCalories ?? 0;
+
+        final calorieProgress = targetCalories > 0
+            ? ((todayCalories / targetCalories) * 100).clamp(0, 100).toInt()
+            : 0;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _buildGoalCard(
+                '운동',
+                '$todayWorkoutMinutes / $dailyMinutes분',
+                Icons.fitness_center,
+                mainButtonColor,
+                '$workoutProgress%',
+                workoutProgress,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildGoalCard(
+                '칼로리',
+                '$todayCalories / ${targetCalories}kcal',
+                Icons.local_fire_department,
+                secondaryButtonColor,
+                '$calorieProgress%',
+                calorieProgress,
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _buildDefaultGoals(),
+    );
+  }
+
+  Widget _buildDefaultGoals() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildGoalCard(
+            '운동',
+            '목표 설정 필요',
+            Icons.fitness_center,
+            mainButtonColor,
+            '0%',
+            0,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _buildGoalCard(
+            '칼로리',
+            '목표 설정 필요',
+            Icons.local_fire_department,
+            secondaryButtonColor,
+            '0%',
+            0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGoalCard(String title, String value, IconData icon, Color color, String progress, int progressValue) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -152,12 +221,14 @@ class HomeScreen extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 24),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: mainButtonColor,
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: mainButtonColor,
+                  ),
                 ),
               ),
             ],
@@ -165,15 +236,28 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 20,
+            style: const TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: mainButtonColor,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progressValue / 100,
+              backgroundColor: borderColor,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 6,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            '진행률: $progress',
+            '달성률: $progress',
             style: const TextStyle(
               fontSize: 12,
               color: subTextColor,

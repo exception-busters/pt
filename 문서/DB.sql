@@ -175,20 +175,20 @@ CREATE TABLE public.routine_record (
   start_time timestamp without time zone,
   end_time timestamp without time zone,
   total_calories numeric,
-  completion_method character varying DEFAULT 'pose_assisted',
+  completion_method text DEFAULT 'pose_assisted'::text,
   manual_notes text,
-  perceived_intensity smallint,
+  perceived_intensity smallint CHECK (perceived_intensity >= 1 AND perceived_intensity <= 10),
   is_user_reported boolean DEFAULT false,
+  session_status text DEFAULT 'completed'::text,
   CONSTRAINT routine_record_pkey PRIMARY KEY (session_id),
   CONSTRAINT routine_record_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT routine_record_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id)
 );
-
 CREATE TABLE public.routine_schedule (
-  schedule_id integer NOT NULL DEFAULT nextval('routine_schedule_schedule_id_seq'::regclass),
+  schedule_id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
   user_id uuid NOT NULL,
   routine_id integer NOT NULL,
-  weekday smallint NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+  weekday smallint NOT NULL CHECK (weekday >= 0 AND weekday <= 6),
   start_time time without time zone,
   sort_order integer DEFAULT 0,
   is_active boolean DEFAULT true,
@@ -196,8 +196,7 @@ CREATE TABLE public.routine_schedule (
   created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT routine_schedule_pkey PRIMARY KEY (schedule_id),
   CONSTRAINT routine_schedule_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT routine_schedule_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id),
-  CONSTRAINT routine_schedule_unique UNIQUE (user_id, weekday, routine_id, sort_order)
+  CONSTRAINT routine_schedule_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id)
 );
 CREATE TABLE public.user_challenge (
   user_challenge_id integer NOT NULL DEFAULT nextval('user_challenge_user_challenge_id_seq'::regclass),

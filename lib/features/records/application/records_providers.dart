@@ -35,6 +35,10 @@ final recordsHistoryProvider = FutureProvider<RecordsHistory>((ref) async {
       duration: duration.inSeconds > 0 ? duration : null,
       calories: session.totalCalories,
       startedAt: start,
+      completionMethod: session.completionMethod,
+      manualNotes: session.manualNotes,
+      perceivedIntensity: session.perceivedIntensity,
+      isUserReported: session.isUserReported,
     );
 
     history.upsertRecord(

@@ -51,6 +51,13 @@ function extractTextFromResponse(result: unknown): string | null {
     for (const choice of maybeChoices) {
       const message = (choice as OpenAIResponseChoice).message;
       const content = message?.content;
+
+      // Handle string content (standard chat completions format)
+      if (typeof content === "string" && content.trim().length > 0) {
+        return content;
+      }
+
+      // Handle array content
       if (Array.isArray(content)) {
         for (const block of content) {
           const blockText = (block as { text?: unknown }).text;
@@ -225,7 +232,7 @@ ${preferences}
 }
 
 async function callOpenAI(prompt: string): Promise<DietPlan> {
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -233,8 +240,18 @@ async function callOpenAI(prompt: string): Promise<DietPlan> {
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
-      input: prompt,
-      max_output_tokens: 800,
+      messages: [
+        {
+          role: "system",
+          content: "당신은 한국어로 답변하는 전문 영양사입니다. 사용자 정보를 기반으로 개인 맞춤 식단을 JSON 형식으로 제공하세요."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 800,
+      temperature: 0.7,
     }),
   });
 
