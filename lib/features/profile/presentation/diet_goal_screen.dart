@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
@@ -5,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/models/diet_goal_model.dart';
 import '../data/profile_data_service.dart';
+import '../../diet/application/diet_providers.dart'
+    show todayDietPlanProvider;
 
 class DietGoalScreen extends ConsumerStatefulWidget {
   const DietGoalScreen({super.key});
@@ -132,6 +136,10 @@ class _DietGoalScreenState extends ConsumerState<DietGoalScreen> {
         Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
         
         if (success) {
+          ref.invalidate(todayDietPlanProvider);
+          unawaited(
+            ref.read(todayDietPlanProvider.future).catchError((_) {}),
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('식단 목표가 저장되었습니다'),

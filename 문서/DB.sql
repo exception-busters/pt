@@ -38,6 +38,18 @@ CREATE TABLE public.exercise (
   video_url character varying,
   CONSTRAINT exercise_pkey PRIMARY KEY (exercise_id)
 );
+CREATE TABLE public.exercisegoal (
+  goal_id integer NOT NULL DEFAULT nextval('exercisegoal_goal_id_seq'::regclass),
+  user_id uuid,
+  goal_type character varying,
+  level character varying,
+  weekly_days integer,
+  daily_duration_min integer,
+  preferred_types ARRAY,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT exercisegoal_pkey PRIMARY KEY (goal_id),
+  CONSTRAINT exercisegoal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.feedback (
   feedback_id integer NOT NULL DEFAULT nextval('feedback_feedback_id_seq'::regclass),
   session_id integer,
@@ -47,7 +59,7 @@ CREATE TABLE public.feedback (
   score numeric,
   created_at timestamp without time zone,
   CONSTRAINT feedback_pkey PRIMARY KEY (feedback_id),
-  CONSTRAINT feedback_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.workoutsession(session_id),
+  CONSTRAINT feedback_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.routine_record(session_id),
   CONSTRAINT feedback_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercise(exercise_id)
 );
 CREATE TABLE public.foodinfo (
@@ -69,12 +81,12 @@ CREATE TABLE public.item (
   CONSTRAINT item_pkey PRIMARY KEY (item_id)
 );
 CREATE TABLE public.myfood (
-  myfood_id integer NOT NULL DEFAULT nextval('myfood_myfood_id_seq'::regclass),
+  my_food_id integer NOT NULL DEFAULT nextval('myfood_my_food_id_seq'::regclass),
   user_id uuid,
   food_id integer,
   is_favorite boolean,
   added_at timestamp without time zone,
-  CONSTRAINT myfood_pkey PRIMARY KEY (myfood_id),
+  CONSTRAINT myfood_pkey PRIMARY KEY (my_food_id),
   CONSTRAINT myfood_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT myfood_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foodinfo(food_id)
 );
@@ -99,14 +111,14 @@ CREATE TABLE public.nutritionsummary (
   CONSTRAINT nutritionsummary_pkey PRIMARY KEY (summary_id),
   CONSTRAINT nutritionsummary_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
-CREATE TABLE public.pointtransaction (
-  transaction_id integer NOT NULL DEFAULT nextval('pointtransaction_transaction_id_seq'::regclass),
+CREATE TABLE public.point_transaction (
+  transaction_id integer NOT NULL DEFAULT nextval('point_transaction_transaction_id_seq'::regclass),
   user_id uuid,
   change_amount numeric,
   reason character varying,
   created_at timestamp without time zone,
-  CONSTRAINT pointtransaction_pkey PRIMARY KEY (transaction_id),
-  CONSTRAINT pointtransaction_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+  CONSTRAINT point_transaction_pkey PRIMARY KEY (transaction_id),
+  CONSTRAINT point_transaction_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.posedata (
   pose_id integer NOT NULL DEFAULT nextval('posedata_pose_id_seq'::regclass),
@@ -114,7 +126,7 @@ CREATE TABLE public.posedata (
   frame_index integer,
   keypoints_json json,
   CONSTRAINT posedata_pkey PRIMARY KEY (pose_id),
-  CONSTRAINT posedata_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.workoutsession(session_id)
+  CONSTRAINT posedata_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.routine_record(session_id)
 );
 CREATE TABLE public.purchase (
   purchase_id integer NOT NULL DEFAULT nextval('purchase_purchase_id_seq'::regclass),
@@ -136,16 +148,77 @@ CREATE TABLE public.ranking (
   CONSTRAINT ranking_pkey PRIMARY KEY (rank_id),
   CONSTRAINT ranking_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
-CREATE TABLE public.routineexercise (
-  routine_ex_id integer NOT NULL DEFAULT nextval('routineexercise_routine_ex_id_seq'::regclass),
+CREATE TABLE public.routine (
+  routine_id integer NOT NULL DEFAULT nextval('routine_routine_id_seq'::regclass),
+  user_id uuid,
+  title character varying,
+  description text,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT routine_pkey PRIMARY KEY (routine_id),
+  CONSTRAINT routine_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.routine_exercise (
+  routine_ex_id integer NOT NULL DEFAULT nextval('routine_exercise_routine_ex_id_seq'::regclass),
   routine_id integer,
   exercise_id integer,
   sets integer,
   reps integer,
   rest_time_sec integer,
-  CONSTRAINT routineexercise_pkey PRIMARY KEY (routine_ex_id),
-  CONSTRAINT routineexercise_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.workoutroutine(routine_id),
-  CONSTRAINT routineexercise_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercise(exercise_id)
+  CONSTRAINT routine_exercise_pkey PRIMARY KEY (routine_ex_id),
+  CONSTRAINT routine_exercise_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id),
+  CONSTRAINT routine_exercise_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercise(exercise_id)
+);
+CREATE TABLE public.routine_record (
+  session_id integer NOT NULL DEFAULT nextval('routine_record_session_id_seq'::regclass),
+  user_id uuid,
+  routine_id integer,
+  start_time timestamp without time zone,
+  end_time timestamp without time zone,
+  total_calories numeric,
+  completion_method character varying DEFAULT 'pose_assisted',
+  manual_notes text,
+  perceived_intensity smallint,
+  is_user_reported boolean DEFAULT false,
+  CONSTRAINT routine_record_pkey PRIMARY KEY (session_id),
+  CONSTRAINT routine_record_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT routine_record_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id)
+);
+
+CREATE TABLE public.routine_schedule (
+  schedule_id integer NOT NULL DEFAULT nextval('routine_schedule_schedule_id_seq'::regclass),
+  user_id uuid NOT NULL,
+  routine_id integer NOT NULL,
+  weekday smallint NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+  start_time time without time zone,
+  sort_order integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  note text,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT routine_schedule_pkey PRIMARY KEY (schedule_id),
+  CONSTRAINT routine_schedule_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT routine_schedule_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id),
+  CONSTRAINT routine_schedule_unique UNIQUE (user_id, weekday, routine_id, sort_order)
+);
+CREATE TABLE public.user_challenge (
+  user_challenge_id integer NOT NULL DEFAULT nextval('user_challenge_user_challenge_id_seq'::regclass),
+  user_id uuid,
+  challenge_id integer,
+  progress_value numeric,
+  completed boolean,
+  joined_at timestamp without time zone,
+  CONSTRAINT user_challenge_pkey PRIMARY KEY (user_challenge_id),
+  CONSTRAINT user_challenge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT user_challenge_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenge(challenge_id)
+);
+CREATE TABLE public.user_content_access (
+  access_id integer NOT NULL DEFAULT nextval('user_content_access_access_id_seq'::regclass),
+  user_id uuid,
+  item_id integer,
+  has_access boolean,
+  granted_at timestamp without time zone,
+  CONSTRAINT user_content_access_pkey PRIMARY KEY (access_id),
+  CONSTRAINT user_content_access_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT user_content_access_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id)
 );
 CREATE TABLE public.userbadge (
   user_badge_id integer NOT NULL DEFAULT nextval('userbadge_user_badge_id_seq'::regclass),
@@ -155,27 +228,6 @@ CREATE TABLE public.userbadge (
   CONSTRAINT userbadge_pkey PRIMARY KEY (user_badge_id),
   CONSTRAINT userbadge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT userbadge_badge_id_fkey FOREIGN KEY (badge_id) REFERENCES public.badge(badge_id)
-);
-CREATE TABLE public.userchallenge (
-  user_challenge_id integer NOT NULL DEFAULT nextval('userchallenge_user_challenge_id_seq'::regclass),
-  user_id uuid,
-  challenge_id integer,
-  progress_value numeric,
-  completed boolean,
-  joined_at timestamp without time zone,
-  CONSTRAINT userchallenge_pkey PRIMARY KEY (user_challenge_id),
-  CONSTRAINT userchallenge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT userchallenge_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenge(challenge_id)
-);
-CREATE TABLE public.usercontentaccess (
-  access_id integer NOT NULL DEFAULT nextval('usercontentaccess_access_id_seq'::regclass),
-  user_id uuid,
-  item_id integer,
-  has_access boolean,
-  granted_at timestamp without time zone,
-  CONSTRAINT usercontentaccess_pkey PRIMARY KEY (access_id),
-  CONSTRAINT usercontentaccess_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT usercontentaccess_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id)
 );
 CREATE TABLE public.usermeal (
   meal_id integer NOT NULL DEFAULT nextval('usermeal_meal_id_seq'::regclass),
@@ -205,49 +257,4 @@ CREATE TABLE public.users (
   join_date timestamp without time zone DEFAULT now(),
   profile_completed boolean DEFAULT false,
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
-);
-CREATE TABLE public.workoutgoal (
-  goal_id integer NOT NULL DEFAULT nextval('workoutgoal_goal_id_seq'::regclass),
-  user_id uuid,
-  goal_type character varying,
-  level character varying,
-  weekly_days integer,
-  daily_duration_min integer,
-  preferred_types ARRAY,
-  created_at timestamp without time zone DEFAULT now(),
-  CONSTRAINT workoutgoal_pkey PRIMARY KEY (goal_id),
-  CONSTRAINT workoutgoal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
-);
-CREATE TABLE public.workoutrecords (
-  record_id integer NOT NULL DEFAULT nextval('workoutrecords_record_id_seq'::regclass),
-  session_id integer,
-  exercise_id integer,
-  set_num integer,
-  reps_done integer,
-  start_time timestamp without time zone,
-  end_time timestamp without time zone,
-  calories_burned numeric,
-  CONSTRAINT workoutrecords_pkey PRIMARY KEY (record_id),
-  CONSTRAINT workoutrecords_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.workoutsession(session_id),
-  CONSTRAINT workoutrecords_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercise(exercise_id)
-);
-CREATE TABLE public.workoutroutine (
-  routine_id integer NOT NULL DEFAULT nextval('workoutroutine_routine_id_seq'::regclass),
-  user_id uuid,
-  title character varying,
-  description text,
-  created_at timestamp without time zone DEFAULT now(),
-  CONSTRAINT workoutroutine_pkey PRIMARY KEY (routine_id),
-  CONSTRAINT workoutroutine_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
-);
-CREATE TABLE public.workoutsession (
-  session_id integer NOT NULL DEFAULT nextval('workoutsession_session_id_seq'::regclass),
-  user_id uuid,
-  routine_id integer,
-  start_time timestamp without time zone,
-  end_time timestamp without time zone,
-  total_calories numeric,
-  CONSTRAINT workoutsession_pkey PRIMARY KEY (session_id),
-  CONSTRAINT workoutsession_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT workoutsession_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.workoutroutine(routine_id)
 );

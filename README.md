@@ -59,12 +59,19 @@ pose_detection_app/
 
 ## 🚀 시작하기
 
-### 1. 사전 준비
-- Flutter SDK/Dart SDK 3.9.2 이상 (`flutter doctor`로 점검)
-- Node.js 18+ 및 `npx` 사용 가능 환경 (Supabase CLI 실행용)
-- Android Studio 또는 VS Code, 실기기/에뮬레이터(iOS는 macOS 필요)
+### 순서 한눈에 보기
+1. 환경 점검 (`flutter doctor`, `node -v`, `npx supabase --version`)
+2. Flutter 의존성 설치 (`flutter pub get`)
+3. 디바이스 선택 후 앱 실행 (`flutter run -d <target>`)
+4. (필요 시) 정답 데이터 생성 스크립트 실행
+5. Supabase Edge Function 구성/배포
 
-환경 점검 예시:
+### 1. 환경 점검
+- Flutter SDK/Dart SDK 3.9.2 이상
+- Node.js 18+ 및 `npx supabase` 사용 가능
+- Android Studio 또는 VS Code, 테스트용 실기기/에뮬레이터(iOS는 macOS 필요)
+
+확인 명령:
 ```bash
 flutter doctor
 node -v
@@ -72,29 +79,22 @@ npx supabase --version
 ```
 
 ### 2. Flutter 의존성 설치
-
 ```bash
 flutter pub get
 ```
 
 ### 3. 앱 실행
-
 ```bash
-flutter run          # 연결된 디바이스 자동 선택
-flutter run -d chrome   # 웹
-flutter run -d android  # 안드로이드
-flutter run -d ios      # iOS (macOS 필요)
+flutter run                # 연결된 디바이스 자동 선택
+flutter run -d chrome      # 웹
+flutter run -d android     # 안드로이드
+flutter run -d ios         # iOS (macOS 필요)
 ```
 
 ### 4. (선택) 정답 데이터 추출
-
 PT-Pose-Data가 있는 경우:
-
 ```bash
-python scripts/extract_reference_data.py \
-  --input PT-Pose-Data/PT_Pose/1.Training/Labeling/맨몸운동_Labeling_new_220128/맨몸운동_01 \
-  --output assets/exercise_reference.json \
-  --exercise-id "001-1-1-01"
+python scripts/extract_reference_data.py --input PT-Pose-Data/PT_Pose/1.Training/Labeling/맨몸운동_Labeling_new_220128/맨몸운동_01 --output assets/exercise_reference.json --exercise-id "001-1-1-01"
 ```
 
 ---
@@ -112,11 +112,9 @@ CLI가 프로필을 묻는다면 기본값(`supabase`)을 사용하면 됩니다
 ### 2. 함수 비밀값 설정/갱신
 새 환경 초기 설정 또는 키 교체 시 사용합니다.
 ```bash
-npx supabase secrets set \
-  OPENAI_API_KEY="새로운 OpenAI 키" \
-  SUPABASE_URL="<프로젝트 전용 URL>" \
-  SUPABASE_ANON_KEY="<프로젝트 ANON 키>"
+npx supabase secrets set OPENAI_API_KEY="새로운 OpenAI 키" SUPABASE_URL="<프로젝트 전용 URL>" SUPABASE_ANON_KEY="<프로젝트 ANON 키>"
 ```
+`diet-recommendation`과 `workout-recommendation` 두 함수 모두 위 세 값을 사용합니다.
 서비스 롤 키 등 추가 항목이 있다면 동일 명령에 이어서 지정합니다.
 
 ### 3. 로컬에서 함수 테스트

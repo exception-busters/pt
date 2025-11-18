@@ -255,18 +255,40 @@ class _MealInputCard extends ConsumerWidget {
   }
 }
 
-class _DietRecommendationSection extends ConsumerWidget {
+class _DietRecommendationSection extends ConsumerStatefulWidget {
   const _DietRecommendationSection({required this.plan});
 
   final DietRecommendationResult plan;
+
+  @override
+  ConsumerState<_DietRecommendationSection> createState() => _DietRecommendationSectionState();
+}
+
+class _DietRecommendationSectionState extends ConsumerState<_DietRecommendationSection> {
+  late DietRecommendationResult _plan;
+
+  @override
+  void initState() {
+    super.initState();
+    _plan = widget.plan;
+  }
+
+  @override
+  void didUpdateWidget(covariant _DietRecommendationSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.plan != widget.plan) {
+      _plan = widget.plan;
+    }
+  }
 
   String _macroLine(double current, double target, String label) {
     return '$label ${current.toStringAsFixed(0)}g / ${target.toStringAsFixed(0)}g';
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final plan = _plan;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -361,18 +383,101 @@ class _DietRecommendationSection extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         for (final meal in plan.meals) ...[
-          _EditableMealCard(meal: meal),
+          _EditableMealCard(
+            key: ValueKey('${meal.label}_${meal.items.length}'),
+            meal: meal,
+            onRefresh: () => _refreshMeal(context, meal.label),
+          ),
           const SizedBox(height: 16),
         ],
       ],
     );
   }
+
+  Future<MealRecommendation?> _refreshMeal(BuildContext context, String label) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final foods = await ref.read(foodDatabaseProvider.future);
+      if (foods.isEmpty) {
+        throw const DietRecommendationException('음식 데이터가 없어 추천을 재생성할 수 없어요.');
+      }
+      final profile = await ref.read(dietUserProfileProvider.future);
+      final aiService = ref.read(dietAIServiceProvider);
+      final aiPlan = await aiService.fetchRecommendation(profile: profile);
+      final plan = (aiPlan != null && aiPlan.meals.isNotEmpty)
+          ? aiPlan
+          : DietRecommendationEngine(foods: foods, profile: profile).generate();
+      final updatedMeal = _findMeal(plan.meals, label);
+      if (updatedMeal == null) {
+        throw Exception('새 추천에서 $label 끼니를 찾지 못했습니다.');
+      }
+      if (!mounted) {
+        return updatedMeal;
+      }
+      setState(() {
+        _applyMealUpdate(updatedMeal);
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text('$label 추천을 새로 불러왔어요.')),
+      );
+      return updatedMeal;
+    } catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('추천을 새로 불러오지 못했어요: $error')),
+        );
+      }
+      return null;
+    }
+  }
+
+  MealRecommendation? _findMeal(List<MealRecommendation> meals, String label) {
+    try {
+      return meals.firstWhere((meal) => meal.label == label);
+    } catch (_) {
+      try {
+        return meals.firstWhere((meal) => meal.label.contains(label));
+      } catch (_) {
+        return meals.isNotEmpty ? meals.first : null;
+      }
+    }
+  }
+
+  void _applyMealUpdate(MealRecommendation updatedMeal) {
+    final updatedMeals = <MealRecommendation>[];
+    var replaced = false;
+    for (final meal in _plan.meals) {
+      if (!replaced && meal.label == updatedMeal.label) {
+        updatedMeals.add(updatedMeal);
+        replaced = true;
+      } else {
+        updatedMeals.add(meal);
+      }
+    }
+    if (!replaced) {
+      updatedMeals.add(updatedMeal);
+    }
+
+    final total = updatedMeals.fold<NutritionSummary>(
+      NutritionSummary.zero,
+      (acc, meal) => acc + meal.nutrition,
+    );
+
+    _plan = DietRecommendationResult(
+      profile: _plan.profile,
+      target: _plan.target,
+      meals: updatedMeals,
+      total: total,
+      summary: describeDietSummary(_plan.target, total),
+    );
+  }
 }
 
 class _EditableMealCard extends ConsumerStatefulWidget {
-  const _EditableMealCard({required this.meal});
+  const _EditableMealCard({required this.meal, required this.onRefresh, super.key});
 
   final MealRecommendation meal;
+  final Future<MealRecommendation?> Function() onRefresh;
 
   @override
   ConsumerState<_EditableMealCard> createState() => _EditableMealCardState();
@@ -380,26 +485,21 @@ class _EditableMealCard extends ConsumerStatefulWidget {
 
 class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
   late List<_EditableMealItem> _items;
-  late List<TextEditingController> _gramControllers;
+  List<TextEditingController> _gramControllers = [];
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _items = widget.meal.items
-        .map(
-            (item) => _EditableMealItem(
-              food: item.food,
-              grams: item.grams,
-            ),
-          )
-          .toList();
-    _gramControllers = _items
-        .map(
-          (item) => TextEditingController(
-            text: item.grams.toStringAsFixed(0),
-          ),
-        )
-        .toList();
+    _setItemsFromMeal(widget.meal);
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableMealCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.meal != widget.meal) {
+      _setItemsFromMeal(widget.meal);
+    }
   }
 
   NutritionSummary get _totalNutrition {
@@ -409,20 +509,25 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
     );
   }
 
-  void _resetToOriginal() {
-    setState(() {
-      _items = widget.meal.items
-          .map(
-            (item) => _EditableMealItem(
-              food: item.food,
-              grams: item.grams,
-            ),
-          )
-          .toList();
-      for (var i = 0; i < _gramControllers.length; i++) {
-        _gramControllers[i].text = widget.meal.items[i].grams.toStringAsFixed(0);
-      }
-    });
+  void _setItemsFromMeal(MealRecommendation meal) {
+    for (final controller in _gramControllers) {
+      controller.dispose();
+    }
+    _items = meal.items
+        .map(
+          (item) => _EditableMealItem(
+            food: item.food,
+            grams: item.grams,
+          ),
+        )
+        .toList();
+    _gramControllers = _items
+        .map(
+          (item) => TextEditingController(
+            text: item.grams.toStringAsFixed(0),
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -503,8 +608,14 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
               ),
               const SizedBox(width: 12),
               TextButton(
-                onPressed: _resetToOriginal,
-                child: const Text('추천 초기화'),
+                onPressed: _isRefreshing ? null : () => _handleRefresh(context),
+                child: _isRefreshing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('추천 초기화'),
               ),
             ],
           ),
@@ -531,6 +642,27 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
         content: Text('${widget.meal.label} 식단에 AI 추천을 적용했어요.'),
       ),
     );
+  }
+
+  Future<void> _handleRefresh(BuildContext context) async {
+    if (_isRefreshing) return;
+    setState(() {
+      _isRefreshing = true;
+    });
+    try {
+      final updatedMeal = await widget.onRefresh();
+      if (updatedMeal != null && mounted) {
+        setState(() {
+          _setItemsFromMeal(updatedMeal);
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 }
 

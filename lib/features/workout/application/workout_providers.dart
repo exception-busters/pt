@@ -7,6 +7,7 @@ import '../data/supabase_workout_service.dart';
 import '../domain/models/supabase_exercise.dart';
 import '../domain/models/supabase_workout_routine.dart';
 import '../domain/models/supabase_routine_exercise.dart';
+import '../domain/models/supabase_routine_schedule.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/complete_profile_providers.dart';
 import '../../profile/domain/models/workout_goal_model.dart';
@@ -823,6 +824,20 @@ void _putIfNotNull(Map<String, dynamic> target, String key, dynamic value) {
 
 // Supabase 연동 프로바이더들
 final supabaseWorkoutServiceProvider = Provider<SupabaseWorkoutService>((ref) => SupabaseWorkoutService());
+
+final routineSchedulesProvider = FutureProvider<Map<int, List<SupabaseRoutineSchedule>>>((ref) async {
+  final auth = ref.watch(authControllerProvider);
+  if (!auth.isLoggedIn) {
+    return {};
+  }
+  final service = ref.watch(supabaseWorkoutServiceProvider);
+  final schedules = await service.getRoutineSchedules();
+  final grouped = <int, List<SupabaseRoutineSchedule>>{};
+  for (final schedule in schedules) {
+    grouped.putIfAbsent(schedule.routineId, () => []).add(schedule);
+  }
+  return grouped;
+});
 
 // 데이터베이스에서 운동 목록을 가져오는 프로바이더 (Exercise_list 테이블 사용)
 final databaseExercisesProvider = FutureProvider<List<Exercise>>((ref) async {

@@ -344,13 +344,28 @@ class DietController extends StateNotifier<DietData> {
   void _setMeal(String mealType, MealData? mealData) {
     switch (mealType) {
       case '아침':
-        state = state.copyWith(breakfast: mealData);
+        state = DietData(
+          date: state.date,
+          breakfast: mealData,
+          lunch: state.lunch,
+          dinner: state.dinner,
+        );
         break;
       case '점심':
-        state = state.copyWith(lunch: mealData);
+        state = DietData(
+          date: state.date,
+          breakfast: state.breakfast,
+          lunch: mealData,
+          dinner: state.dinner,
+        );
         break;
       case '저녁':
-        state = state.copyWith(dinner: mealData);
+        state = DietData(
+          date: state.date,
+          breakfast: state.breakfast,
+          lunch: state.lunch,
+          dinner: mealData,
+        );
         break;
     }
     
@@ -547,6 +562,15 @@ class NutritionSummary {
       fat: fat + other.fat,
     );
   }
+
+  NutritionSummary operator -(NutritionSummary other) {
+    return NutritionSummary(
+      calories: calories - other.calories,
+      protein: protein - other.protein,
+      carbs: carbs - other.carbs,
+      fat: fat - other.fat,
+    );
+  }
 }
 
 class MealComponent {
@@ -631,6 +655,27 @@ class DietRecommendationResult {
   final List<MealRecommendation> meals;
   final NutritionSummary total;
   final String summary;
+}
+
+String describeDietSummary(DailyTarget target, NutritionSummary actual) {
+  String diff(double actualValue, double targetValue, String unit) {
+    final delta = actualValue - targetValue;
+    if (delta.abs() < 1) {
+      return '(목표와 유사)';
+    }
+    final sign = delta > 0 ? '+' : '';
+    return '(${sign}${delta.round()}$unit)';
+  }
+
+  final calorieDiff = diff(actual.calories, target.calories, 'kcal');
+  final proteinDiff = diff(actual.protein, target.protein, 'g');
+  final carbDiff = diff(actual.carbs, target.carbs, 'g');
+  final fatDiff = diff(actual.fat, target.fat, 'g');
+
+  return '칼로리 ${actual.calories.round()}kcal $calorieDiff · '
+      '단백질 ${actual.protein.round()}g $proteinDiff · '
+      '탄수화물 ${actual.carbs.round()}g $carbDiff · '
+      '지방 ${actual.fat.round()}g $fatDiff';
 }
 
 class _MacroRatio {
@@ -756,7 +801,7 @@ class DietRecommendationEngine {
       );
     }
 
-    final summary = _buildSummary(target, total);
+    final summary = describeDietSummary(target, total);
 
     return DietRecommendationResult(
       profile: profile,
@@ -850,27 +895,6 @@ class DietRecommendationEngine {
   double _fallbackCalories(DietUserProfile profile) {
     final calorieMap = _goalCalories[profile.goal] ?? _goalCalories[DietGoal.maintain]!;
     return (calorieMap[profile.experience] ?? calorieMap.values.first).toDouble();
-  }
-
-  String _buildSummary(DailyTarget target, NutritionSummary actual) {
-    String diff(double actualValue, double targetValue, String unit) {
-      final delta = actualValue - targetValue;
-      if (delta.abs() < 1) {
-        return '(목표와 유사)';
-      }
-      final sign = delta > 0 ? '+' : '';
-      return '(${sign}${delta.round()}$unit)';
-    }
-
-    final calorieDiff = diff(actual.calories, target.calories, 'kcal');
-    final proteinDiff = diff(actual.protein, target.protein, 'g');
-    final carbDiff = diff(actual.carbs, target.carbs, 'g');
-    final fatDiff = diff(actual.fat, target.fat, 'g');
-
-    return '칼로리 ${actual.calories.round()}kcal $calorieDiff · '
-        '단백질 ${actual.protein.round()}g $proteinDiff · '
-        '탄수화물 ${actual.carbs.round()}g $carbDiff · '
-        '지방 ${actual.fat.round()}g $fatDiff';
   }
 
   MealItemRecommendation _buildMealItem(

@@ -4,6 +4,7 @@ import '../domain/models/supabase_workout_routine.dart';
 import '../domain/models/supabase_routine_exercise.dart';
 import '../domain/models/supabase_workout_session.dart';
 import '../domain/models/supabase_workout_record.dart';
+import '../domain/models/supabase_routine_schedule.dart';
 
 class SupabaseWorkoutService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -122,7 +123,7 @@ class SupabaseWorkoutService {
       }
       
       final response = await _supabase
-          .from('workoutsession')
+          .from('routine_record')
           .insert(session.toInsertJson())
           .select()
           .single();
@@ -797,7 +798,7 @@ class SupabaseWorkoutService {
     try {
       final since = DateTime.now().subtract(Duration(days: daysBack));
       final response = await _supabase
-          .from('workoutsession')
+          .from('routine_record')
           .select('''
             session_id,
             user_id,
@@ -806,6 +807,10 @@ class SupabaseWorkoutService {
             end_time,
             total_calories,
             session_status,
+            completion_method,
+            manual_notes,
+            perceived_intensity,
+            is_user_reported,
             routine:routine_id (
               routine_id,
               title
@@ -831,6 +836,183 @@ class SupabaseWorkoutService {
       print('❌ 최근 운동 세션 조회 실패: $e');
       print(stackTrace);
       return [];
+    }
+  }
+
+  Future<List<SupabaseRoutineSchedule>> getRoutineSchedules({
+    bool onlyActive = true,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      print('❌ 루틴 스케줄 조회 실패: 사용자 인증 정보가 없습니다.');
+      return [];
+    }
+
+    try {
+      var query = _supabase
+          .from('routine_schedule')
+          .select('schedule_id, user_id, routine_id, weekday, start_time, sort_order, is_active, note')
+          .eq('user_id', currentUser.id);
+      if (onlyActive) {
+        query = query.eq('is_active', true);
+      }
+      final response = await query
+          .order('weekday', ascending: true)
+          .order('sort_order', ascending: true);
+
+      return (response as List)
+          .map(
+            (json) => SupabaseRoutineSchedule.fromJson(
+              json as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    } catch (e, stackTrace) {
+      print('❌ 루틴 스케줄 조회 실패: $e');
+      print(stackTrace);
+      return [];
+    }
+  }
+
+  Future<List<SupabaseRoutineSchedule>> saveRoutineSchedule({
+    required int routineId,
+    required Set<int> weekdays,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('사용자가 인증되지 않았습니다.');
+    }
+
+    try {
+      final existingResponse = await _supabase
+          .from('routine_schedule')
+          .select('schedule_id, weekday')
+          .eq('user_id', currentUser.id)
+          .eq('routine_id', routineId);
+
+      final existing = <int, int>{};
+      for (final entry in (existingResponse as List)) {
+        final map = entry as Map<String, dynamic>;
+        existing[map['weekday'] as int] = map['schedule_id'] as int;
+      }
+
+      final toDelete = existing.entries
+          .where((entry) => !weekdays.contains(entry.key))
+          .map((entry) => entry.value)
+          .toList();
+
+      if (toDelete.isNotEmpty) {
+        final filterValue = '(${toDelete.join(',')})';
+        await _supabase
+            .from('routine_schedule')
+            .delete()
+            .filter('schedule_id', 'in', filterValue);
+      }
+
+      final toInsert = weekdays
+          .where((weekday) => !existing.containsKey(weekday))
+          .map((weekday) => {
+                'user_id': currentUser.id,
+                'routine_id': routineId,
+                'weekday': weekday,
+              })
+          .toList();
+
+      if (toInsert.isNotEmpty) {
+        await _supabase.from('routine_schedule').insert(toInsert);
+      }
+
+      return getRoutineSchedules();
+    } catch (e) {
+      print('❌ 루틴 스케줄 저장 실패: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> logManualCompletion({
+    required int routineId,
+    required int durationMinutes,
+    int? totalCalories,
+    String? notes,
+    int? perceivedIntensity,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      print('❌ 수동 운동 기록 실패: 사용자 인증 필요');
+      return false;
+    }
+
+    final now = DateTime.now();
+    final clampedDuration = durationMinutes.clamp(1, 300);
+    final end = now.add(Duration(minutes: clampedDuration));
+
+    final payload = {
+      'user_id': currentUser.id,
+      'routine_id': routineId,
+      'start_time': now.toIso8601String(),
+      'end_time': end.toIso8601String(),
+      'total_calories': totalCalories ?? 0,
+      'session_status': 'completed',
+      'completion_method': 'manual',
+      'manual_notes': notes,
+      'perceived_intensity': perceivedIntensity,
+      'is_user_reported': true,
+    };
+
+    try {
+      await _supabase.from('routine_record').insert(payload);
+      return true;
+    } catch (e) {
+      print('❌ 수동 운동 기록 실패: $e');
+      return false;
+    }
+  }
+
+  Future<bool> addRoutineToWeekday({
+    required int routineId,
+    required int weekday,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      print('❌ 요일 추가 실패: 사용자 인증 필요');
+      return false;
+    }
+
+    try {
+      final existing = await _supabase
+          .from('routine_schedule')
+          .select('schedule_id')
+          .eq('user_id', currentUser.id)
+          .eq('routine_id', routineId)
+          .eq('weekday', weekday)
+          .maybeSingle();
+
+      if (existing != null) {
+        return true;
+      }
+
+      await _supabase.from('routine_schedule').insert({
+        'user_id': currentUser.id,
+        'routine_id': routineId,
+        'weekday': weekday,
+      });
+      return true;
+    } catch (e) {
+      print('❌ 요일 추가 실패: $e');
+      return false;
+    }
+  }
+
+  Future<bool> removeRoutineSchedule(int scheduleId) async {
+    try {
+      await _supabase
+          .from('routine_schedule')
+          .delete()
+          .eq('schedule_id', scheduleId);
+      return true;
+    } catch (e) {
+      print('❌ 스케줄 삭제 실패: $e');
+      return false;
     }
   }
 
@@ -866,7 +1048,7 @@ class SupabaseWorkoutService {
   Future<bool> _checkSessionExists(int sessionId) async {
     try {
       final response = await _supabase
-          .from('workoutsession')
+          .from('routine_record')
           .select('session_id')
           .eq('session_id', sessionId)
           .maybeSingle();

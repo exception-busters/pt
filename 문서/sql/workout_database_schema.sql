@@ -35,8 +35,8 @@ CREATE TABLE IF NOT EXISTS public.routineexercise (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- 4. workoutsession 테이블 - 운동 세션 기록
-CREATE TABLE IF NOT EXISTS public.workoutsession (
+-- 4. routine_record 테이블 - 운동 세션 기록
+CREATE TABLE IF NOT EXISTS public.routine_record (
     session_id BIGSERIAL PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     routine_id BIGINT REFERENCES public.workoutroutine(routine_id) ON DELETE SET NULL,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public.workoutsession (
 -- 5. workoutrecords 테이블 - 세트별 운동 수행 기록
 CREATE TABLE IF NOT EXISTS public.workoutrecords (
     record_id BIGSERIAL PRIMARY KEY,
-    session_id BIGINT REFERENCES public.workoutsession(session_id) ON DELETE CASCADE,
+    session_id BIGINT REFERENCES public.routine_record(session_id) ON DELETE CASCADE,
     exercise_id BIGINT REFERENCES public.exercise(exercise_id) ON DELETE CASCADE,
     set_num INTEGER NOT NULL,
     reps_done INTEGER NOT NULL,
@@ -64,14 +64,14 @@ CREATE TABLE IF NOT EXISTS public.workoutrecords (
 -- 인덱스 생성 (성능 최적화)
 CREATE INDEX IF NOT EXISTS idx_workout_routine_user_id ON public.workoutroutine(user_id);
 CREATE INDEX IF NOT EXISTS idx_routine_exercise_routine_id ON public.routineexercise(routine_id);
-CREATE INDEX IF NOT EXISTS idx_workout_session_user_id ON public.workoutsession(user_id);
+CREATE INDEX IF NOT EXISTS idx_workout_session_user_id ON public.routine_record(user_id);
 CREATE INDEX IF NOT EXISTS idx_workout_records_session_id ON public.workoutrecords(session_id);
 CREATE INDEX IF NOT EXISTS idx_exercise_body_part ON public.exercise(body_part);
 
 -- RLS (Row Level Security) 정책 설정
 ALTER TABLE public.workoutroutine ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.routineexercise ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.workoutsession ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.routine_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workoutrecords ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exercise ENABLE ROW LEVEL SECURITY;
 
@@ -119,21 +119,21 @@ CREATE POLICY "Users can delete own routine exercises" ON public.routineexercise
         )
     );
 
--- workoutsession 정책
-CREATE POLICY "Users can view own sessions" ON public.workoutsession
+-- routine_record 정책
+CREATE POLICY "Users can view own sessions" ON public.routine_record
     FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own sessions" ON public.workoutsession
+CREATE POLICY "Users can insert own sessions" ON public.routine_record
     FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own sessions" ON public.workoutsession
+CREATE POLICY "Users can update own sessions" ON public.routine_record
     FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own sessions" ON public.workoutsession
+CREATE POLICY "Users can delete own sessions" ON public.routine_record
     FOR DELETE USING (auth.uid() = user_id);
 
 -- workoutrecords 정책
 CREATE POLICY "Users can view own records" ON public.workoutrecords
     FOR SELECT USING (
         EXISTS (
-            SELECT 1 FROM public.workoutsession 
+            SELECT 1 FROM public.routine_record 
             WHERE session_id = workoutrecords.session_id 
             AND user_id = auth.uid()
         )
@@ -141,7 +141,7 @@ CREATE POLICY "Users can view own records" ON public.workoutrecords
 CREATE POLICY "Users can insert own records" ON public.workoutrecords
     FOR INSERT WITH CHECK (
         EXISTS (
-            SELECT 1 FROM public.workoutsession 
+            SELECT 1 FROM public.routine_record 
             WHERE session_id = workoutrecords.session_id 
             AND user_id = auth.uid()
         )
@@ -149,7 +149,7 @@ CREATE POLICY "Users can insert own records" ON public.workoutrecords
 CREATE POLICY "Users can update own records" ON public.workoutrecords
     FOR UPDATE USING (
         EXISTS (
-            SELECT 1 FROM public.workoutsession 
+            SELECT 1 FROM public.routine_record 
             WHERE session_id = workoutrecords.session_id 
             AND user_id = auth.uid()
         )
@@ -157,7 +157,7 @@ CREATE POLICY "Users can update own records" ON public.workoutrecords
 CREATE POLICY "Users can delete own records" ON public.workoutrecords
     FOR DELETE USING (
         EXISTS (
-            SELECT 1 FROM public.workoutsession 
+            SELECT 1 FROM public.routine_record 
             WHERE session_id = workoutrecords.session_id 
             AND user_id = auth.uid()
         )
@@ -183,5 +183,5 @@ ON CONFLICT DO NOTHING;
 COMMENT ON TABLE public.exercise IS '운동 동작 기본 정보';
 COMMENT ON TABLE public.workoutroutine IS '사용자별 운동 루틴';
 COMMENT ON TABLE public.routineexercise IS '루틴 내 운동 구성';
-COMMENT ON TABLE public.workoutsession IS '운동 세션 기록';
+COMMENT ON TABLE public.routine_record IS '운동 세션 기록';
 COMMENT ON TABLE public.workoutrecords IS '세트별 운동 수행 기록';

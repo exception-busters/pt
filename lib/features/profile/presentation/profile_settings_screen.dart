@@ -6,6 +6,10 @@ import '../domain/models/user_profile_model.dart';
 import '../domain/models/workout_goal_model.dart';
 import '../domain/models/diet_goal_model.dart';
 import '../../common/widgets/profile_loading_overlay.dart';
+import '../../workout/application/workout_providers.dart'
+    show aiRecommendedRoutinesProvider;
+import '../../diet/application/diet_providers.dart'
+    show todayDietPlanProvider;
 
 class ProfileSettingsScreen extends ConsumerStatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -67,6 +71,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
 
     final controller = ref.read(completeUserDataProvider.notifier);
     final currentData = ref.read(completeUserDataProvider);
+    var workoutGoalUpdated = false;
+    var dietGoalUpdated = false;
 
     // 닉네임 업데이트
     if (_nicknameController.text.isNotEmpty && 
@@ -97,7 +103,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         dailyDurationMin: currentData.workout?.dailyDurationMin ?? 30,
         preferredTypes: currentData.workout?.preferredTypes ?? ['general'],
       );
-      await controller.updateWorkoutGoal(updatedWorkout);
+      workoutGoalUpdated = await controller.updateWorkoutGoal(updatedWorkout);
     }
 
     // 식단 목표 업데이트
@@ -111,7 +117,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         dailyWaterMl: currentData.diet?.dailyWaterMl ?? 2000,
         dietaryRestrictions: currentData.diet?.dietaryRestrictions ?? [],
       );
-      await controller.updateDietGoal(updatedDiet);
+      dietGoalUpdated = await controller.updateDietGoal(updatedDiet);
+    }
+
+    if (workoutGoalUpdated) {
+      ref.invalidate(aiRecommendedRoutinesProvider);
+    }
+    if (dietGoalUpdated) {
+      ref.invalidate(todayDietPlanProvider);
     }
 
     // 성공 메시지 표시

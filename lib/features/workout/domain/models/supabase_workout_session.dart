@@ -6,6 +6,10 @@ class SupabaseWorkoutSession {
   final DateTime? endTime;
   final int totalCalories;
   final String sessionStatus;
+  final String? completionMethod;
+  final String? manualNotes;
+  final int? perceivedIntensity;
+  final bool isUserReported;
 
   const SupabaseWorkoutSession({
     this.sessionId,
@@ -15,6 +19,10 @@ class SupabaseWorkoutSession {
     this.endTime,
     this.totalCalories = 0,
     this.sessionStatus = 'in_progress',
+    this.completionMethod,
+    this.manualNotes,
+    this.perceivedIntensity,
+    this.isUserReported = false,
   });
 
   factory SupabaseWorkoutSession.fromJson(Map<String, dynamic> json) {
@@ -28,6 +36,10 @@ class SupabaseWorkoutSession {
           : null,
       totalCalories: json['total_calories'] as int? ?? 0,
       sessionStatus: json['session_status'] as String? ?? 'in_progress',
+      completionMethod: json['completion_method'] as String?,
+      manualNotes: json['manual_notes'] as String?,
+      perceivedIntensity: json['perceived_intensity'] as int?,
+      isUserReported: json['is_user_reported'] as bool? ?? false,
     );
   }
 
@@ -40,6 +52,10 @@ class SupabaseWorkoutSession {
       'end_time': endTime?.toIso8601String(),
       'total_calories': totalCalories,
       'session_status': sessionStatus,
+      'completion_method': completionMethod,
+      'manual_notes': manualNotes,
+      'perceived_intensity': perceivedIntensity,
+      'is_user_reported': isUserReported,
     };
   }
 
@@ -52,6 +68,10 @@ class SupabaseWorkoutSession {
       'end_time': endTime?.toIso8601String(),
       'total_calories': totalCalories,
       'session_status': sessionStatus,
+      'completion_method': completionMethod,
+      'manual_notes': manualNotes,
+      'perceived_intensity': perceivedIntensity,
+      'is_user_reported': isUserReported,
     };
   }
 

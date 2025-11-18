@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/core/router/app_router.dart';
 import 'package:flutter_application_1/color.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/features/auth/application/auth_providers.dart';
+import 'package:flutter_application_1/features/diet/application/diet_providers.dart';
+import 'package:flutter_application_1/features/workout/application/workout_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +25,8 @@ class PTApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(_appWarmupProvider);
+
     return MaterialApp.router(
       title: 'PT 앱',
       debugShowCheckedModeBanner: false,
@@ -61,3 +68,52 @@ class PTApp extends ConsumerWidget {
     );
   }
 }
+
+final _appWarmupProvider = Provider<void>((ref) {
+  var hasPrefetchedDiet = false;
+  var hasPrefetchedWorkout = false;
+
+  Future<void> _prefetchDietPlan() async {
+    final future = ref.read(todayDietPlanProvider.future);
+    unawaited(
+      future.catchError(
+        (error, stack) => debugPrint('사전 식단 추천 로딩 실패: $error'),
+      ),
+    );
+  }
+
+  Future<void> _prefetchWorkoutRoutines() async {
+    final future = ref.read(aiRecommendedRoutinesProvider.future);
+    unawaited(
+      future.catchError(
+        (error, stack) => debugPrint('사전 운동 추천 로딩 실패: $error'),
+      ),
+    );
+  }
+
+  void _triggerPrefetch(AuthState state) {
+    if (!state.isLoggedIn || state.isLoading) {
+      if (!state.isLoggedIn) {
+        hasPrefetchedDiet = false;
+        hasPrefetchedWorkout = false;
+      }
+      return;
+    }
+
+    if (!hasPrefetchedDiet) {
+      hasPrefetchedDiet = true;
+      _prefetchDietPlan();
+    }
+
+    if (!hasPrefetchedWorkout) {
+      hasPrefetchedWorkout = true;
+      _prefetchWorkoutRoutines();
+    }
+  }
+
+  ref.listen<AuthState>(
+    authControllerProvider,
+    (previous, next) => _triggerPrefetch(next),
+    fireImmediately: true,
+  );
+});

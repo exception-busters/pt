@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
@@ -6,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../application/complete_profile_providers.dart';
 import '../domain/models/workout_goal_model.dart';
 import '../data/profile_data_service.dart';
+import '../../workout/application/workout_providers.dart'
+    show aiRecommendedRoutinesProvider;
 
 class WorkoutGoalScreen extends ConsumerStatefulWidget {
   const WorkoutGoalScreen({super.key});
@@ -155,6 +159,10 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
         Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
         
         if (success) {
+          ref.invalidate(aiRecommendedRoutinesProvider);
+          unawaited(
+            ref.read(aiRecommendedRoutinesProvider.future).catchError((_) {}),
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('운동 목표가 저장되었습니다'),
