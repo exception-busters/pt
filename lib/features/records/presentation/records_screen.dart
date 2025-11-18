@@ -347,6 +347,9 @@ class _SummaryCard extends StatelessWidget {
     final workoutMinutes = showWorkout ? (record?.totalWorkoutMinutes ?? 0) : 0;
     final diets = showDiet ? (record?.diets.length ?? 0) : 0;
     final dietCalories = showDiet ? (record?.totalDietCalories ?? 0) : 0;
+    final carbs = showDiet ? (record?.totalCarbs ?? 0) : 0;
+    final protein = showDiet ? (record?.totalProtein ?? 0) : 0;
+    final fat = showDiet ? (record?.totalFat ?? 0) : 0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -379,10 +382,12 @@ class _SummaryCard extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: _SummaryStat(
-                  label: '식단',
-                  value: diets > 0 ? '${diets}끼 · ${dietCalories}kcal' : '기록 없음',
-                  icon: Icons.restaurant,
+                child: _DietSummaryStat(
+                  diets: diets,
+                  calories: dietCalories,
+                  carbs: carbs,
+                  protein: protein,
+                  fat: fat,
                 ),
               ),
             ],
@@ -435,6 +440,106 @@ class _SummaryStat extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DietSummaryStat extends StatelessWidget {
+  const _DietSummaryStat({
+    required this.diets,
+    required this.calories,
+    required this.carbs,
+    required this.protein,
+    required this.fat,
+  });
+
+  final int diets;
+  final int calories;
+  final int carbs;
+  final int protein;
+  final int fat;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMacros = carbs > 0 || protein > 0 || fat > 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.restaurant, size: 16, color: subTextColor),
+            const SizedBox(width: 4),
+            const Text(
+              '식단',
+              style: TextStyle(fontSize: 12, color: subTextColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (diets > 0) ...[
+          Text(
+            '$diets끼 · ${calories}kcal',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: mainButtonColor,
+            ),
+          ),
+          if (hasMacros) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                _MacroChip(label: '탄', value: carbs, color: Colors.orange),
+                _MacroChip(label: '단', value: protein, color: Colors.red),
+                _MacroChip(label: '지', value: fat, color: Colors.blue),
+              ],
+            ),
+          ],
+        ] else
+          const Text(
+            '기록 없음',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: mainButtonColor,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MacroChip extends StatelessWidget {
+  const _MacroChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+      ),
+      child: Text(
+        '$label ${value}g',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -509,31 +614,35 @@ class _WorkoutTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: color.withOpacity(0.2)),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.15),
-          child: Icon(Icons.fitness_center, color: color),
-        ),
-        title: Text(
-          entry.title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: mainButtonColor,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showWorkoutDetailModal(context, entry),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: color.withOpacity(0.15),
+            child: Icon(Icons.fitness_center, color: color),
           ),
+          title: Text(
+            entry.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: mainButtonColor,
+            ),
+          ),
+          subtitle: Text(
+            timeText != null ? '$timeText · $durationText' : durationText,
+            style: const TextStyle(color: subTextColor),
+          ),
+          trailing: entry.calories > 0
+              ? Text(
+                  '${entry.calories} kcal',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                )
+              : null,
         ),
-        subtitle: Text(
-          timeText != null ? '$timeText · $durationText' : durationText,
-          style: const TextStyle(color: subTextColor),
-        ),
-        trailing: entry.calories > 0
-            ? Text(
-                '${entry.calories} kcal',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              )
-            : null,
       ),
     );
   }
@@ -545,6 +654,15 @@ class _WorkoutTile extends StatelessWidget {
       return '${hours}시간 ${minutes}분';
     }
     return '${duration.inMinutes}분';
+  }
+
+  void _showWorkoutDetailModal(BuildContext context, WorkoutRecordEntry entry) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _WorkoutDetailModal(entry: entry),
+    );
   }
 }
 
@@ -559,6 +677,8 @@ class _DietTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasMacros = entry.carbs > 0 || entry.protein > 0 || entry.fat > 0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
@@ -577,9 +697,26 @@ class _DietTile extends StatelessWidget {
             color: mainButtonColor,
           ),
         ),
-        subtitle: Text(
-          entry.description,
-          style: const TextStyle(color: subTextColor),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              entry.description,
+              style: const TextStyle(color: subTextColor),
+            ),
+            if (hasMacros) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  _MacroChip(label: '탄', value: entry.carbs, color: Colors.orange),
+                  _MacroChip(label: '단', value: entry.protein, color: Colors.red),
+                  _MacroChip(label: '지', value: entry.fat, color: Colors.blue),
+                ],
+              ),
+            ],
+          ],
         ),
         trailing: entry.calories > 0
             ? Text(
@@ -591,6 +728,254 @@ class _DietTile extends StatelessWidget {
               )
             : null,
       ),
+    );
+  }
+}
+
+class _WorkoutDetailModal extends StatelessWidget {
+  const _WorkoutDetailModal({required this.entry});
+
+  final WorkoutRecordEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final durationText = entry.duration != null
+        ? _formatDuration(entry.duration!)
+        : '시간 정보 없음';
+    final timeText = entry.startedAt != null
+        ? '${entry.startedAt!.year}년 ${entry.startedAt!.month}월 ${entry.startedAt!.day}일 ${entry.startedAt!.hour.toString().padLeft(2, '0')}:${entry.startedAt!.minute.toString().padLeft(2, '0')}'
+        : '시간 정보 없음';
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        top: 16,
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 드래그 핸들
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // 제목
+            Row(
+              children: [
+                const Icon(
+                  Icons.fitness_center,
+                  color: mainButtonColor,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    entry.title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // 시작 시간
+            _DetailRow(
+              icon: Icons.access_time,
+              label: '시작 시간',
+              value: timeText,
+            ),
+            const SizedBox(height: 16),
+            // 운동 시간
+            _DetailRow(
+              icon: Icons.timer,
+              label: '운동 시간',
+              value: durationText,
+            ),
+            const SizedBox(height: 16),
+            // 소모 칼로리
+            _DetailRow(
+              icon: Icons.local_fire_department,
+              label: '소모 칼로리',
+              value: entry.calories > 0 ? '${entry.calories} kcal' : '기록 없음',
+            ),
+            if (entry.completionMethod != null) ...[
+              const SizedBox(height: 16),
+              _DetailRow(
+                icon: entry.completionMethod == 'manual'
+                    ? Icons.edit_note
+                    : Icons.phone_android,
+                label: '완료 방법',
+                value: entry.completionMethod == 'manual' ? '수동 완료' : '앱으로 진행',
+              ),
+            ],
+            if (entry.perceivedIntensity != null) ...[
+              const SizedBox(height: 16),
+              _DetailRow(
+                icon: Icons.trending_up,
+                label: '운동 강도 (RPE)',
+                value: '${entry.perceivedIntensity}/10',
+                valueWidget: _buildRPEIndicator(entry.perceivedIntensity!),
+              ),
+            ],
+            if (entry.manualNotes != null && entry.manualNotes!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _DetailRow(
+                icon: Icons.notes,
+                label: '메모',
+                value: entry.manualNotes!,
+                isMultiline: true,
+              ),
+            ],
+            const SizedBox(height: 24),
+            // 닫기 버튼
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: mainButtonColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  '닫기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분';
+    }
+    return '${duration.inMinutes}분';
+  }
+
+  Widget _buildRPEIndicator(int rpe) {
+    Color color;
+    String label;
+
+    if (rpe <= 2) {
+      color = Colors.green;
+      label = '매우 가벼움';
+    } else if (rpe <= 4) {
+      color = Colors.lightGreen;
+      label = '가벼움';
+    } else if (rpe <= 6) {
+      color = Colors.orange;
+      label = '보통';
+    } else if (rpe <= 8) {
+      color = Colors.deepOrange;
+      label = '힘듦';
+    } else {
+      color = Colors.red;
+      label = '매우 힘듦';
+    }
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueWidget,
+    this.isMultiline = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Widget? valueWidget;
+  final bool isMultiline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment:
+          isMultiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Icon(icon, color: mainButtonColor, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: subTextColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (valueWidget != null)
+                valueWidget!
+              else
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: mainButtonColor,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

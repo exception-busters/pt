@@ -1073,8 +1073,13 @@ final dietAIServiceProvider = Provider<DietAIService>((ref) {
   return DietAIService(Supabase.instance.client);
 });
 
-final dietUserProfileProvider = FutureProvider<DietUserProfile>((ref) async {
+final dietUserProfileProvider = FutureProvider.autoDispose<DietUserProfile>((ref) async {
+  // Auth 상태를 watch하여 로그인/로그아웃 시 자동으로 새로고침
+  final authState = ref.watch(authControllerProvider);
+
   final repository = ref.watch(dietProfileRepositoryProvider);
+
+  print('🔍 [Diet] 식단 프로필 로드 - isLoggedIn: ${authState.isLoggedIn}');
 
   try {
     final snapshot = await repository.fetchUserSnapshot();
@@ -1217,13 +1222,14 @@ final foodDatabaseProvider = FutureProvider<List<FoodItem>>((ref) async {
   return foods;
 });
 
-final todayDietPlanProvider = FutureProvider<DietRecommendationResult>((ref) async {
+final todayDietPlanProvider = FutureProvider.autoDispose<DietRecommendationResult>((ref) async {
   final foods = await ref.watch(foodDatabaseProvider.future);
   if (foods.isEmpty) {
     throw const DietRecommendationException('사용 가능한 음식 데이터가 없습니다.');
   }
 
   final profile = await ref.watch(dietUserProfileProvider.future);
+  print('🔍 [Diet] 오늘의 식단 추천 로드');
 
   final aiService = ref.watch(dietAIServiceProvider);
   final aiPlan = await aiService.fetchRecommendation(profile: profile);

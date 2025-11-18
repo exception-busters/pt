@@ -92,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -100,6 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.1),
                 const Icon(
                   Icons.fitness_center,
                   size: 80,
@@ -221,6 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     foregroundColor: subTextColor,
                   ),
                 ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.1),
               ],
             ),
           ),

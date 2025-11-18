@@ -40,6 +40,18 @@ class DailyRecord {
     return diets.fold(0, (sum, item) => sum + item.calories);
   }
 
+  int get totalCarbs {
+    return diets.fold(0, (sum, item) => sum + item.carbs);
+  }
+
+  int get totalProtein {
+    return diets.fold(0, (sum, item) => sum + item.protein);
+  }
+
+  int get totalFat {
+    return diets.fold(0, (sum, item) => sum + item.fat);
+  }
+
   DailyRecord merge(DailyRecord other) {
     assert(truncateToDate(date) == truncateToDate(other.date));
     return DailyRecord(

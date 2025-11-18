@@ -23,11 +23,13 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
   int _weeklyWorkoutDays = 3;
   int _dailyWorkoutMinutes = 30;
   String _selectedLevel = '초급';
+  String _selectedExperience = '6개월 미만';
   List<String> _selectedWorkoutTypes = ['유산소'];
   bool _isLoading = true;
 
   final List<String> _goals = ['다이어트', '근력향상', '건강유지'];
   final List<String> _levels = ['초급', '중급', '고급'];
+  final List<String> _experienceDurations = ['6개월 미만', '6개월~1년', '1~2년', '2년 이상'];
   final List<String> _workoutTypes = ['유산소', '근력운동', '요가', '필라테스', '스트레칭'];
 
   @override
@@ -72,6 +74,7 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
         setState(() {
           _selectedGoal = _getGoalStringFromType(workoutGoal.goalType);
           _selectedLevel = _getLevelStringFromType(workoutGoal.level);
+          _selectedExperience = _getExperienceStringFromType(workoutGoal.experienceDuration);
           _weeklyWorkoutDays = workoutGoal.weeklyDays ?? 3;
           _dailyWorkoutMinutes = workoutGoal.dailyDurationMin ?? 30;
           final rawTypes = workoutGoal.preferredTypes;
@@ -134,6 +137,7 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
       userId: user.id,
       goalType: _getGoalTypeFromString(_selectedGoal),
       level: _getLevelFromString(_selectedLevel),
+      experienceDuration: _getExperienceDurationFromString(_selectedExperience),
       weeklyDays: _weeklyWorkoutDays,
       dailyDurationMin: _dailyWorkoutMinutes,
       preferredTypes: _selectedWorkoutTypes
@@ -220,6 +224,36 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
         return WorkoutLevel.advanced;
       default:
         return WorkoutLevel.beginner;
+    }
+  }
+
+  String _getExperienceStringFromType(ExperienceDuration? duration) {
+    switch (duration) {
+      case ExperienceDuration.lessThan6Months:
+        return '6개월 미만';
+      case ExperienceDuration.sixMonthsToYear:
+        return '6개월~1년';
+      case ExperienceDuration.oneToTwoYears:
+        return '1~2년';
+      case ExperienceDuration.moreThanTwoYears:
+        return '2년 이상';
+      default:
+        return '6개월 미만';
+    }
+  }
+
+  ExperienceDuration _getExperienceDurationFromString(String duration) {
+    switch (duration) {
+      case '6개월 미만':
+        return ExperienceDuration.lessThan6Months;
+      case '6개월~1년':
+        return ExperienceDuration.sixMonthsToYear;
+      case '1~2년':
+        return ExperienceDuration.oneToTwoYears;
+      case '2년 이상':
+        return ExperienceDuration.moreThanTwoYears;
+      default:
+        return ExperienceDuration.lessThan6Months;
     }
   }
 
@@ -318,7 +352,41 @@ class _WorkoutGoalScreenState extends ConsumerState<WorkoutGoalScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
+              // 운동 경험 기간
+              const Text(
+                '운동 경험 기간',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: mainButtonColor,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  children: _experienceDurations.map((experience) {
+                    return RadioListTile<String>(
+                      title: Text(experience),
+                      value: experience,
+                      groupValue: _selectedExperience,
+                      activeColor: mainButtonColor,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedExperience = value!;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 24),
+
               // 주간 운동 일수
               const Text(
                 '주간 운동 일수',

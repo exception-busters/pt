@@ -16,6 +16,7 @@ type WorkoutRequest = {
   goal?: {
     goal_type?: string
     level?: string
+    experience_duration?: string
     weekly_days?: number
     daily_minutes?: number
   }
@@ -79,6 +80,13 @@ const LEVEL_LABELS: Record<string, string> = {
   beginner: "초급",
   intermediate: "중급",
   advanced: "고급",
+}
+
+const EXPERIENCE_LABELS: Record<string, string> = {
+  lessThan6Months: "6개월 미만",
+  sixMonthsToYear: "6개월~1년",
+  oneToTwoYears: "1~2년",
+  moreThanTwoYears: "2년 이상",
 }
 
 const INTENSITY_BY_LEVEL: Record<
@@ -253,13 +261,26 @@ function buildOpenAiPrompt(payload: WorkoutRequest, catalog: CatalogExercise[]):
     catalog: trimmedCatalog,
   }
 
+  const experienceLabel = payload.goal?.experience_duration
+    ? EXPERIENCE_LABELS[payload.goal.experience_duration] ?? payload.goal.experience_duration
+    : "미설정"
+
+  const levelLabel = payload.goal?.level
+    ? LEVEL_LABELS[payload.goal.level] ?? payload.goal.level
+    : "초급"
+
   return `당신은 한국어 트레이너입니다. 아래 사용자 정보를 참고해 개인 맞춤 운동 루틴을 JSON으로 생성하세요.
+
+사용자 운동 경험: ${experienceLabel}
+자가 평가 숙련도: ${levelLabel}
 
 요구 사항:
 1. routines 배열을 반환하세요 (최대 ${payload.options?.routine_count ?? 3}개).
 2. 각 루틴은 id(string), name(string), notes(string)와 blocks 배열을 포함합니다.
 3. blocks 배열의 원소는 catalog.exercise_id 값을 참조하는 숫자 exercise_id, display_name, sets, reps, rest_seconds, estimated_duration_sec, notes를 포함합니다.
-4. 세트/횟수는 사용자의 목표(goal_type)와 레벨(level)에 맞춰 합리적으로 설정하세요.
+4. 세트/횟수는 사용자의 운동 경험 기간(${experienceLabel})과 자가 평가 숙련도(${levelLabel})를 모두 고려하여 설정하세요.
+   - 경험이 적거나 숙련도가 낮으면 강도를 낮추세요.
+   - 경험이 많고 숙련도가 높으면 고강도로 구성하세요.
 5. catalog에 존재하지 않는 운동은 사용하지 마세요.
 
 반드시 아래 JSON 스키마와 동일한 키/자료형을 지켜 출력하세요.

@@ -34,6 +34,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
       final height = prefs.getDouble(_getUserDataKey('user_height'));
       final workoutGoalStr = prefs.getString(_getUserDataKey('user_workout_goal'));
       final workoutLevelStr = prefs.getString(_getUserDataKey('user_workout_level'));
+      final experienceDurationStr = prefs.getString(_getUserDataKey('user_experience_duration'));
 
       final workoutGoal = workoutGoalStr != null
           ? WorkoutGoal.values.firstWhere(
@@ -49,6 +50,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
         height: height,
         workoutGoal: workoutGoal == WorkoutGoal.fitnessImprovement ? WorkoutGoal.healthMaintenance : workoutGoal,
         workoutLevel: workoutLevelStr != null ? WorkoutLevel.values.firstWhere((l) => l.name == workoutLevelStr, orElse: () => WorkoutLevel.beginner) : null,
+        experienceDuration: experienceDurationStr != null ? ExperienceDuration.values.firstWhere((e) => e.name == experienceDurationStr, orElse: () => ExperienceDuration.lessThan6Months) : null,
       );
     } catch (e) {
       print('사용자 데이터 로드 실패: $e');
@@ -67,6 +69,7 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
         await prefs.remove(_getUserDataKey('user_height'));
         await prefs.remove(_getUserDataKey('user_workout_goal'));
         await prefs.remove(_getUserDataKey('user_workout_level'));
+        await prefs.remove(_getUserDataKey('user_experience_duration'));
       }
     } catch (e) {
       print('사용자별 데이터 삭제 실패: $e');
@@ -95,6 +98,10 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
 
   void updateWorkoutLevel(WorkoutLevel level) {
     state = state.copyWith(workoutLevel: level);
+  }
+
+  void updateExperienceDuration(ExperienceDuration duration) {
+    state = state.copyWith(experienceDuration: duration);
   }
 
   Future<void> saveOnboardingData() async {
@@ -133,7 +140,10 @@ class OnboardingNotifier extends StateNotifier<OnboardingData> with AuthStateMix
           if (state.workoutLevel != null) {
             await prefs.setString(_getUserDataKey('user_workout_level'), state.workoutLevel!.name);
           }
-          
+          if (state.experienceDuration != null) {
+            await prefs.setString(_getUserDataKey('user_experience_duration'), state.experienceDuration!.name);
+          }
+
           print('✅ 로컬 캐시에도 저장 완료');
         }
         

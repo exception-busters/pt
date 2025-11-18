@@ -652,10 +652,15 @@ final openAiRoutineServiceProvider = Provider<OpenAiRoutineService>((ref) {
   return service;
 });
 
-final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref) async {
+final aiRecommendedRoutinesProvider = FutureProvider.autoDispose<List<WorkoutRoutine>>((ref) async {
+  // Auth 상태를 watch하여 로그인/로그아웃 시 자동으로 새로고침
+  final authState = ref.watch(authControllerProvider);
+
   final exercises = await ref.watch(databaseExercisesProvider.future);
   final workoutGoal = ref.watch(workoutGoalModelProvider);
   final userProfile = ref.watch(userProfileModelProvider);
+
+  print('🔍 [Workout] AI 루틴 추천 로드 - isLoggedIn: ${authState.isLoggedIn}');
 
   if (_enableWorkoutAi) {
     try {

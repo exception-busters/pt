@@ -32,11 +32,14 @@ class OnboardingService {
 
       final workoutGoal = workout.WorkoutGoalModel(
         userId: currentUser.id,
-        goalType: data.workoutGoal != null 
+        goalType: data.workoutGoal != null
             ? _mapWorkoutGoal(data.workoutGoal!)
             : null,
-        level: data.workoutLevel != null 
+        level: data.workoutLevel != null
             ? _mapWorkoutLevel(data.workoutLevel!)
+            : null,
+        experienceDuration: data.experienceDuration != null
+            ? _mapExperienceDuration(data.experienceDuration!)
             : null,
         weeklyDays: 3, // 기본값
         dailyDurationMin: 30, // 기본값
@@ -70,42 +73,30 @@ class OnboardingService {
     try {
       // 먼저 기존 데이터가 있는지 확인
       final existingData = await _supabase
-          .from('public_users')
-          .select('id')
-          .eq('id', userId)
+          .from('users')
+          .select('user_id')
+          .eq('user_id', userId)
           .maybeSingle();
 
       final profileData = {
-        'id': userId,
-        'gender': data.gender?.name,
-        'age': data.age,
-        'weight': data.weight,
-        'height': data.height,
-        'workout_goal': data.workoutGoal?.name,
-        'workout_level': data.workoutLevel?.name,
-        'updated_at': DateTime.now().toIso8601String(),
+        'user_id': userId,
+        // users 테이블에는 email, nickname, profile_image만 있으므로
+        // 여기서는 profile_completed만 업데이트
       };
 
       if (existingData != null) {
-        // 기존 데이터 업데이트
-        print('🔄 기존 프로필 데이터 업데이트');
+        // 기존 데이터 업데이트 - profile_completed를 true로
+        print('🔄 users 테이블 profile_completed 업데이트');
         await _supabase
-            .from('public_users')
-            .update(profileData)
-            .eq('id', userId);
-      } else {
-        // 새 데이터 삽입
-        print('➕ 새 프로필 데이터 삽입');
-        profileData['created_at'] = DateTime.now().toIso8601String();
-        await _supabase
-            .from('public_users')
-            .insert(profileData);
+            .from('users')
+            .update({'profile_completed': true})
+            .eq('user_id', userId);
       }
-      
-      print('✅ public_users 테이블에 온보딩 데이터 저장 완료');
+
+      print('✅ users 테이블 업데이트 완료');
     } catch (e) {
-      print('❌ public_users 테이블 저장 실패: $e');
-      // public_users 저장 실패해도 계속 진행 (profile_completed는 업데이트)
+      print('❌ users 테이블 저장 실패: $e');
+      // users 저장 실패해도 계속 진행
     }
   }
 
@@ -116,28 +107,27 @@ class OnboardingService {
         return null;
       }
 
-      final response = await _supabase
-          .from('public_users')
-          .select()
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-      if (response == null) {
+      // ProfileDataService를 사용하여 데이터 조회
+      final userData = await ProfileDataService.loadCompleteUserData(currentUser.id);
+      if (userData == null) {
         return null;
       }
 
+      final userProfile = userData['profile'] as profile.UserProfileModel?;
+      final workoutGoal = userData['workout'] as workout.WorkoutGoalModel?;
+
       return onboarding.OnboardingData(
-        gender: response['gender'] != null 
-            ? onboarding.Gender.values.firstWhere((g) => g.name == response['gender'])
+        gender: userProfile?.gender != null
+            ? (userProfile!.gender == profile.Gender.male ? onboarding.Gender.male : onboarding.Gender.female)
             : null,
-        age: response['age'],
-        weight: response['weight']?.toDouble(),
-        height: response['height']?.toDouble(),
-        workoutGoal: response['workout_goal'] != null
-            ? onboarding.WorkoutGoal.values.firstWhere((g) => g.name == response['workout_goal'])
+        age: userProfile?.age,
+        weight: userProfile?.weight,
+        height: userProfile?.height,
+        workoutGoal: workoutGoal?.goalType != null
+            ? _mapToOnboardingWorkoutGoal(workoutGoal!.goalType!)
             : null,
-        workoutLevel: response['workout_level'] != null
-            ? onboarding.WorkoutLevel.values.firstWhere((l) => l.name == response['workout_level'])
+        workoutLevel: workoutGoal?.level != null
+            ? _mapToOnboardingWorkoutLevel(workoutGoal!.level!)
             : null,
       );
     } catch (e) {
@@ -176,6 +166,20 @@ class OnboardingService {
         return workout.WorkoutLevel.intermediate;
       case onboarding.WorkoutLevel.advanced:
         return workout.WorkoutLevel.advanced;
+    }
+  }
+
+  // 온보딩 ExperienceDuration을 WorkoutGoalModel ExperienceDuration으로 매핑
+  workout.ExperienceDuration _mapExperienceDuration(onboarding.ExperienceDuration duration) {
+    switch (duration) {
+      case onboarding.ExperienceDuration.lessThan6Months:
+        return workout.ExperienceDuration.lessThan6Months;
+      case onboarding.ExperienceDuration.sixMonthsToYear:
+        return workout.ExperienceDuration.sixMonthsToYear;
+      case onboarding.ExperienceDuration.oneToTwoYears:
+        return workout.ExperienceDuration.oneToTwoYears;
+      case onboarding.ExperienceDuration.moreThanTwoYears:
+        return workout.ExperienceDuration.moreThanTwoYears;
     }
   }
 

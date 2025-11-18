@@ -14,7 +14,14 @@ class DietHistoryRepository {
     final prefix =
         userId != null ? 'diet_data_${userId}_' : 'diet_data_default_';
 
+    print('🔍 [Diet] 식단 데이터 로드 - user_id: $userId');
+    print('🔍 [Diet] SharedPreferences prefix: $prefix');
+
     final keys = prefs.getKeys().where((key) => key.startsWith(prefix)).toList();
+    print('🔍 [Diet] 찾은 식단 키 개수: ${keys.length}');
+    if (keys.isNotEmpty) {
+      print('🔍 [Diet] 식단 키 목록: ${keys.take(3).join(", ")}...');
+    }
     if (keys.isEmpty) {
       return const [];
     }
@@ -67,13 +74,16 @@ class DietHistoryRepository {
       final description = _buildDescription(mealJson);
       if (description.isEmpty) continue;
 
-      final calories = _extractCalories(mealJson);
+      final nutrition = _extractNutrition(mealJson);
 
       meals.add(
         DietRecordEntry(
           mealLabel: entry.value,
           description: description,
-          calories: calories,
+          calories: nutrition['calories'] ?? 0,
+          carbs: nutrition['carbs'] ?? 0,
+          protein: nutrition['protein'] ?? 0,
+          fat: nutrition['fat'] ?? 0,
         ),
       );
     }
@@ -107,22 +117,59 @@ class DietHistoryRepository {
     return '';
   }
 
-  int _extractCalories(Map<String, dynamic> mealJson) {
+  Map<String, int> _extractNutrition(Map<String, dynamic> mealJson) {
+    final result = {
+      'calories': 0,
+      'carbs': 0,
+      'protein': 0,
+      'fat': 0,
+    };
+
     final nutrition = mealJson['nutrition'];
     if (nutrition is Map<String, dynamic>) {
+      // 칼로리 추출
       final calories = nutrition['calories'];
       if (calories is num) {
-        return calories.round();
+        result['calories'] = calories.round();
       }
+
+      // 탄수화물 추출
+      final carbs = nutrition['carbs'] ?? nutrition['carbohydrates'];
+      if (carbs is num) {
+        result['carbs'] = carbs.round();
+      }
+
+      // 단백질 추출
+      final protein = nutrition['protein'];
+      if (protein is num) {
+        result['protein'] = protein.round();
+      }
+
+      // 지방 추출
+      final fat = nutrition['fat'];
+      if (fat is num) {
+        result['fat'] = fat.round();
+      }
+
+      return result;
     }
 
+    // nutrition 객체가 없을 경우 calories만 추출 시도
     final caloriesText = mealJson['calories'];
     if (caloriesText is String) {
       final digits = RegExp(r'[0-9]+').stringMatch(caloriesText);
       if (digits != null) {
-        return int.tryParse(digits) ?? 0;
+        result['calories'] = int.tryParse(digits) ?? 0;
       }
+    } else if (caloriesText is num) {
+      result['calories'] = caloriesText.round();
     }
-    return 0;
+
+    return result;
+  }
+
+  int _extractCalories(Map<String, dynamic> mealJson) {
+    final nutrition = _extractNutrition(mealJson);
+    return nutrition['calories'] ?? 0;
   }
 }

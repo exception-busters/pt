@@ -183,9 +183,14 @@ class _MealInputCard extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '단백질 ${nutrition.protein.toStringAsFixed(1)}g · 탄수화물 ${nutrition.carbs.toStringAsFixed(1)}g · 지방 ${nutrition.fat.toStringAsFixed(1)}g',
-                  style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _MacroChip(label: '탄', value: nutrition.carbs, color: Colors.orange),
+                    _MacroChip(label: '단', value: nutrition.protein, color: Colors.red),
+                    _MacroChip(label: '지', value: nutrition.fat, color: Colors.blue),
+                  ],
                 ),
               ],
             )
@@ -579,10 +584,15 @@ class _EditableMealCardState extends ConsumerState<_EditableMealCard> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            '단백질 ${totals.protein.toStringAsFixed(1)}g · 탄수화물 ${totals.carbs.toStringAsFixed(1)}g · 지방 ${totals.fat.toStringAsFixed(1)}g',
-            style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _MacroChip(label: '탄', value: totals.carbs, color: Colors.orange),
+              _MacroChip(label: '단', value: totals.protein, color: Colors.red),
+              _MacroChip(label: '지', value: totals.fat, color: Colors.blue),
+            ],
           ),
           const SizedBox(height: 16),
           for (var i = 0; i < _items.length; i++) ...[
@@ -994,9 +1004,14 @@ class _EditableMealItemRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                '단백질 ${item.nutrition.protein.toStringAsFixed(1)}g · 탄수화물 ${item.nutrition.carbs.toStringAsFixed(1)}g · 지방 ${item.nutrition.fat.toStringAsFixed(1)}g',
-                style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  _MacroChip(label: '탄', value: item.nutrition.carbs, color: Colors.orange),
+                  _MacroChip(label: '단', value: item.nutrition.protein, color: Colors.red),
+                  _MacroChip(label: '지', value: item.nutrition.fat, color: Colors.blue),
+                ],
               ),
             ],
           ),
@@ -1110,6 +1125,38 @@ class _EditableMealItem {
       protein: food.protein * ratio,
       carbs: food.carbs * ratio,
       fat: food.fat * ratio,
+    );
+  }
+}
+
+class _MacroChip extends StatelessWidget {
+  const _MacroChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+      ),
+      child: Text(
+        '$label ${value.toStringAsFixed(0)}g',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }

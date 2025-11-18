@@ -408,9 +408,10 @@ class _WorkoutPreferencesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onboardingData = ref.watch(onboardingProvider);
-    
-    final bool canProceed = onboardingData.workoutGoal != null && 
-                           onboardingData.workoutLevel != null;
+
+    final bool canProceed = onboardingData.workoutGoal != null &&
+                           onboardingData.workoutLevel != null &&
+                           onboardingData.experienceDuration != null;
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -530,13 +531,61 @@ class _WorkoutPreferencesScreen extends ConsumerWidget {
                       ),
                     );
                   }).toList(),
+
+                  const SizedBox(height: 32),
+
+                  // 운동 경험 기간
+                  const Text(
+                    '운동 경험 기간',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  ...ExperienceDuration.values.map((duration) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: RadioListTile<ExperienceDuration>(
+                        title: Text(
+                          duration.displayName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        value: duration,
+                        groupValue: onboardingData.experienceDuration,
+                        onChanged: (value) {
+                          if (value != null) {
+                            ref.read(onboardingProvider.notifier).updateExperienceDuration(value);
+                          }
+                        },
+                        activeColor: mainButtonColor,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: onboardingData.experienceDuration == duration
+                                ? mainButtonColor
+                                : borderColor,
+                          ),
+                        ),
+                        tileColor: onboardingData.experienceDuration == duration
+                            ? mainButtonColor.withOpacity(0.1)
+                            : backgroundColor,
+                      ),
+                    );
+                  }).toList(),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

@@ -4,6 +4,13 @@ enum WorkoutGoal { weightLoss, muscleGain, fitnessImprovement, healthMaintenance
 
 enum WorkoutLevel { beginner, intermediate, advanced }
 
+enum ExperienceDuration {
+  lessThan6Months,    // 6개월 미만
+  sixMonthsToYear,    // 6개월~1년
+  oneToTwoYears,      // 1~2년
+  moreThanTwoYears    // 2년 이상
+}
+
 class OnboardingData {
   final Gender? gender;
   final int? age;
@@ -11,6 +18,7 @@ class OnboardingData {
   final double? height;
   final WorkoutGoal? workoutGoal;
   final WorkoutLevel? workoutLevel;
+  final ExperienceDuration? experienceDuration;
 
   const OnboardingData({
     this.gender,
@@ -19,6 +27,7 @@ class OnboardingData {
     this.height,
     this.workoutGoal,
     this.workoutLevel,
+    this.experienceDuration,
   });
 
   OnboardingData copyWith({
@@ -28,6 +37,7 @@ class OnboardingData {
     double? height,
     WorkoutGoal? workoutGoal,
     WorkoutLevel? workoutLevel,
+    ExperienceDuration? experienceDuration,
   }) {
     return OnboardingData(
       gender: gender ?? this.gender,
@@ -36,6 +46,7 @@ class OnboardingData {
       height: height ?? this.height,
       workoutGoal: workoutGoal ?? this.workoutGoal,
       workoutLevel: workoutLevel ?? this.workoutLevel,
+      experienceDuration: experienceDuration ?? this.experienceDuration,
     );
   }
 
@@ -47,6 +58,7 @@ class OnboardingData {
       'height': height,
       'workout_goal': workoutGoal?.name,
       'workout_level': workoutLevel?.name,
+      'experience_duration': experienceDuration?.name,
     };
   }
 
@@ -56,7 +68,8 @@ class OnboardingData {
         weight != null &&
         height != null &&
         workoutGoal != null &&
-        workoutLevel != null;
+        workoutLevel != null &&
+        experienceDuration != null;
   }
 }
 
@@ -95,6 +108,21 @@ extension WorkoutLevelExtension on WorkoutLevel {
         return '중급';
       case WorkoutLevel.advanced:
         return '고급';
+    }
+  }
+}
+
+extension ExperienceDurationExtension on ExperienceDuration {
+  String get displayName {
+    switch (this) {
+      case ExperienceDuration.lessThan6Months:
+        return '6개월 미만';
+      case ExperienceDuration.sixMonthsToYear:
+        return '6개월~1년';
+      case ExperienceDuration.oneToTwoYears:
+        return '1~2년';
+      case ExperienceDuration.moreThanTwoYears:
+        return '2년 이상';
     }
   }
 }
