@@ -11,6 +11,56 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 const List<String> _weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
 
+// Helper function to build day schedule map
+Map<int, List<_ScheduledRoutineEntry>> _buildDayScheduleMap(
+  List<dynamic> routines,
+  Map<int, List<SupabaseRoutineSchedule>> scheduleMap,
+) {
+  final routineById = <int, dynamic>{};
+  for (final routine in routines) {
+    final id = routine.routineId as int?;
+    if (id != null) {
+      routineById[id] = routine;
+    }
+  }
+
+  final result = <int, List<_ScheduledRoutineEntry>>{};
+  scheduleMap.forEach((routineId, schedules) {
+    final routine = routineById[routineId];
+    if (routine == null) return;
+    for (final schedule in schedules) {
+      result.putIfAbsent(schedule.weekday, () => []).add(
+            _ScheduledRoutineEntry(
+              routine: routine,
+              schedule: schedule,
+            ),
+          );
+    }
+  });
+
+  for (final entries in result.values) {
+    entries.sort(
+      (a, b) => a.schedule.sortOrder.compareTo(b.schedule.sortOrder),
+    );
+  }
+
+  for (var day = 0; day < _weekdayLabels.length; day++) {
+    result.putIfAbsent(day, () => []);
+  }
+
+  return result;
+}
+
+class _ScheduledRoutineEntry {
+  const _ScheduledRoutineEntry({
+    required this.routine,
+    required this.schedule,
+  });
+
+  final dynamic routine;
+  final SupabaseRoutineSchedule schedule;
+}
+
 class WorkoutScreen extends ConsumerStatefulWidget {
   const WorkoutScreen({super.key});
 
@@ -115,6 +165,11 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
               final success = await ref.read(supabaseRoutineNotifierProvider.notifier).deleteRoutine(routine.routineId);
               if (context.mounted) {
                 Navigator.of(context).pop();
+                if (success) {
+                  // 삭제 후 provider 새로고침 (루틴 목록 & 요일별 스케줄)
+                  ref.invalidate(supabaseRoutineNotifierProvider);
+                  ref.invalidate(routineSchedulesProvider);
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success ? 'Supabase 루틴이 삭제되었습니다' : '루틴 삭제에 실패했습니다'),
@@ -154,45 +209,6 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     context.push('/app/workout/exercise', extra: {
       'exerciseIds': exerciseIds,
     });
-  }
-
-  Map<int, List<_ScheduledRoutineEntry>> _buildDayScheduleMap(
-    List<dynamic> routines,
-    Map<int, List<SupabaseRoutineSchedule>> scheduleMap,
-  ) {
-    final routineById = <int, dynamic>{};
-    for (final routine in routines) {
-      final id = routine.routineId as int?;
-      if (id != null) {
-        routineById[id] = routine;
-      }
-    }
-
-    final result = <int, List<_ScheduledRoutineEntry>>{};
-    scheduleMap.forEach((routineId, schedules) {
-      final routine = routineById[routineId];
-      if (routine == null) return;
-      for (final schedule in schedules) {
-        result.putIfAbsent(schedule.weekday, () => []).add(
-              _ScheduledRoutineEntry(
-                routine: routine,
-                schedule: schedule,
-              ),
-            );
-      }
-    });
-
-    for (final entries in result.values) {
-      entries.sort(
-        (a, b) => a.schedule.sortOrder.compareTo(b.schedule.sortOrder),
-      );
-    }
-
-    for (var day = 0; day < _weekdayLabels.length; day++) {
-      result.putIfAbsent(day, () => []);
-    }
-
-    return result;
   }
 
   Future<void> _handleAddRoutineToDay(
@@ -279,29 +295,10 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
   }
 
   Future<void> _openScheduleManager() async {
-    final routines = ref.read(supabaseRoutineNotifierProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => const <dynamic>[],
-        );
-
-    final scheduleData =
-        ref.read(routineSchedulesProvider).maybeWhen<Map<int, List<SupabaseRoutineSchedule>>>(
-              data: (value) => value,
-              orElse: () => const {},
-            );
-
-    Future<Map<int, List<_ScheduledRoutineEntry>>> reloadEntries() async {
-      final latest = await ref.read(routineSchedulesProvider.future);
-      return _buildDayScheduleMap(routines, latest);
-    }
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _ScheduleManagerSheet(
-        routines: routines,
-        initialEntries: _buildDayScheduleMap(routines, scheduleData),
-        reloadEntries: reloadEntries,
         onAddRoutine: (routineId, weekday) async {
           final success = await ref
               .read(supabaseWorkoutServiceProvider)
@@ -1152,37 +1149,26 @@ class _ScheduleSection extends StatelessWidget {
   }
 }
 
-class _ScheduleManagerSheet extends StatefulWidget {
+class _ScheduleManagerSheet extends ConsumerStatefulWidget {
   const _ScheduleManagerSheet({
-    required this.routines,
-    required this.initialEntries,
-    required this.reloadEntries,
     required this.onAddRoutine,
     required this.onRemoveSchedule,
   });
 
-  final List<dynamic> routines;
-  final Map<int, List<_ScheduledRoutineEntry>> initialEntries;
-  final Future<Map<int, List<_ScheduledRoutineEntry>>> Function()
-      reloadEntries;
   final Future<bool> Function(int routineId, int weekday) onAddRoutine;
   final Future<bool> Function(int scheduleId) onRemoveSchedule;
 
   @override
-  State<_ScheduleManagerSheet> createState() => _ScheduleManagerSheetState();
+  ConsumerState<_ScheduleManagerSheet> createState() => _ScheduleManagerSheetState();
 }
 
-class _ScheduleManagerSheetState extends State<_ScheduleManagerSheet>
+class _ScheduleManagerSheetState extends ConsumerState<_ScheduleManagerSheet>
     with SingleTickerProviderStateMixin {
-  late Map<int, List<_ScheduledRoutineEntry>> _entries;
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _entries = widget.initialEntries.map(
-      (key, value) => MapEntry(key, List.of(value)),
-    );
     _tabController = TabController(length: 2, vsync: this);
   }
 
@@ -1192,13 +1178,6 @@ class _ScheduleManagerSheetState extends State<_ScheduleManagerSheet>
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    final refreshed = await widget.reloadEntries();
-    setState(() {
-      _entries = refreshed;
-    });
-  }
-
   Future<void> _removeEntry(_ScheduledRoutineEntry entry) async {
     final scheduleId = entry.schedule.scheduleId;
     if (scheduleId == null) {
@@ -1206,7 +1185,6 @@ class _ScheduleManagerSheetState extends State<_ScheduleManagerSheet>
     }
     final success = await widget.onRemoveSchedule(scheduleId);
     if (success) {
-      await _refresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('스케줄을 삭제했습니다.')),
@@ -1226,6 +1204,22 @@ class _ScheduleManagerSheetState extends State<_ScheduleManagerSheet>
 
   @override
   Widget build(BuildContext context) {
+    // Provider에서 실시간으로 데이터 가져오기
+    final routinesAsync = ref.watch(supabaseRoutineNotifierProvider);
+    final schedulesAsync = ref.watch(routineSchedulesProvider);
+
+    final routines = routinesAsync.maybeWhen(
+      data: (data) => data,
+      orElse: () => const <dynamic>[],
+    );
+
+    final scheduleData = schedulesAsync.maybeWhen<Map<int, List<SupabaseRoutineSchedule>>>(
+      data: (value) => value,
+      orElse: () => const {},
+    );
+
+    final entries = _buildDayScheduleMap(routines, scheduleData);
+
     return DefaultTabController(
       length: 2,
       child: SafeArea(
@@ -1269,23 +1263,28 @@ class _ScheduleManagerSheetState extends State<_ScheduleManagerSheet>
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _RoutineListTab(
-                      routines: widget.routines,
-                      entries: _entries,
-                      onRefresh: _refresh,
-                      onAddRoutine: widget.onAddRoutine,
-                      onRemoveSchedule: widget.onRemoveSchedule,
-                    ),
-                    _WeeklyScheduleTab(
-                      routines: widget.routines,
-                      entries: _entries,
-                      onAddRoutine: widget.onAddRoutine,
-                      onRemoveEntry: _removeEntry,
-                    ),
-                  ],
+                child: routinesAsync.when(
+                  data: (_) => TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _RoutineListTab(
+                        routines: routines,
+                        entries: entries,
+                        onAddRoutine: widget.onAddRoutine,
+                        onRemoveSchedule: widget.onRemoveSchedule,
+                      ),
+                      _WeeklyScheduleTab(
+                        routines: routines,
+                        entries: entries,
+                        onAddRoutine: widget.onAddRoutine,
+                        onRemoveEntry: _removeEntry,
+                      ),
+                    ],
+                  ),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Center(
+                    child: Text('오류: $error'),
+                  ),
                 ),
               ),
             ],
@@ -1408,16 +1407,6 @@ class _DayScheduleSection extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ScheduledRoutineEntry {
-  const _ScheduledRoutineEntry({
-    required this.routine,
-    required this.schedule,
-  });
-
-  final dynamic routine;
-  final SupabaseRoutineSchedule schedule;
 }
 
 class _RoutinePickerSheet extends StatelessWidget {
@@ -1639,14 +1628,12 @@ class _RoutineListTab extends ConsumerWidget {
   const _RoutineListTab({
     required this.routines,
     required this.entries,
-    required this.onRefresh,
     required this.onAddRoutine,
     required this.onRemoveSchedule,
   });
 
   final List<dynamic> routines;
   final Map<int, List<_ScheduledRoutineEntry>> entries;
-  final VoidCallback onRefresh;
   final Future<bool> Function(int routineId, int weekday) onAddRoutine;
   final Future<bool> Function(int scheduleId) onRemoveSchedule;
 
@@ -1691,7 +1678,8 @@ class _RoutineListTab extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (success) {
-      onRefresh();
+      ref.invalidate(supabaseRoutineNotifierProvider);
+      ref.invalidate(routineSchedulesProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${routine.title} 루틴이 삭제되었습니다.')),
       );
@@ -1725,7 +1713,7 @@ class _RoutineListTab extends ConsumerWidget {
           .read(supabaseWorkoutServiceProvider)
           .saveRoutineSchedule(routineId: routineId, weekdays: selectedDays);
 
-      onRefresh();
+      ref.invalidate(supabaseRoutineNotifierProvider);
       ref.invalidate(routineSchedulesProvider);
 
       if (!context.mounted) return;
@@ -1871,7 +1859,8 @@ class _RoutineListTab extends ConsumerWidget {
                           if (scheduleId != null) {
                             final success = await onRemoveSchedule(scheduleId);
                             if (success) {
-                              onRefresh();
+                              ref.invalidate(supabaseRoutineNotifierProvider);
+                              ref.invalidate(routineSchedulesProvider);
                             }
                           }
                         },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:flutter_application_1/color.dart';
 import '../application/records_providers.dart';
@@ -28,6 +29,13 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
         title: const Text('기록'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: '통계 보기',
+            onPressed: () => context.push('/app/records/statistics'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: recordsAsync.when(
