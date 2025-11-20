@@ -960,31 +960,41 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          CameraPreview(_controller!),
+          // 카메라 프리뷰와 스켈레톤을 좌우 반전 (거울 모드)
+          Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..scale(-1.0, 1.0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CameraPreview(_controller!),
 
-          // ValueListenableBuilder로 스켈레톤만 선택적 리빌드
-          ValueListenableBuilder<Size?>(
-            valueListenable: _imageSizeNotifier,
-            builder: (context, imageSize, child) {
-              if (imageSize == null || !_showSkeleton) {
-                return const SizedBox.shrink();
-              }
-              return ValueListenableBuilder<List<Pose>>(
-                valueListenable: _posesNotifier,
-                builder: (context, poses, child) {
-                  return CustomPaint(
-                    painter: PosePainter(
-                      poses,
-                      imageSize,
-                      exercise: _selectedExercise,
-                    ),
-                    child: Container(),
-                  );
-                },
-              );
-            },
+                // ValueListenableBuilder로 스켈레톤만 선택적 리빌드
+                ValueListenableBuilder<Size?>(
+                  valueListenable: _imageSizeNotifier,
+                  builder: (context, imageSize, child) {
+                    if (imageSize == null || !_showSkeleton) {
+                      return const SizedBox.shrink();
+                    }
+                    return ValueListenableBuilder<List<Pose>>(
+                      valueListenable: _posesNotifier,
+                      builder: (context, poses, child) {
+                        return CustomPaint(
+                          painter: PosePainter(
+                            poses,
+                            imageSize,
+                            exercise: _selectedExercise,
+                          ),
+                          child: Container(),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-          
+
           // 개발자 전용 스킵 버튼 - 모든 운동 완료 및 홈으로 이동
           Positioned(
             top: 48,
