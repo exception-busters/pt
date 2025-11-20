@@ -652,15 +652,29 @@ final openAiRoutineServiceProvider = Provider<OpenAiRoutineService>((ref) {
   return service;
 });
 
-final aiRecommendedRoutinesProvider = FutureProvider.autoDispose<List<WorkoutRoutine>>((ref) async {
+final aiRecommendedRoutinesProvider = FutureProvider<List<WorkoutRoutine>>((ref) async {
   // Auth 상태를 watch하여 로그인/로그아웃 시 자동으로 새로고침
   final authState = ref.watch(authControllerProvider);
+
+  // keepAlive를 사용하여 캐싱 유지
+  ref.keepAlive();
 
   final exercises = await ref.watch(databaseExercisesProvider.future);
   final workoutGoal = ref.watch(workoutGoalModelProvider);
   final userProfile = ref.watch(userProfileModelProvider);
 
   print('🔍 [Workout] AI 루틴 추천 로드 - isLoggedIn: ${authState.isLoggedIn}');
+
+  // 캐시 확인 (SharedPreferences 사용)
+  final cachedRoutines = await _loadCachedRoutines();
+  if (cachedRoutines != null && cachedRoutines.isNotEmpty) {
+    print('✅ [Workout] 캐시된 AI 추천 루틴 사용 (${cachedRoutines.length}개)');
+    // 백그라운드에서 새로운 추천 가져오기
+    _refreshRoutinesInBackground(ref, exercises, workoutGoal, userProfile);
+    return cachedRoutines;
+  }
+
+  List<WorkoutRoutine> finalRoutines;
 
   if (_enableWorkoutAi) {
     try {
@@ -670,7 +684,9 @@ final aiRecommendedRoutinesProvider = FutureProvider.autoDispose<List<WorkoutRou
         userProfile: userProfile,
       );
       if (routines.isNotEmpty) {
-        return routines;
+        finalRoutines = routines;
+        await _saveCachedRoutines(finalRoutines);
+        return finalRoutines;
       }
       print('⚠️ workout-recommendation에서 빈 루틴을 받았습니다. 로컬 템플릿으로 폴백합니다.');
     } catch (e) {
@@ -684,7 +700,9 @@ final aiRecommendedRoutinesProvider = FutureProvider.autoDispose<List<WorkoutRou
           availableExercises: exercises,
         );
         if (routines.isNotEmpty) {
-          return routines;
+          finalRoutines = routines;
+          await _saveCachedRoutines(finalRoutines);
+          return finalRoutines;
         }
       } catch (e) {
         print('OpenAI 추천 루틴 생성 실패: $e');
@@ -696,7 +714,9 @@ final aiRecommendedRoutinesProvider = FutureProvider.autoDispose<List<WorkoutRou
     print('ℹ️ ENABLE_WORKOUT_AI=false 설정으로 AI 추천을 건너뜁니다.');
   }
 
-  return AIRecommendedRoutines.getRecommendedRoutines(exercises);
+  finalRoutines = AIRecommendedRoutines.getRecommendedRoutines(exercises);
+  await _saveCachedRoutines(finalRoutines);
+  return finalRoutines;
 });
 
 Future<List<WorkoutRoutine>> _fetchWorkoutAiRoutines({
@@ -1130,3 +1150,125 @@ class RoutineCreationNotifier extends StateNotifier<RoutineCreationState> {
 final routineCreationNotifierProvider = StateNotifierProvider<RoutineCreationNotifier, RoutineCreationState>((ref) {
   return RoutineCreationNotifier();
 });
+
+// ==================== AI 추천 캐싱 ====================
+
+const String _aiRoutinesCacheKey = 'ai_recommended_routines_cache';
+const String _aiRoutinesCacheTimeKey = 'ai_recommended_routines_cache_time';
+const Duration _cacheValidDuration = Duration(hours: 24);
+
+/// 캐시된 AI 추천 루틴 로드
+Future<List<WorkoutRoutine>?> _loadCachedRoutines() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheTimeMs = prefs.getInt(_aiRoutinesCacheTimeKey);
+
+    if (cacheTimeMs == null) {
+      print('🔍 [Cache] AI 추천 캐시 없음');
+      return null;
+    }
+
+    final cacheTime = DateTime.fromMillisecondsSinceEpoch(cacheTimeMs);
+    final now = DateTime.now();
+    final age = now.difference(cacheTime);
+
+    if (age > _cacheValidDuration) {
+      print('⏰ [Cache] AI 추천 캐시 만료 (${age.inHours}시간 경과)');
+      await _clearCache();
+      return null;
+    }
+
+    final cachedJson = prefs.getString(_aiRoutinesCacheKey);
+    if (cachedJson == null) {
+      print('🔍 [Cache] AI 추천 캐시 데이터 없음');
+      return null;
+    }
+
+    final List<dynamic> routinesJson = jsonDecode(cachedJson);
+    final routines = routinesJson
+        .map((json) => WorkoutRoutine.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    print('✅ [Cache] AI 추천 캐시 로드 성공 (${routines.length}개, ${age.inMinutes}분 전)');
+    return routines;
+  } catch (e) {
+    print('❌ [Cache] AI 추천 캐시 로드 실패: $e');
+    await _clearCache();
+    return null;
+  }
+}
+
+/// AI 추천 루틴 캐시 저장
+Future<void> _saveCachedRoutines(List<WorkoutRoutine> routines) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final routinesJson = routines.map((r) => r.toJson()).toList();
+    final jsonString = jsonEncode(routinesJson);
+
+    await prefs.setString(_aiRoutinesCacheKey, jsonString);
+    await prefs.setInt(_aiRoutinesCacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+
+    print('💾 [Cache] AI 추천 캐시 저장 완료 (${routines.length}개)');
+  } catch (e) {
+    print('❌ [Cache] AI 추천 캐시 저장 실패: $e');
+  }
+}
+
+/// 캐시 클리어
+Future<void> _clearCache() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_aiRoutinesCacheKey);
+    await prefs.remove(_aiRoutinesCacheTimeKey);
+    print('🗑️ [Cache] AI 추천 캐시 삭제');
+  } catch (e) {
+    print('❌ [Cache] 캐시 삭제 실패: $e');
+  }
+}
+
+/// 백그라운드에서 AI 추천 갱신
+void _refreshRoutinesInBackground(
+  Ref ref,
+  List<Exercise> exercises,
+  WorkoutGoalModel? workoutGoal,
+  UserProfileModel? userProfile,
+) {
+  Future(() async {
+    try {
+      print('🔄 [Background] AI 추천 백그라운드 갱신 시작');
+
+      List<WorkoutRoutine>? newRoutines;
+
+      if (_enableWorkoutAi) {
+        try {
+          newRoutines = await _fetchWorkoutAiRoutines(
+            exercises: exercises,
+            workoutGoal: workoutGoal,
+            userProfile: userProfile,
+          );
+        } catch (e) {
+          print('⚠️ [Background] Supabase 추천 실패: $e');
+        }
+
+        if (newRoutines == null || newRoutines.isEmpty) {
+          if (_hasOpenAiKey) {
+            // OpenAI 폴백은 생략 (백그라운드에서는 너무 느림)
+            print('ℹ️ [Background] OpenAI 폴백 건너뜀');
+          }
+        }
+      }
+
+      if (newRoutines == null || newRoutines.isEmpty) {
+        newRoutines = AIRecommendedRoutines.getRecommendedRoutines(exercises);
+      }
+
+      // 새 추천을 캐시에 저장
+      await _saveCachedRoutines(newRoutines);
+
+      // Provider 갱신 (ref.invalidate는 사용하지 않음 - 사용자 경험 유지)
+      print('✅ [Background] AI 추천 백그라운드 갱신 완료');
+    } catch (e) {
+      print('❌ [Background] AI 추천 백그라운드 갱신 실패: $e');
+    }
+  });
+}

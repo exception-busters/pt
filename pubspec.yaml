@@ -47,6 +47,9 @@ dependencies:
   url_launcher: ^6.3.1                    # URL 실행 (YouTube 링크)
   http: ^1.2.1                           # OpenAI API 연동
   table_calendar: ^3.1.2
+  google_sign_in: ^6.2.1                 # Google 로그인
+  cached_network_image: ^3.3.1           # 이미지 캐싱
+  intl: ^0.19.0                          # 날짜 포맷팅
 
 dev_dependencies:
   flutter_test:

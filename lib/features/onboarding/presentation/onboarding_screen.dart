@@ -333,21 +333,21 @@ class _PersonalInfoScreenState extends ConsumerState<_PersonalInfoScreen> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          const SizedBox(height: 20),
-          const Text(
-            '정보를 입력해주세요',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: mainButtonColor,
-            ),
-          ),
-          const SizedBox(height: 24),
-          
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    '정보를 입력해주세요',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: mainButtonColor,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   NumberPickerWidget(
                     label: '만 나이',
                     unit: '세',
@@ -429,86 +429,38 @@ class _DietPreferencesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final onboardingData = ref.watch(onboardingProvider);
 
-    final bool canProceed = onboardingData.dietGoal != null &&
-                           onboardingData.mealsPerDay != null;
+    final bool canProceed = onboardingData.mealsPerDay != null;
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          const Text(
-            '식단 목표를 선택해주세요',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: mainButtonColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '목표에 맞는 식단을 AI가 추천해드립니다',
-            style: TextStyle(
-              fontSize: 16,
-              color: subTextColor,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 48),
-
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 식단 목표 선택
+                  const SizedBox(height: 40),
                   const Text(
-                    '식단 목표',
+                    '식단 설정',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
                       color: mainButtonColor,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
-                  ...DietGoal.values.map((goal) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: RadioListTile<DietGoal>(
-                        title: Text(
-                          goal.displayName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        value: goal,
-                        groupValue: onboardingData.dietGoal,
-                        onChanged: (value) {
-                          if (value != null) {
-                            ref.read(onboardingProvider.notifier).updateDietGoal(value);
-                          }
-                        },
-                        activeColor: mainButtonColor,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: onboardingData.dietGoal == goal
-                                ? mainButtonColor
-                                : borderColor,
-                          ),
-                        ),
-                        tileColor: onboardingData.dietGoal == goal
-                            ? mainButtonColor.withOpacity(0.1)
-                            : Colors.transparent,
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '하루 식사 횟수를 선택해주세요',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: subTextColor,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 48),
 
                   // 하루 식사 횟수 선택
                   const Text(
@@ -640,23 +592,23 @@ class _WorkoutPreferencesScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          const Text(
-            '운동 목적과 수준을 선택해주세요',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: mainButtonColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 48),
-          
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 40),
+                  const Text(
+                    '운동 목적과 수준을 선택해주세요',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: mainButtonColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 48),
+
                   // 운동 목적
                   const Text(
                     '운동 목적',

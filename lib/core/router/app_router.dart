@@ -17,6 +17,7 @@ import 'package:flutter_application_1/features/profile/presentation/notification
 import 'package:flutter_application_1/features/profile/presentation/help_screen.dart';
 import 'package:flutter_application_1/features/records/presentation/records_detail_screen.dart';
 import 'package:flutter_application_1/features/records/presentation/records_screen.dart';
+import 'package:flutter_application_1/features/records/presentation/statistics_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_detail_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/workout_screen.dart';
 import 'package:flutter_application_1/features/workout/presentation/create_routine_screen.dart';
@@ -187,6 +188,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'records',
             builder: (context, state) => const RecordsScreen(),
             routes: [
+              GoRoute(
+                path: 'statistics',
+                name: 'statistics',
+                builder: (context, state) => const StatisticsScreen(),
+              ),
               GoRoute(
                 path: 'detail/:id',
                 name: 'record-detail',

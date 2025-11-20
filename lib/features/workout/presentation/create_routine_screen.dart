@@ -194,7 +194,10 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
         await ref
             .read(workoutRoutineControllerProvider.notifier)
             .updateRoutine(widget.editingRoutine!.id, routine);
-        
+
+        // 수정 후 provider 새로고침
+        ref.invalidate(workoutRoutineControllerProvider);
+
         if (mounted) {
           Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
           ScaffoldMessenger.of(context).showSnackBar(
@@ -212,10 +215,17 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
           '사용자가 수정한 운동 루틴',
           _selectedExercises,
         );
-        
+
         if (mounted) {
           Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
           if (success) {
+            // 수정 후 provider 새로고침 (루틴 목록 & 요일별 스케줄)
+            ref.invalidate(supabaseRoutineNotifierProvider);
+            ref.invalidate(routineSchedulesProvider);
+
+            // provider 업데이트를 위한 짧은 대기
+            await Future.delayed(const Duration(milliseconds: 100));
+
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('루틴이 수정되었습니다'),
@@ -242,9 +252,13 @@ class _CreateRoutineScreenState extends ConsumerState<CreateRoutineScreen> {
         if (mounted) {
           Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
           if (success) {
-            // 성공 시 워크아웃 화면의 루틴 목록도 새로고침
+            // 성공 시 provider 새로고침 (루틴 목록 & 요일별 스케줄)
             ref.invalidate(supabaseRoutineNotifierProvider);
-            
+            ref.invalidate(routineSchedulesProvider);
+
+            // provider 업데이트를 위한 짧은 대기
+            await Future.delayed(const Duration(milliseconds: 100));
+
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('새 루틴이 데이터베이스에 저장되었습니다'),

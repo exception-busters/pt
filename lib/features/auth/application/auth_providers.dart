@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase_flutter show AuthState;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../common/data/supabase_service.dart';
 
 class AuthState {
@@ -300,16 +301,121 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> _clearUserSpecificData(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 사용자별 프로필 이미지 키 삭제
       await prefs.remove('profile_image_$userId');
-      
+
       // 필요시 다른 사용자별 데이터도 정리 가능
       // 온보딩 데이터는 OnboardingNotifier에서 처리됨
-      
+
       print('✅ 사용자별 로컬 데이터 정리 완료');
     } catch (e) {
       print('❌ 사용자별 데이터 정리 실패: $e');
+    }
+  }
+
+  /// Google 로그인 (Supabase 연동)
+  Future<bool> signInWithGoogle() async {
+    try {
+      state = state.copyWith(isLoading: true);
+      _controller.add(state);
+
+      print('🔵 [Google Login] 구글 로그인 시작...');
+
+      // 1. Google Sign In 초기화
+      // ⚠️ Web Client ID는 Google Cloud Console에서 발급받은 것을 사용하세요
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        serverClientId: '659372212462-si3sn3e91uflem8vocrta0bddmjeko54.apps.googleusercontent.com', // 여기에 Web Client ID 입력
+      );
+
+      print('📱 [Google Login] Google Sign In 초기화 완료');
+
+      // 2. 이전 세션 정리 (옵션)
+      try {
+        await googleSignIn.signOut();
+        print('📱 [Google Login] 이전 세션 정리 완료');
+      } catch (e) {
+        print('⚠️ [Google Login] 이전 세션 없음');
+      }
+
+      // 3. Google 계정 선택
+      print('📱 [Google Login] Google 계정 선택 다이얼로그 표시 중...');
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('❌ [Google Login] 사용자가 로그인 취소');
+        state = const AuthState(isLoggedIn: false, isLoading: false);
+        _controller.add(state);
+        return false;
+      }
+
+      print('✅ [Google Login] 계정 선택 완료: ${googleUser.email}');
+
+      // 4. Google 인증 정보 가져오기
+      print('📱 [Google Login] Google 인증 토큰 가져오는 중...');
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        throw Exception('Google ID 토큰을 가져오지 못했습니다');
+      }
+
+      print('✅ [Google Login] 구글 토큰 획득 성공');
+
+      // 5. Supabase에 Google 토큰으로 로그인
+      print('📱 [Google Login] Supabase 인증 시도 중...');
+      final response = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      if (response.user != null) {
+        print('✅ [Google Login] Supabase 로그인 성공');
+        print('   - User ID: ${response.user!.id}');
+        print('   - Email: ${response.user!.email}');
+
+        // 6. 사용자 DB 존재 확인 및 생성
+        print('📱 [Google Login] DB 사용자 확인/생성 중...');
+        await _ensureUserExistsInDatabase(response.user!);
+        print('✅ [Google Login] DB 사용자 확인 완료');
+
+        // 7. profile_completed 상태 조회
+        print('📱 [Google Login] 프로필 완성 상태 조회 중...');
+        final profileCompleted = await _loadProfileCompletedStatus(response.user!);
+        print('✅ [Google Login] profile_completed = $profileCompleted');
+
+        // 8. 최종 상태 업데이트
+        state = AuthState(
+          isLoggedIn: true,
+          profileCompleted: profileCompleted,
+          isLoading: false,
+        );
+        _controller.add(state);
+
+        print('🎉 [Google Login] 전체 프로세스 성공!');
+
+        // 9. 완전한 사용자 데이터 로드 트리거
+        _triggerCompleteUserDataLoad();
+
+        return true;
+      } else {
+        print('❌ [Google Login] Supabase 응답에 사용자 정보 없음');
+        state = const AuthState(isLoggedIn: false, isLoading: false);
+        _controller.add(state);
+        return false;
+      }
+    } catch (e, stackTrace) {
+      print('========================================');
+      print('❌ [Google Login] 에러 발생!');
+      print('   - 에러: $e');
+      print('   - 스택: $stackTrace');
+      print('========================================');
+      state = const AuthState(isLoggedIn: false, isLoading: false);
+      _controller.add(state);
+      return false;
     }
   }
 
