@@ -72,6 +72,36 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
     return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
   }
 
+  Future<void> _selectWeek() async {
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _WeekPickerDialog(
+        initialWeekStart: _selectedWeekStart,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedWeekStart = picked;
+      });
+    }
+  }
+
+  Future<void> _selectMonth() async {
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _MonthYearPickerDialog(
+        initialDate: _selectedMonth,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedMonth = picked;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -92,12 +122,14 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
             weekStart: _selectedWeekStart,
             onPrevious: _previousWeek,
             onNext: _nextWeek,
+            onSelectWeek: _selectWeek,
             isCurrentWeek: _isCurrentWeek(),
           ),
           _MonthlyStatsView(
             month: _selectedMonth,
             onPrevious: _previousMonth,
             onNext: _nextMonth,
+            onSelectMonth: _selectMonth,
             isCurrentMonth: _isCurrentMonth(),
           ),
         ],
@@ -110,12 +142,14 @@ class _WeeklyStatsView extends ConsumerWidget {
   final DateTime weekStart;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+  final VoidCallback onSelectWeek;
   final bool isCurrentWeek;
 
   const _WeeklyStatsView({
     required this.weekStart,
     required this.onPrevious,
     required this.onNext,
+    required this.onSelectWeek,
     required this.isCurrentWeek,
   });
 
@@ -147,12 +181,26 @@ class _WeeklyStatsView extends ConsumerWidget {
                     icon: const Icon(Icons.chevron_left),
                     onPressed: onPrevious,
                   ),
-                  Text(
-                    '${DateFormat('M월 d일').format(weekStart)} - ${DateFormat('M월 d일').format(weekEnd.subtract(const Duration(days: 1)))}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: mainButtonColor,
+                  GestureDetector(
+                    onTap: onSelectWeek,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${DateFormat('M월 d일').format(weekStart)} - ${DateFormat('M월 d일').format(weekEnd.subtract(const Duration(days: 1)))}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 18,
+                          color: mainButtonColor,
+                        ),
+                      ],
                     ),
                   ),
                   IconButton(
@@ -287,12 +335,14 @@ class _MonthlyStatsView extends ConsumerWidget {
   final DateTime month;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+  final VoidCallback onSelectMonth;
   final bool isCurrentMonth;
 
   const _MonthlyStatsView({
     required this.month,
     required this.onPrevious,
     required this.onNext,
+    required this.onSelectMonth,
     required this.isCurrentMonth,
   });
 
@@ -323,12 +373,26 @@ class _MonthlyStatsView extends ConsumerWidget {
                     icon: const Icon(Icons.chevron_left),
                     onPressed: onPrevious,
                   ),
-                  Text(
-                    DateFormat('yyyy년 M월').format(month),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: mainButtonColor,
+                  GestureDetector(
+                    onTap: onSelectMonth,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          DateFormat('yyyy년 M월').format(month),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: mainButtonColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.calendar_month,
+                          size: 18,
+                          color: mainButtonColor,
+                        ),
+                      ],
                     ),
                   ),
                   IconButton(
@@ -921,6 +985,387 @@ class _WeeklyDietChart extends StatelessWidget {
           ],
         );
       }),
+    );
+  }
+}
+
+// 주 선택 다이얼로그
+class _WeekPickerDialog extends StatefulWidget {
+  final DateTime initialWeekStart;
+
+  const _WeekPickerDialog({required this.initialWeekStart});
+
+  @override
+  State<_WeekPickerDialog> createState() => _WeekPickerDialogState();
+}
+
+class _WeekPickerDialogState extends State<_WeekPickerDialog> {
+  late int _selectedYear;
+  late int _selectedMonth;
+  DateTime? _selectedWeekStart;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialWeekStart.year;
+    _selectedMonth = widget.initialWeekStart.month;
+    _selectedWeekStart = widget.initialWeekStart;
+  }
+
+  List<DateTime> _getWeeksInMonth(int year, int month) {
+    final firstDay = DateTime(year, month, 1);
+    final lastDay = DateTime(year, month + 1, 0);
+    final weeks = <DateTime>[];
+
+    // 첫 주의 월요일 찾기
+    var currentMonday = firstDay.subtract(Duration(days: firstDay.weekday - 1));
+
+    // 해당 월의 모든 주 찾기
+    while (currentMonday.isBefore(lastDay) ||
+           (currentMonday.year == year && currentMonday.month == month)) {
+      weeks.add(currentMonday);
+      currentMonday = currentMonday.add(const Duration(days: 7));
+
+      // 다음 주가 다음 달로 넘어가면서 이번 달 날짜가 하나도 없으면 중단
+      final weekEnd = currentMonday.add(const Duration(days: 6));
+      if (currentMonday.isAfter(lastDay) && weekEnd.month != month) {
+        break;
+      }
+    }
+
+    return weeks;
+  }
+
+  String _formatWeekRange(DateTime weekStart) {
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    return '${DateFormat('M/d').format(weekStart)} - ${DateFormat('M/d').format(weekEnd)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final currentWeekStart = now.subtract(Duration(days: now.weekday - 1));
+
+    final years = List.generate(
+      now.year - 2020 + 1,
+      (index) => 2020 + index,
+    ).reversed.toList();
+
+    final weeks = _getWeeksInMonth(_selectedYear, _selectedMonth);
+
+    return AlertDialog(
+      title: const Text('주 선택'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 연도 선택
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    value: _selectedYear,
+                    decoration: const InputDecoration(
+                      labelText: '연도',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: years.map((year) {
+                      return DropdownMenuItem(
+                        value: year,
+                        child: Text('$year년'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedYear = value;
+                          // 선택한 연도/월이 미래인 경우 현재 월로 조정
+                          if (_selectedYear == now.year && _selectedMonth > now.month) {
+                            _selectedMonth = now.month;
+                          }
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 월 선택
+                Expanded(
+                  child: DropdownButtonFormField<int>(
+                    value: _selectedMonth,
+                    decoration: const InputDecoration(
+                      labelText: '월',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: List.generate(12, (index) {
+                      final month = index + 1;
+                      final isFuture = _selectedYear == now.year && month > now.month;
+                      return DropdownMenuItem(
+                        value: month,
+                        enabled: !isFuture,
+                        child: Text(
+                          '$month월',
+                          style: TextStyle(
+                            color: isFuture ? Colors.grey : Colors.black,
+                          ),
+                        ),
+                      );
+                    }),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedMonth = value;
+                          _selectedWeekStart = null; // 월이 바뀌면 선택 초기화
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // 주 선택 리스트
+            const Text(
+              '주 선택',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: mainButtonColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 300,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: weeks.length,
+                itemBuilder: (context, index) {
+                  final weekStart = weeks[index];
+                  final weekEnd = weekStart.add(const Duration(days: 6));
+                  final isSelected = _selectedWeekStart != null &&
+                      weekStart.year == _selectedWeekStart!.year &&
+                      weekStart.month == _selectedWeekStart!.month &&
+                      weekStart.day == _selectedWeekStart!.day;
+                  final isFuture = weekStart.isAfter(currentWeekStart);
+
+                  return Card(
+                    color: isFuture
+                        ? Colors.grey[200]
+                        : (isSelected ? mainButtonColor.withOpacity(0.1) : Colors.white),
+                    child: ListTile(
+                      enabled: !isFuture,
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isFuture
+                              ? Colors.grey[300]
+                              : (isSelected ? mainButtonColor : Colors.grey[300]),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        _formatWeekRange(weekStart),
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isFuture ? Colors.grey : Colors.black,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${weekStart.year}년 ${weekStart.month}월',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isFuture ? Colors.grey[400] : subTextColor,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: mainButtonColor.withOpacity(0.1),
+                      onTap: isFuture
+                          ? null
+                          : () {
+                              setState(() {
+                                _selectedWeekStart = weekStart;
+                              });
+                            },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: _selectedWeekStart == null
+              ? null
+              : () {
+                  Navigator.of(context).pop(_selectedWeekStart);
+                },
+          child: const Text('확인'),
+        ),
+      ],
+    );
+  }
+}
+
+// 연도/월 선택 다이얼로그
+class _MonthYearPickerDialog extends StatefulWidget {
+  final DateTime initialDate;
+
+  const _MonthYearPickerDialog({required this.initialDate});
+
+  @override
+  State<_MonthYearPickerDialog> createState() => _MonthYearPickerDialogState();
+}
+
+class _MonthYearPickerDialogState extends State<_MonthYearPickerDialog> {
+  late int _selectedYear;
+  late int _selectedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialDate.year;
+    _selectedMonth = widget.initialDate.month;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final years = List.generate(
+      now.year - 2020 + 1,
+      (index) => 2020 + index,
+    ).reversed.toList();
+
+    final months = [
+      '1월', '2월', '3월', '4월', '5월', '6월',
+      '7월', '8월', '9월', '10월', '11월', '12월'
+    ];
+
+    return AlertDialog(
+      title: const Text('월 선택'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 연도 선택 드롭다운
+            DropdownButtonFormField<int>(
+              value: _selectedYear,
+              decoration: const InputDecoration(
+                labelText: '연도',
+                border: OutlineInputBorder(),
+              ),
+              items: years.map((year) {
+                return DropdownMenuItem(
+                  value: year,
+                  child: Text('$year년'),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedYear = value;
+                    // 선택한 연도/월이 미래인 경우 현재 월로 조정
+                    if (_selectedYear == now.year && _selectedMonth > now.month) {
+                      _selectedMonth = now.month;
+                    }
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+            // 월 선택 그리드
+            const Text(
+              '월',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: mainButtonColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 2.5,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: 12,
+              itemBuilder: (context, index) {
+                final month = index + 1;
+                final isSelected = month == _selectedMonth;
+                final isFuture = _selectedYear == now.year && month > now.month;
+
+                return InkWell(
+                  onTap: isFuture
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedMonth = month;
+                          });
+                        },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isFuture
+                          ? Colors.grey[200]
+                          : (isSelected ? mainButtonColor : Colors.white),
+                      border: Border.all(
+                        color: isSelected ? mainButtonColor : borderColor,
+                        width: isSelected ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        months[index],
+                        style: TextStyle(
+                          color: isFuture
+                              ? Colors.grey[400]
+                              : (isSelected ? Colors.white : Colors.black),
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.of(context).pop(
+              DateTime(_selectedYear, _selectedMonth, 1),
+            );
+          },
+          child: const Text('확인'),
+        ),
+      ],
     );
   }
 }
