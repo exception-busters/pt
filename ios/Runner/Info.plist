@@ -50,5 +50,20 @@
 	<string>프로필 사진을 촬영하기 위해 카메라 접근이 필요합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>프로필 사진을 선택하기 위해 사진 라이브러리 접근이 필요합니다.</string>
+
+	<!-- Google Sign In URL Scheme -->
+	<!-- TODO: Google Cloud Console에서 iOS Client ID의 Reversed Client ID로 교체하세요 -->
+	<!-- 예시: com.googleusercontent.apps.123456789-abcdefg -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.YOUR-REVERSED-CLIENT-ID</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

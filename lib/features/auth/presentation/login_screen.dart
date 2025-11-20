@@ -88,15 +88,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     context.push('/signup');
   }
 
+  Future<void> _loginWithGoogle() async {
+    final auth = ref.read(authControllerProvider.notifier);
+    final ok = await auth.signInWithGoogle();
+
+    if (!mounted) return;
+
+    // 로그인 실패 시에만 에러 메시지 표시
+    // 성공 시에는 GoRouter가 자동으로 리다이렉트하므로 아무것도 하지 않음
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('구글 로그인에 실패했습니다. 다시 시도해주세요.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // AuthController의 로딩 상태를 직접 감지
+    final authState = ref.watch(authControllerProvider);
+    final isAuthLoading = authState.isLoading;
+
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -207,26 +231,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('구글 로그인 기능은 추후 구현됩니다'),
-                        backgroundColor: mainButtonColor,
-                      ),
-                    );
-                  },
+                  onPressed: (isAuthLoading || _isLoading) ? null : _loginWithGoogle,
                   icon: const Icon(Icons.login),
                   label: const Text('Google로 계속하기'),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: borderColor),
                     foregroundColor: subTextColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 SizedBox(height: MediaQuery.of(context).size.height * 0.1),
               ],
+                ),
+              ),
             ),
           ),
-        ),
+
+          // 로딩 오버레이 (AuthController의 isLoading 사용)
+          if (isAuthLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(mainButtonColor),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '로그인 중...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
