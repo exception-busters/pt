@@ -8,6 +8,8 @@ class WeeklyWorkoutStats {
   final int totalRoutines;
   final Map<String, int> exercisesByBodyPart;
   final List<DailyWorkoutSummary> dailySummaries;
+  final int totalCaloriesBurned;
+  final double averageIntensity;
 
   WeeklyWorkoutStats({
     required this.weekStart,
@@ -18,6 +20,8 @@ class WeeklyWorkoutStats {
     required this.totalRoutines,
     required this.exercisesByBodyPart,
     required this.dailySummaries,
+    this.totalCaloriesBurned = 0,
+    this.averageIntensity = 0.0,
   });
 
   double get completionRate {
@@ -28,6 +32,15 @@ class WeeklyWorkoutStats {
   int get averageMinutesPerDay {
     if (totalWorkouts == 0) return 0;
     return totalMinutes ~/ 7;
+  }
+
+  double get averageWorkoutsPerDay {
+    return totalWorkouts / 7.0;
+  }
+
+  int get averageCaloriesPerWorkout {
+    if (totalWorkouts == 0) return 0;
+    return totalCaloriesBurned ~/ totalWorkouts;
   }
 }
 
@@ -57,6 +70,8 @@ class MonthlyWorkoutStats {
   final Map<String, int> exercisesByBodyPart;
   final List<WeeklyWorkoutSummary> weeklySummaries;
   final Map<String, int> exercisesByDifficulty;
+  final int totalCaloriesBurned;
+  final double averageIntensity;
 
   MonthlyWorkoutStats({
     required this.monthStart,
@@ -68,6 +83,8 @@ class MonthlyWorkoutStats {
     required this.exercisesByBodyPart,
     required this.weeklySummaries,
     required this.exercisesByDifficulty,
+    this.totalCaloriesBurned = 0,
+    this.averageIntensity = 0.0,
   });
 
   double get completionRate {
@@ -80,6 +97,17 @@ class MonthlyWorkoutStats {
     final weeks = (monthEnd.difference(monthStart).inDays / 7).ceil();
     if (weeks == 0) return 0.0;
     return totalWorkouts / weeks;
+  }
+
+  double get averageWorkoutsPerDay {
+    final days = monthEnd.difference(monthStart).inDays;
+    if (days == 0) return 0.0;
+    return totalWorkouts / days;
+  }
+
+  int get averageCaloriesPerWorkout {
+    if (totalWorkouts == 0) return 0;
+    return totalCaloriesBurned ~/ totalWorkouts;
   }
 }
 
@@ -165,6 +193,12 @@ class MonthlyDietStats {
   double get calorieAchievementRate {
     if (targetCalories == 0) return 0.0;
     return (averageCalories / targetCalories) * 100;
+  }
+
+  double get averageMealsPerDay {
+    final days = monthEnd.difference(monthStart).inDays;
+    if (days == 0) return 0.0;
+    return totalMeals / days;
   }
 }
 

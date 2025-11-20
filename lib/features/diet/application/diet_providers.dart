@@ -455,10 +455,66 @@ class DietController extends StateNotifier<DietData> {
         print('✅ [Diet Sync] meal_component ${componentInserts.length}개 삽입 완료');
       }
 
+      // 5. nutritionsummary 업데이트 (해당 날짜의 모든 식사 합산)
+      await _updateNutritionSummary(user.id, mealDate);
+
       print('🎉 [Diet Sync] Supabase 동기화 성공 - $mealType');
     } catch (error, stackTrace) {
       print('❌ [Diet Sync] Supabase 동기화 실패($mealType): $error');
       print('Stack trace: $stackTrace');
+    }
+  }
+
+  /// nutritionsummary 테이블 업데이트 (해당 날짜의 모든 식사 합산)
+  Future<void> _updateNutritionSummary(String userId, DateTime date) async {
+    try {
+      final client = Supabase.instance.client;
+      final dateStr = date.toIso8601String().split('T')[0];
+
+      // 해당 날짜의 모든 meal_record 조회
+      final meals = await client
+          .from('meal_record')
+          .select('calories, carbs, protein, fat')
+          .eq('user_id', userId)
+          .eq('meal_date', dateStr);
+
+      if (meals.isEmpty) {
+        // 식사 기록이 없으면 nutritionsummary에서도 삭제
+        await client
+            .from('nutritionsummary')
+            .delete()
+            .eq('user_id', userId)
+            .eq('date', dateStr);
+        print('🗑️ [Nutrition Summary] 식사 기록 없음 - 요약 삭제');
+        return;
+      }
+
+      // 합산 계산
+      var totalCalories = 0.0;
+      var totalCarbs = 0.0;
+      var totalProtein = 0.0;
+      var totalFat = 0.0;
+
+      for (final meal in meals) {
+        totalCalories += (meal['calories'] as num?)?.toDouble() ?? 0;
+        totalCarbs += (meal['carbs'] as num?)?.toDouble() ?? 0;
+        totalProtein += (meal['protein'] as num?)?.toDouble() ?? 0;
+        totalFat += (meal['fat'] as num?)?.toDouble() ?? 0;
+      }
+
+      // nutritionsummary에 upsert (있으면 업데이트, 없으면 삽입)
+      await client.from('nutritionsummary').upsert({
+        'user_id': userId,
+        'date': dateStr,
+        'total_calories': totalCalories,
+        'total_carbs': totalCarbs,
+        'total_protein': totalProtein,
+        'total_fat': totalFat,
+      }, onConflict: 'user_id,date');
+
+      print('✅ [Nutrition Summary] 영양 요약 업데이트 완료 - $dateStr');
+    } catch (error) {
+      print('❌ [Nutrition Summary] 업데이트 실패: $error');
     }
   }
 

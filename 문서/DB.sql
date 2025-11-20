@@ -47,6 +47,7 @@ CREATE TABLE public.exercisegoal (
   daily_duration_min integer,
   preferred_types ARRAY,
   created_at timestamp without time zone DEFAULT now(),
+  experience_duration character varying,
   CONSTRAINT exercisegoal_pkey PRIMARY KEY (goal_id),
   CONSTRAINT exercisegoal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
@@ -80,6 +81,36 @@ CREATE TABLE public.item (
   is_premium boolean,
   CONSTRAINT item_pkey PRIMARY KEY (item_id)
 );
+CREATE TABLE public.meal_component (
+  component_id integer NOT NULL DEFAULT nextval('meal_component_component_id_seq'::regclass),
+  meal_record_id integer NOT NULL,
+  food_code character varying,
+  food_name character varying NOT NULL,
+  food_category character varying,
+  grams numeric NOT NULL CHECK (grams >= 0::numeric),
+  calories numeric DEFAULT 0,
+  protein numeric DEFAULT 0,
+  carbs numeric DEFAULT 0,
+  fat numeric DEFAULT 0,
+  fiber numeric DEFAULT 0,
+  sodium numeric DEFAULT 0,
+  CONSTRAINT meal_component_pkey PRIMARY KEY (component_id),
+  CONSTRAINT meal_component_meal_record_id_fkey FOREIGN KEY (meal_record_id) REFERENCES public.meal_record(meal_record_id)
+);
+CREATE TABLE public.meal_record (
+  meal_record_id integer NOT NULL DEFAULT nextval('meal_record_meal_record_id_seq'::regclass),
+  user_id uuid NOT NULL,
+  meal_date date NOT NULL,
+  meal_type character varying NOT NULL CHECK (meal_type::text = ANY (ARRAY['breakfast'::character varying, 'lunch'::character varying, 'dinner'::character varying]::text[])),
+  calories numeric DEFAULT 0,
+  carbs numeric DEFAULT 0,
+  protein numeric DEFAULT 0,
+  fat numeric DEFAULT 0,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT meal_record_pkey PRIMARY KEY (meal_record_id),
+  CONSTRAINT meal_record_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
 CREATE TABLE public.myfood (
   my_food_id integer NOT NULL DEFAULT nextval('myfood_my_food_id_seq'::regclass),
   user_id uuid,
@@ -87,8 +118,8 @@ CREATE TABLE public.myfood (
   is_favorite boolean,
   added_at timestamp without time zone,
   CONSTRAINT myfood_pkey PRIMARY KEY (my_food_id),
-  CONSTRAINT myfood_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT myfood_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foodinfo(food_id)
+  CONSTRAINT myfood_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foodinfo(food_id),
+  CONSTRAINT myfood_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.notification (
   noti_id integer NOT NULL DEFAULT nextval('notification_noti_id_seq'::regclass),
@@ -134,8 +165,8 @@ CREATE TABLE public.purchase (
   item_id integer,
   purchase_date timestamp without time zone,
   CONSTRAINT purchase_pkey PRIMARY KEY (purchase_id),
-  CONSTRAINT purchase_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT purchase_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id)
+  CONSTRAINT purchase_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id),
+  CONSTRAINT purchase_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.ranking (
   rank_id integer NOT NULL DEFAULT nextval('ranking_rank_id_seq'::regclass),
@@ -181,8 +212,8 @@ CREATE TABLE public.routine_record (
   is_user_reported boolean DEFAULT false,
   session_status text DEFAULT 'completed'::text,
   CONSTRAINT routine_record_pkey PRIMARY KEY (session_id),
-  CONSTRAINT routine_record_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT routine_record_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id)
+  CONSTRAINT routine_record_routine_id_fkey FOREIGN KEY (routine_id) REFERENCES public.routine(routine_id),
+  CONSTRAINT routine_record_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.routine_schedule (
   schedule_id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -206,8 +237,8 @@ CREATE TABLE public.user_challenge (
   completed boolean,
   joined_at timestamp without time zone,
   CONSTRAINT user_challenge_pkey PRIMARY KEY (user_challenge_id),
-  CONSTRAINT user_challenge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT user_challenge_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenge(challenge_id)
+  CONSTRAINT user_challenge_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenge(challenge_id),
+  CONSTRAINT user_challenge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.user_content_access (
   access_id integer NOT NULL DEFAULT nextval('user_content_access_access_id_seq'::regclass),
@@ -216,8 +247,8 @@ CREATE TABLE public.user_content_access (
   has_access boolean,
   granted_at timestamp without time zone,
   CONSTRAINT user_content_access_pkey PRIMARY KEY (access_id),
-  CONSTRAINT user_content_access_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT user_content_access_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id)
+  CONSTRAINT user_content_access_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.item(item_id),
+  CONSTRAINT user_content_access_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.userbadge (
   user_badge_id integer NOT NULL DEFAULT nextval('userbadge_user_badge_id_seq'::regclass),
@@ -225,8 +256,8 @@ CREATE TABLE public.userbadge (
   badge_id integer,
   earned_at timestamp without time zone,
   CONSTRAINT userbadge_pkey PRIMARY KEY (user_badge_id),
-  CONSTRAINT userbadge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT userbadge_badge_id_fkey FOREIGN KEY (badge_id) REFERENCES public.badge(badge_id)
+  CONSTRAINT userbadge_badge_id_fkey FOREIGN KEY (badge_id) REFERENCES public.badge(badge_id),
+  CONSTRAINT userbadge_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.usermeal (
   meal_id integer NOT NULL DEFAULT nextval('usermeal_meal_id_seq'::regclass),
@@ -235,8 +266,8 @@ CREATE TABLE public.usermeal (
   meal_time timestamp without time zone,
   quantity numeric,
   CONSTRAINT usermeal_pkey PRIMARY KEY (meal_id),
-  CONSTRAINT usermeal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
-  CONSTRAINT usermeal_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foodinfo(food_id)
+  CONSTRAINT usermeal_food_id_fkey FOREIGN KEY (food_id) REFERENCES public.foodinfo(food_id),
+  CONSTRAINT usermeal_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 CREATE TABLE public.userprofile (
   user_id uuid NOT NULL,

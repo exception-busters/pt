@@ -76,17 +76,21 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
   }
 
   try {
-    // workout_records 조회
+    // routine_record 조회 (완료된 세션만)
     final records = await client
-        .from('workout_records')
-        .select('*, routines(*)')
+        .from('routine_record')
+        .select('*, routine(*)')
         .eq('user_id', userId)
-        .gte('completed_at', weekStart.toIso8601String())
-        .lt('completed_at', weekEnd.toIso8601String())
-        .order('completed_at');
+        .eq('session_status', 'completed')
+        .gte('end_time', weekStart.toIso8601String())
+        .lt('end_time', weekEnd.toIso8601String())
+        .order('end_time');
 
     final totalWorkouts = records.length;
     var totalMinutes = 0;
+    var totalCaloriesBurned = 0;
+    var totalIntensity = 0.0;
+    var intensityCount = 0;
     final exercisesByBodyPart = <String, int>{};
 
     // 일별 요약 초기화
@@ -103,30 +107,59 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
 
     // 기록 처리
     for (final record in records) {
-      // 운동 시간 계산 (추정: 세트당 3분)
-      final routine = record['routines'];
+      // 운동 시간 계산
+      var sessionMinutes = 0;
+      final routine = record['routine'];
       if (routine != null) {
+        // 루틴이 있으면 세트 기반 계산 (세트당 3분)
         final exercises = routine['routine_exercise'] as List?;
         if (exercises != null) {
           for (final ex in exercises) {
             final sets = ex['sets'] as int? ?? 3;
-            totalMinutes += sets * 3;
+            sessionMinutes += sets * 3;
           }
         }
+      } else {
+        // 루틴이 없으면 칼로리 기반 추정 (100kcal당 10분)
+        final calories = record['total_calories'] as num?;
+        if (calories != null) {
+          sessionMinutes = (calories / 100 * 10).round();
+        } else {
+          // 칼로리도 없으면 기본 45분
+          sessionMinutes = 45;
+        }
+      }
+      totalMinutes += sessionMinutes;
+
+      // 소모 칼로리 및 인지 강도 추가
+      final calories = record['total_calories'] as int?;
+      if (calories != null) {
+        totalCaloriesBurned += calories;
+      }
+
+      final intensity = record['perceived_intensity'] as int?;
+      if (intensity != null) {
+        totalIntensity += intensity.toDouble();
+        intensityCount++;
       }
 
       // 일별 요약 업데이트
-      final completedAt = DateTime.parse(record['completed_at'] as String);
-      final dayIndex = completedAt.difference(weekStart).inDays;
+      final endTime = record['end_time'] != null
+          ? DateTime.parse(record['end_time'] as String)
+          : null;
+      if (endTime == null) continue;
+      final dayIndex = endTime.difference(weekStart).inDays;
       if (dayIndex >= 0 && dayIndex < 7) {
         dailySummaries[dayIndex] = DailyWorkoutSummary(
           date: dailySummaries[dayIndex].date,
           workoutCount: dailySummaries[dayIndex].workoutCount + 1,
-          totalMinutes: dailySummaries[dayIndex].totalMinutes + 30, // 추정
+          totalMinutes: dailySummaries[dayIndex].totalMinutes + sessionMinutes,
           hasWorkout: true,
         );
       }
     }
+
+    final averageIntensity = intensityCount > 0 ? totalIntensity / intensityCount : 0.0;
 
     return WeeklyWorkoutStats(
       weekStart: weekStart,
@@ -137,6 +170,8 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
       totalRoutines: totalWorkouts,
       exercisesByBodyPart: exercisesByBodyPart,
       dailySummaries: dailySummaries,
+      totalCaloriesBurned: totalCaloriesBurned,
+      averageIntensity: averageIntensity,
     );
   } catch (e) {
     print('주간 운동 통계 계산 실패: $e');
@@ -157,16 +192,36 @@ Future<MonthlyWorkoutStats> _calculateMonthlyWorkoutStats(
 
   try {
     final records = await client
-        .from('workout_records')
+        .from('routine_record')
         .select('*')
         .eq('user_id', userId)
-        .gte('completed_at', monthStart.toIso8601String())
-        .lt('completed_at', monthEnd.toIso8601String())
-        .order('completed_at');
+        .eq('session_status', 'completed')
+        .gte('end_time', monthStart.toIso8601String())
+        .lt('end_time', monthEnd.toIso8601String())
+        .order('end_time');
 
     final totalWorkouts = records.length;
+    var totalCaloriesBurned = 0;
+    var totalIntensity = 0.0;
+    var intensityCount = 0;
     final exercisesByBodyPart = <String, int>{};
     final exercisesByDifficulty = <String, int>{};
+
+    // 칼로리와 인지 강도 계산
+    for (final record in records) {
+      final calories = record['total_calories'] as int?;
+      if (calories != null) {
+        totalCaloriesBurned += calories;
+      }
+
+      final intensity = record['perceived_intensity'] as int?;
+      if (intensity != null) {
+        totalIntensity += intensity.toDouble();
+        intensityCount++;
+      }
+    }
+
+    final averageIntensity = intensityCount > 0 ? totalIntensity / intensityCount : 0.0;
 
     // 주별 요약 계산
     final weeklySummaries = <WeeklyWorkoutSummary>[];
@@ -178,9 +233,12 @@ Future<MonthlyWorkoutStats> _calculateMonthlyWorkoutStats(
       final weekEndCapped = currentWeekEnd.isAfter(monthEnd) ? monthEnd : currentWeekEnd;
 
       final weekRecords = records.where((record) {
-        final completedAt = DateTime.parse(record['completed_at'] as String);
-        return completedAt.isAfter(currentWeekStart.subtract(const Duration(seconds: 1))) &&
-               completedAt.isBefore(weekEndCapped);
+        final endTime = record['end_time'] != null
+            ? DateTime.parse(record['end_time'] as String)
+            : null;
+        if (endTime == null) return false;
+        return endTime.isAfter(currentWeekStart.subtract(const Duration(seconds: 1))) &&
+               endTime.isBefore(weekEndCapped);
       }).toList();
 
       weeklySummaries.add(WeeklyWorkoutSummary(
@@ -203,6 +261,8 @@ Future<MonthlyWorkoutStats> _calculateMonthlyWorkoutStats(
       exercisesByBodyPart: exercisesByBodyPart,
       weeklySummaries: weeklySummaries,
       exercisesByDifficulty: exercisesByDifficulty,
+      totalCaloriesBurned: totalCaloriesBurned,
+      averageIntensity: averageIntensity,
     );
   } catch (e) {
     print('월간 운동 통계 계산 실패: $e');
@@ -231,8 +291,18 @@ Future<WeeklyDietStats> _calculateWeeklyDietStats(
         .gte('date', weekStart.toIso8601String().split('T')[0])
         .lt('date', weekEnd.toIso8601String().split('T')[0]);
 
+    // meal_record 조회 (끼니 수 계산용)
+    final mealRecords = await client
+        .from('meal_record')
+        .select('meal_date')
+        .eq('user_id', userId)
+        .gte('meal_date', weekStart.toIso8601String().split('T')[0])
+        .lt('meal_date', weekEnd.toIso8601String().split('T')[0]);
+
     var totalCalories = 0.0;
-    var mealCount = 0;
+    var totalCarbs = 0.0;
+    var totalProtein = 0.0;
+    var totalFat = 0.0;
     final dailySummaries = <DailyDietSummary>[];
 
     // 일별 요약 초기화
@@ -246,33 +316,56 @@ Future<WeeklyDietStats> _calculateWeeklyDietStats(
       ));
     }
 
+    // 날짜별 끼니 수 계산
+    final Map<String, int> mealCountsByDate = {};
+    for (final meal in mealRecords) {
+      final dateStr = meal['meal_date'] as String;
+      mealCountsByDate[dateStr] = (mealCountsByDate[dateStr] ?? 0) + 1;
+    }
+
     for (final summary in summaries) {
       final calories = (summary['total_calories'] as num?)?.toDouble() ?? 0;
-      final meals = (summary['total_meals'] as int?) ?? 0;
+      final carbs = (summary['total_carbs'] as num?)?.toDouble() ?? 0;
+      final protein = (summary['total_protein'] as num?)?.toDouble() ?? 0;
+      final fat = (summary['total_fat'] as num?)?.toDouble() ?? 0;
+
       totalCalories += calories;
-      mealCount += meals;
+      totalCarbs += carbs;
+      totalProtein += protein;
+      totalFat += fat;
 
       final date = DateTime.parse(summary['date'] as String);
+      final dateStr = summary['date'] as String;
       final dayIndex = date.difference(weekStart).inDays;
       if (dayIndex >= 0 && dayIndex < 7) {
+        final mealsThisDay = mealCountsByDate[dateStr] ?? 0;
         dailySummaries[dayIndex] = DailyDietSummary(
           date: date,
-          mealCount: meals,
+          mealCount: mealsThisDay,
           totalCalories: calories,
-          hasMeals: meals > 0,
+          hasMeals: mealsThisDay > 0,
         );
       }
     }
 
+    final totalMeals = mealCountsByDate.values.fold(0, (sum, count) => sum + count);
+
     final averageCalories = summaries.isEmpty ? 0.0 : totalCalories / 7;
+    final averageCarbs = summaries.isEmpty ? 0.0 : totalCarbs / 7;
+    final averageProtein = summaries.isEmpty ? 0.0 : totalProtein / 7;
+    final averageFat = summaries.isEmpty ? 0.0 : totalFat / 7;
 
     return WeeklyDietStats(
       weekStart: weekStart,
       weekEnd: weekEnd,
-      totalMeals: mealCount,
+      totalMeals: totalMeals,
       averageCalories: averageCalories,
       targetCalories: targetCalories,
-      averageNutrients: {},
+      averageNutrients: {
+        'carbs': averageCarbs,
+        'protein': averageProtein,
+        'fat': averageFat,
+      },
       dailySummaries: dailySummaries,
     );
   } catch (e) {
@@ -302,8 +395,25 @@ Future<MonthlyDietStats> _calculateMonthlyDietStats(
         .lt('date', monthEnd.toIso8601String().split('T')[0])
         .order('date');
 
+    // meal_record 조회 (끼니 수 계산용)
+    final mealRecords = await client
+        .from('meal_record')
+        .select('meal_date')
+        .eq('user_id', userId)
+        .gte('meal_date', monthStart.toIso8601String().split('T')[0])
+        .lt('meal_date', monthEnd.toIso8601String().split('T')[0]);
+
+    // 날짜별 끼니 수 계산
+    final Map<String, int> mealCountsByDate = {};
+    for (final meal in mealRecords) {
+      final dateStr = meal['meal_date'] as String;
+      mealCountsByDate[dateStr] = (mealCountsByDate[dateStr] ?? 0) + 1;
+    }
+
     var totalCalories = 0.0;
-    var mealCount = 0;
+    var totalCarbs = 0.0;
+    var totalProtein = 0.0;
+    var totalFat = 0.0;
 
     // 주별 요약 계산
     final weeklySummaries = <WeeklyDietSummary>[];
@@ -324,7 +434,8 @@ Future<MonthlyDietStats> _calculateMonthlyDietStats(
       var weekMeals = 0;
       for (final summary in weekSummaries) {
         weekCalories += (summary['total_calories'] as num?)?.toDouble() ?? 0;
-        weekMeals += (summary['total_meals'] as int?) ?? 0;
+        final dateStr = summary['date'] as String;
+        weekMeals += mealCountsByDate[dateStr] ?? 0;
       }
 
       final weekDays = weekSummaries.length > 0 ? weekSummaries.length : 1;
@@ -340,19 +451,30 @@ Future<MonthlyDietStats> _calculateMonthlyDietStats(
 
     for (final summary in summaries) {
       totalCalories += (summary['total_calories'] as num?)?.toDouble() ?? 0;
-      mealCount += (summary['total_meals'] as int?) ?? 0;
+      totalCarbs += (summary['total_carbs'] as num?)?.toDouble() ?? 0;
+      totalProtein += (summary['total_protein'] as num?)?.toDouble() ?? 0;
+      totalFat += (summary['total_fat'] as num?)?.toDouble() ?? 0;
     }
+
+    final totalMeals = mealCountsByDate.values.fold(0, (sum, count) => sum + count);
 
     final daysInMonth = monthEnd.difference(monthStart).inDays;
     final averageCalories = daysInMonth == 0 ? 0.0 : totalCalories / daysInMonth;
+    final averageCarbs = daysInMonth == 0 ? 0.0 : totalCarbs / daysInMonth;
+    final averageProtein = daysInMonth == 0 ? 0.0 : totalProtein / daysInMonth;
+    final averageFat = daysInMonth == 0 ? 0.0 : totalFat / daysInMonth;
 
     return MonthlyDietStats(
       monthStart: monthStart,
       monthEnd: monthEnd,
-      totalMeals: mealCount,
+      totalMeals: totalMeals,
       averageCalories: averageCalories,
       targetCalories: targetCalories,
-      averageNutrients: {},
+      averageNutrients: {
+        'carbs': averageCarbs,
+        'protein': averageProtein,
+        'fat': averageFat,
+      },
       weeklySummaries: weeklySummaries,
     );
   } catch (e) {

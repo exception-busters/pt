@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_application_1/color.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_application_1/widgets/error_widget.dart';
 import '../application/statistics_providers.dart';
 import '../domain/statistics_models.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StatisticsScreen extends ConsumerStatefulWidget {
   const StatisticsScreen({super.key});
@@ -102,11 +104,252 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
     }
   }
 
+  Future<void> _generateMockData() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('목업 데이터 생성'),
+        content: const Text('지난 4주간의 운동 및 식단 데이터를 생성합니다.\n계속하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('생성'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // BuildContext를 명확하게 캡처
+    final scaffoldContext = context;
+
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+
+      if (userId == null) {
+        throw Exception('로그인이 필요합니다');
+      }
+
+      // 로딩 다이얼로그 표시
+      showDialog(
+        context: scaffoldContext,
+        barrierDismissible: false,
+        builder: (dialogContext) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('목업 데이터 생성 중...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // ⭐ 기존 목업 데이터 삭제 (지난 28일)
+      final cutoffDate = DateTime.now().subtract(const Duration(days: 28));
+      final cutoffStr = DateFormat('yyyy-MM-dd').format(cutoffDate);
+
+      // routine_record에서 is_user_reported=true인 기록 삭제
+      await client
+          .from('routine_record')
+          .delete()
+          .eq('user_id', userId)
+          .eq('is_user_reported', true)
+          .gte('end_time', cutoffStr);
+
+      // meal_record 삭제 (관련 meal_component는 cascade로 자동 삭제됨)
+      await client
+          .from('meal_record')
+          .delete()
+          .eq('user_id', userId)
+          .gte('meal_date', cutoffStr);
+
+      // nutritionsummary 삭제
+      await client
+          .from('nutritionsummary')
+          .delete()
+          .eq('user_id', userId)
+          .gte('date', cutoffStr);
+
+      print('🗑️ [Mock Data] 기존 목업 데이터 삭제 완료');
+
+      final now = DateTime.now();
+      final random = Random();
+
+      // 1. 운동 기록 생성 (이번 주 월요일부터 지난 4주간)
+      // 이번 주 월요일 계산
+      final thisWeekMonday = now.subtract(Duration(days: now.weekday - 1));
+
+      for (var week = 0; week < 4; week++) {
+        final workoutsThisWeek = 3 + random.nextInt(3); // 3-5회
+        for (var i = 0; i < workoutsThisWeek; i++) {
+          // 각 주의 랜덤한 날짜 선택 (이번 주 포함)
+          final weekStartDate = thisWeekMonday.subtract(Duration(days: week * 7));
+          final dayOffset = random.nextInt(7); // 0-6 (월-일)
+          final sessionDate = weekStartDate.add(Duration(days: dayOffset));
+
+          // 미래 날짜는 건너뛰기
+          if (sessionDate.isAfter(now)) continue;
+
+          final startTime = sessionDate.subtract(Duration(hours: 1)); // 1시간 전 시작
+
+          await client.from('routine_record').insert({
+            'user_id': userId,
+            'routine_id': null, // 루틴 없이 직접 기록
+            'start_time': startTime.toIso8601String(),
+            'end_time': sessionDate.toIso8601String(),
+            'total_calories': 200 + random.nextInt(300), // 200-500 kcal
+            'perceived_intensity': 5 + random.nextInt(5), // 5-9
+            'session_status': 'completed',
+            'is_user_reported': true,
+          });
+        }
+      }
+
+      // 2. 식단 기록 생성 (오늘 포함 지난 28일간, 매일)
+      for (var day = 0; day <= 27; day++) {
+        final date = now.subtract(Duration(days: day));
+        final dateStr = DateFormat('yyyy-MM-dd').format(date);
+
+        var dayTotalCalories = 0.0;
+        var dayTotalCarbs = 0.0;
+        var dayTotalProtein = 0.0;
+        var dayTotalFat = 0.0;
+
+        // 각 날짜에 2-3개의 식사 기록 생성
+        final mealTypes = ['breakfast', 'lunch', 'dinner'];
+        final mealsToday = 2 + random.nextInt(2); // 2-3개
+
+        for (var mealIdx = 0; mealIdx < mealsToday; mealIdx++) {
+          final calories = (400 + random.nextInt(400)).toDouble(); // 400-800 kcal
+          final carbs = (50 + random.nextInt(50)).toDouble(); // 50-100g
+          final protein = (20 + random.nextInt(30)).toDouble(); // 20-50g
+          final fat = (15 + random.nextInt(20)).toDouble(); // 15-35g
+
+          // meal_record 테이블에 삽입하고 ID 가져오기
+          final mealRecordResponse = await client.from('meal_record').insert({
+            'user_id': userId,
+            'meal_date': dateStr,
+            'meal_type': mealTypes[mealIdx],
+            'calories': calories,
+            'carbs': carbs,
+            'protein': protein,
+            'fat': fat,
+          }).select('meal_record_id').single();
+
+          final mealRecordId = mealRecordResponse['meal_record_id'] as int;
+
+          // meal_component 테이블에 음식 구성요소 추가 (2-3개)
+          final sampleFoods = [
+            ['밥', 200.0, 300.0, 60.0, 8.0, 1.0],
+            ['닭가슴살', 100.0, 110.0, 0.0, 23.0, 1.0],
+            ['계란', 50.0, 70.0, 1.0, 6.0, 5.0],
+            ['김치', 50.0, 15.0, 2.0, 1.0, 0.5],
+            ['브로콜리', 100.0, 35.0, 7.0, 3.0, 0.5],
+            ['고구마', 150.0, 130.0, 30.0, 2.0, 0.2],
+          ];
+
+          final numFoods = 2 + random.nextInt(2); // 2-3개 음식
+          for (var f = 0; f < numFoods; f++) {
+            final food = sampleFoods[random.nextInt(sampleFoods.length)];
+            await client.from('meal_component').insert({
+              'meal_record_id': mealRecordId,
+              'food_code': 'MOCK${random.nextInt(1000)}',
+              'food_name': food[0],
+              'food_category': '일반',
+              'grams': food[1],
+              'calories': food[2],
+              'carbs': food[3],
+              'protein': food[4],
+              'fat': food[5],
+            });
+          }
+
+          dayTotalCalories += calories;
+          dayTotalCarbs += carbs;
+          dayTotalProtein += protein;
+          dayTotalFat += fat;
+        }
+
+        // nutritionsummary 테이블에 일일 요약 삽입
+        await client.from('nutritionsummary').insert({
+          'user_id': userId,
+          'date': dateStr,
+          'total_calories': dayTotalCalories,
+          'total_carbs': dayTotalCarbs,
+          'total_protein': dayTotalProtein,
+          'total_fat': dayTotalFat,
+        });
+      }
+
+      // Provider 새로고침
+      ref.invalidate(weeklyWorkoutStatsProviderFamily);
+      ref.invalidate(monthlyWorkoutStatsProviderFamily);
+      ref.invalidate(weeklyDietStatsProviderFamily);
+      ref.invalidate(monthlyDietStatsProviderFamily);
+
+      if (mounted) {
+        Navigator.of(scaffoldContext, rootNavigator: true).pop(); // 로딩 다이얼로그 닫기
+
+        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+          const SnackBar(
+            content: Text('목업 데이터가 생성되었습니다!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(scaffoldContext, rootNavigator: true).pop(); // 로딩 다이얼로그 닫기
+        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+          SnackBar(
+            content: Text('오류 발생: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('통계'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'generate_mock') {
+                _generateMockData();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'generate_mock',
+                child: Row(
+                  children: [
+                    Icon(Icons.data_object, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('목업 데이터 생성'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -551,9 +794,33 @@ class _WorkoutStatsCard extends StatelessWidget {
                   icon: Icons.schedule,
                 ),
                 _StatItem(
-                  label: '완료율',
-                  value: '${stats.completionRate.toStringAsFixed(0)}%',
-                  icon: Icons.check_circle,
+                  label: '일평균',
+                  value: '${stats.averageWorkoutsPerDay.toStringAsFixed(1)}회',
+                  icon: Icons.today,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatItem(
+                  label: '소모 칼로리',
+                  value: '${stats.totalCaloriesBurned}kcal',
+                  icon: Icons.local_fire_department,
+                  color: Colors.deepOrange,
+                ),
+                _StatItem(
+                  label: '평균 강도',
+                  value: '${stats.averageIntensity.toStringAsFixed(1)}',
+                  icon: Icons.speed,
+                  color: Colors.red,
+                ),
+                _StatItem(
+                  label: '운동당 칼로리',
+                  value: '${stats.averageCaloriesPerWorkout}kcal',
+                  icon: Icons.bolt,
+                  color: Colors.orange,
                 ),
               ],
             ),
@@ -582,6 +849,9 @@ class _DietStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final achievementColor = stats.isOnTrack ? Colors.green : Colors.orange;
+    final carbs = stats.averageNutrients['carbs'] ?? 0.0;
+    final protein = stats.averageNutrients['protein'] ?? 0.0;
+    final fat = stats.averageNutrients['fat'] ?? 0.0;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -625,6 +895,38 @@ class _DietStatsCard extends StatelessWidget {
                 color: achievementColor,
                 fontWeight: FontWeight.w500,
               ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '영양소 평균 (탄단지)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatItem(
+                  label: '탄수화물',
+                  value: '${carbs.toStringAsFixed(1)}g',
+                  icon: Icons.grain,
+                  color: Colors.brown,
+                ),
+                _StatItem(
+                  label: '단백질',
+                  value: '${protein.toStringAsFixed(1)}g',
+                  icon: Icons.egg,
+                  color: Colors.red[300],
+                ),
+                _StatItem(
+                  label: '지방',
+                  value: '${fat.toStringAsFixed(1)}g',
+                  icon: Icons.water_drop,
+                  color: Colors.yellow[700],
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             const Text(
@@ -728,8 +1030,8 @@ class _MonthlyDietStatsCard extends StatelessWidget {
                   color: achievementColor,
                 ),
                 _StatItem(
-                  label: '총 식사',
-                  value: '${stats.totalMeals}회',
+                  label: '하루 평균 식사',
+                  value: '${stats.averageMealsPerDay.toStringAsFixed(1)}회',
                   icon: Icons.restaurant,
                 ),
               ],
@@ -805,6 +1107,7 @@ class _DailyWorkoutChart extends StatelessWidget {
       children: List.generate(7, (index) {
         final summary = dailySummaries[index];
         final hasWorkout = summary.hasWorkout;
+        final dateLabel = '${summary.date.month}/${summary.date.day}';
 
         return Column(
           children: [
@@ -827,9 +1130,9 @@ class _DailyWorkoutChart extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              weekDays[index],
+              '$dateLabel(${weekDays[index]})',
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 color: subTextColor,
               ),
             ),
@@ -854,6 +1157,7 @@ class _DailyDietChart extends StatelessWidget {
       children: List.generate(7, (index) {
         final summary = dailySummaries[index];
         final hasMeals = summary.hasMeals;
+        final dateLabel = '${summary.date.month}/${summary.date.day}';
 
         return Column(
           children: [
@@ -876,9 +1180,9 @@ class _DailyDietChart extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              weekDays[index],
+              '$dateLabel(${weekDays[index]})',
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 color: subTextColor,
               ),
             ),
