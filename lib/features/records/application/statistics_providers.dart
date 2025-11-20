@@ -6,20 +6,26 @@ import '../../profile/application/complete_profile_providers.dart';
 
 /// 주간 운동 통계 Provider (날짜 선택 가능)
 final weeklyWorkoutStatsProviderFamily = FutureProvider.autoDispose.family<WeeklyWorkoutStats, DateTime>((ref, weekStart) async {
-  final authState = ref.watch(authControllerProvider);
+  print('📊 [Stats] 주간 운동 통계 Provider 호출: $weekStart');
+
+  final authState = ref.read(authControllerProvider);
+  print('📊 [Stats] Auth 상태: ${authState.isLoggedIn}');
+
   if (!authState.isLoggedIn) {
+    print('❌ [Stats] 로그인 안됨');
     throw Exception('로그인이 필요합니다');
   }
 
   final weekStartMidnight = DateTime(weekStart.year, weekStart.month, weekStart.day);
   final weekEnd = weekStartMidnight.add(const Duration(days: 7));
 
+  print('📊 [Stats] 주간 운동 통계 계산 시작: $weekStartMidnight ~ $weekEnd');
   return _calculateWeeklyWorkoutStats(weekStartMidnight, weekEnd);
 });
 
 /// 월간 운동 통계 Provider (날짜 선택 가능)
 final monthlyWorkoutStatsProviderFamily = FutureProvider.autoDispose.family<MonthlyWorkoutStats, DateTime>((ref, month) async {
-  final authState = ref.watch(authControllerProvider);
+  final authState = ref.read(authControllerProvider);
   if (!authState.isLoggedIn) {
     throw Exception('로그인이 필요합니다');
   }
@@ -32,28 +38,35 @@ final monthlyWorkoutStatsProviderFamily = FutureProvider.autoDispose.family<Mont
 
 /// 주간 식단 통계 Provider (날짜 선택 가능)
 final weeklyDietStatsProviderFamily = FutureProvider.autoDispose.family<WeeklyDietStats, DateTime>((ref, weekStart) async {
-  final authState = ref.watch(authControllerProvider);
+  print('📊 [Stats] 주간 식단 통계 Provider 호출: $weekStart');
+
+  final authState = ref.read(authControllerProvider);
+  print('📊 [Stats] Diet Auth 상태: ${authState.isLoggedIn}');
+
   if (!authState.isLoggedIn) {
+    print('❌ [Stats] Diet 로그인 안됨');
     throw Exception('로그인이 필요합니다');
   }
 
-  final dietGoal = ref.watch(dietGoalModelProvider);
+  final dietGoal = ref.read(dietGoalModelProvider);
   final targetCalories = dietGoal?.dailyCalorieTarget ?? 2000;
+  print('📊 [Stats] 목표 칼로리: $targetCalories');
 
   final weekStartMidnight = DateTime(weekStart.year, weekStart.month, weekStart.day);
   final weekEnd = weekStartMidnight.add(const Duration(days: 7));
 
+  print('📊 [Stats] 주간 식단 통계 계산 시작: $weekStartMidnight ~ $weekEnd');
   return _calculateWeeklyDietStats(weekStartMidnight, weekEnd, targetCalories.toDouble());
 });
 
 /// 월간 식단 통계 Provider (날짜 선택 가능)
 final monthlyDietStatsProviderFamily = FutureProvider.autoDispose.family<MonthlyDietStats, DateTime>((ref, month) async {
-  final authState = ref.watch(authControllerProvider);
+  final authState = ref.read(authControllerProvider);
   if (!authState.isLoggedIn) {
     throw Exception('로그인이 필요합니다');
   }
 
-  final dietGoal = ref.watch(dietGoalModelProvider);
+  final dietGoal = ref.read(dietGoalModelProvider);
   final targetCalories = dietGoal?.dailyCalorieTarget ?? 2000;
 
   final monthStart = DateTime(month.year, month.month, 1);
@@ -68,14 +81,20 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
   DateTime weekStart,
   DateTime weekEnd,
 ) async {
+  print('📊 [Stats] _calculateWeeklyWorkoutStats 시작');
+
   final client = Supabase.instance.client;
   final userId = client.auth.currentUser?.id;
 
+  print('📊 [Stats] userId: $userId');
+
   if (userId == null) {
+    print('❌ [Stats] userId가 null');
     throw Exception('사용자 정보가 없습니다');
   }
 
   try {
+    print('📊 [Stats] routine_record 조회 중...');
     // routine_record 조회 (완료된 세션만)
     final records = await client
         .from('routine_record')
@@ -85,6 +104,8 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
         .gte('end_time', weekStart.toIso8601String())
         .lt('end_time', weekEnd.toIso8601String())
         .order('end_time');
+
+    print('📊 [Stats] 조회된 운동 기록: ${records.length}개');
 
     final totalWorkouts = records.length;
     var totalMinutes = 0;
@@ -161,6 +182,8 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
 
     final averageIntensity = intensityCount > 0 ? totalIntensity / intensityCount : 0.0;
 
+    print('📊 [Stats] 주간 운동 통계 계산 완료 - 총 ${totalWorkouts}회, ${totalMinutes}분, ${totalCaloriesBurned}kcal');
+
     return WeeklyWorkoutStats(
       weekStart: weekStart,
       weekEnd: weekEnd,
@@ -174,7 +197,7 @@ Future<WeeklyWorkoutStats> _calculateWeeklyWorkoutStats(
       averageIntensity: averageIntensity,
     );
   } catch (e) {
-    print('주간 운동 통계 계산 실패: $e');
+    print('❌ [Stats] 주간 운동 통계 계산 실패: $e');
     rethrow;
   }
 }
