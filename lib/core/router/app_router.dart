@@ -186,12 +186,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/app/records',
             name: 'records',
-            builder: (context, state) => const RecordsScreen(),
+            builder: (context, state) => const StatisticsScreen(),
             routes: [
               GoRoute(
-                path: 'statistics',
-                name: 'statistics',
-                builder: (context, state) => const StatisticsScreen(),
+                path: 'calendar',
+                name: 'calendar',
+                builder: (context, state) => const RecordsScreen(),
               ),
               GoRoute(
                 path: 'detail/:id',

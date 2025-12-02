@@ -119,6 +119,7 @@ class MotionPhase {
   final String description;
   final double durationSec;
   final List<String> keyChecks;
+  final Map<String, KeyAngle>? phaseAngles; // 페이즈별 각도 기준 (없으면 기본 key_angles 사용)
 
   MotionPhase({
     required this.phaseId,
@@ -126,6 +127,7 @@ class MotionPhase {
     required this.description,
     required this.durationSec,
     required this.keyChecks,
+    this.phaseAngles,
   });
 
   factory MotionPhase.fromJson(Map<String, dynamic> json) {
@@ -135,6 +137,11 @@ class MotionPhase {
       description: json['description'] as String,
       durationSec: (json['duration_sec'] as num).toDouble(),
       keyChecks: List<String>.from(json['key_checks'] as List),
+      phaseAngles: json['phase_angles'] != null
+          ? (json['phase_angles'] as Map<String, dynamic>).map(
+              (key, value) => MapEntry(key, KeyAngle.fromJson(value as Map<String, dynamic>)),
+            )
+          : null,
     );
   }
 
@@ -145,6 +152,8 @@ class MotionPhase {
       'description': description,
       'duration_sec': durationSec,
       'key_checks': keyChecks,
+      if (phaseAngles != null)
+        'phase_angles': phaseAngles!.map((key, value) => MapEntry(key, value.toJson())),
     };
   }
 }

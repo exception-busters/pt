@@ -26,16 +26,9 @@ class _RecordsScreenState extends ConsumerState<RecordsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('기록'),
+        title: const Text('캘린더'),
         backgroundColor: backgroundColor,
         foregroundColor: mainButtonColor,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: '통계 보기',
-            onPressed: () => context.push('/app/records/statistics'),
-          ),
-        ],
       ),
       body: SafeArea(
         child: recordsAsync.when(

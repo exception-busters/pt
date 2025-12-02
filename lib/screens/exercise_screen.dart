@@ -7,7 +7,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // 모델
-import '../models/exercise_model.dart';
+import '../models/exercise_model.dart' show ExerciseModel, KeyAngle;
 
 // 서비스
 import '../services/exercise_loader.dart';
@@ -90,6 +90,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   
   // 준비 피드백 메시지 (맨 아래 고정)
   final ValueNotifier<String?> _readyFeedbackNotifier = ValueNotifier(null);
+
+  // 디버그 정보 (개발 모드에서 표시)
+  final ValueNotifier<String> _debugInfoNotifier = ValueNotifier('');
   
   // 마지막으로 읽은 단계 설명 (중복 방지)
   String? _lastSpokenPhaseDescription;
@@ -145,6 +148,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _feedbacksNotifier.dispose();
     _scoreNotifier.dispose();
     _readyFeedbackNotifier.dispose();
+    _debugInfoNotifier.dispose();
     _posesNotifier.dispose(); // 추가: 포즈 리소스 해제
     _imageSizeNotifier.dispose(); // 추가: 이미지 크기 리소스 해제
     _ttsService.dispose(); // TTS 리소스 해제
@@ -665,14 +669,18 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   void _updateFeedback() {
     final poses = _posesNotifier.value;
-    if (poses.isEmpty || _selectedExercise == null) {
+    if (poses.isEmpty || _selectedExercise == null || _phaseManager == null) {
       _feedbacksNotifier.value = [];
       _scoreNotifier.value = 0.0;
       return;
     }
 
     final pose = poses[0];
-    final userAngles = _calculateUserAngles(pose, _selectedExercise!);
+
+    // 현재 페이즈의 각도 기준 가져오기
+    final currentPhaseAngles = _phaseManager!.getCurrentPhaseAngles();
+
+    final userAngles = _calculateUserAnglesWithPhase(pose, currentPhaseAngles);
 
     if (userAngles.isEmpty) {
       _feedbacksNotifier.value = ['전신이 보이도록 해주세요'];
@@ -681,18 +689,18 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     final score = PoseScorer.calculateScore(
       userAngles,
-      _selectedExercise!.keyAngles,
+      currentPhaseAngles,
     );
 
     final detailedScores = PoseScorer.calculateDetailedScores(
       userAngles,
-      _selectedExercise!.keyAngles,
+      currentPhaseAngles,
     );
 
     final feedbacks = FeedbackGenerator.generateFeedback(
       userAngles,
       detailedScores,
-      _selectedExercise!.keyAngles,
+      currentPhaseAngles,
       _selectedExercise!.feedbackRules,
     );
 
@@ -733,8 +741,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         }
       }
       
-      // 첫 단계 시작 시에도 설명 읽기
-      if (_phaseManager!.currentPhaseIndex == 0 && !_phaseManager!.isReady && !_phaseManager!.isCompleted) {
+      // 첫 단계 시작 시 설명 읽기
+      if (_phaseManager!.currentPhaseIndex == 0 && !_phaseManager!.isCompleted) {
         final phaseDescription = _phaseManager!.currentPhase.description;
         if (_lastSpokenPhaseDescription != phaseDescription) {
           _ttsService.speak(phaseDescription);
@@ -754,16 +762,8 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _moveToNextExercise();
       }
 
-      if (!_phaseManager!.isReady && !_phaseManager!.isCompleted) {
-        // 준비 피드백 - 맨 아래 고정 표시
-        readyFeedback = '⏳ 준비: 자세를 2초 유지하세요 (${_phaseManager!.readyDuration.toStringAsFixed(1)}초)';
-      } else if (_phaseManager!.isReady && !_phaseManager!.isCompleted) {
-        // 운동 진행 중 - TTS만 제공
-        ttsFeedbacks.add('⚠️ ${_phaseManager!.currentPhase.description}');
-        readyFeedback = null; // 준비 완료되면 준비 피드백 제거
-      } else {
-        readyFeedback = null;
-      }
+      // 준비 피드백 없음 - 점수 충족 시 즉시 통과
+      readyFeedback = null;
     }
 
     // 일반 피드백도 TTS만 제공 (텍스트는 표시하지 않음)
@@ -776,6 +776,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     _scoreNotifier.value = score;
     _feedbacksNotifier.value = []; // 텍스트 피드백 비우기 (표시하지 않음)
     _readyFeedbackNotifier.value = readyFeedback; // 준비 피드백만 별도로 관리
+
+    // 디버그 정보 업데이트
+    if (_phaseManager != null) {
+      _debugInfoNotifier.value = _phaseManager!.getDebugInfo(score);
+    }
 
     // TTS: 피드백 음성 재생 (첫 번째 피드백만)
     if (ttsFeedbacks.isNotEmpty) {
@@ -790,10 +795,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     }
   }
 
-  Map<String, double> _calculateUserAngles(Pose pose, ExerciseModel exercise) {
+  /// 페이즈별 각도 기준으로 사용자 각도 계산
+  /// 측면 촬영 시 한쪽 랜드마크만 보이는 경우도 처리
+  Map<String, double> _calculateUserAnglesWithPhase(Pose pose, Map<String, KeyAngle> phaseAngles) {
     Map<String, double> angles = {};
 
-    for (var entry in exercise.keyAngles.entries) {
+    for (var entry in phaseAngles.entries) {
       final angleKey = entry.key;
       final angleInfo = entry.value;
       final points = angleInfo.points;
@@ -815,7 +822,46 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       }
     }
 
+    // 측면 촬영 지원: 한쪽만 감지된 경우 반대쪽 각도도 채움
+    _fillMirroredAngles(angles, phaseAngles);
+
     return angles;
+  }
+
+  /// 좌/우 대칭 각도 쌍 정의
+  static const Map<String, String> _mirroredAnglePairs = {
+    'left_knee_angle': 'right_knee_angle',
+    'right_knee_angle': 'left_knee_angle',
+    'left_hip_angle': 'right_hip_angle',
+    'right_hip_angle': 'left_hip_angle',
+    'left_hip_flexion': 'right_hip_flexion',
+    'right_hip_flexion': 'left_hip_flexion',
+    'left_body_tilt': 'right_body_tilt',
+    'right_body_tilt': 'left_body_tilt',
+  };
+
+  /// 한쪽만 감지된 경우 반대쪽 각도를 복사하여 채움
+  void _fillMirroredAngles(Map<String, double> angles, Map<String, KeyAngle> phaseAngles) {
+    final anglesToAdd = <String, double>{};
+
+    for (var entry in angles.entries) {
+      final angleKey = entry.key;
+      final mirroredKey = _mirroredAnglePairs[angleKey];
+
+      // 반대쪽 각도가 정의되어 있고, 아직 계산되지 않은 경우
+      if (mirroredKey != null &&
+          phaseAngles.containsKey(mirroredKey) &&
+          !angles.containsKey(mirroredKey)) {
+        anglesToAdd[mirroredKey] = entry.value;
+      }
+    }
+
+    angles.addAll(anglesToAdd);
+  }
+
+  /// 기존 메서드 (호환성 유지)
+  Map<String, double> _calculateUserAngles(Pose pose, ExerciseModel exercise) {
+    return _calculateUserAnglesWithPhase(pose, exercise.keyAngles);
   }
 
   PoseLandmark? _getLandmark(Pose pose, String name) {
@@ -1177,6 +1223,34 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                     : null,
               ),
             ),
+
+          // 디버그 정보 (좌측 하단)
+          Positioned(
+            bottom: 160,
+            left: 16,
+            child: ValueListenableBuilder<String>(
+              valueListenable: _debugInfoNotifier,
+              builder: (context, debugInfo, child) {
+                if (debugInfo.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    debugInfo,
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      height: 1.4,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
 
           // 준비 피드백 (진행도 바 위에 배치)
           Positioned(

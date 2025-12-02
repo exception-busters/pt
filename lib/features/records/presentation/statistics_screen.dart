@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_application_1/color.dart';
 import 'package:flutter_application_1/widgets/error_widget.dart';
 import '../application/statistics_providers.dart';
@@ -327,8 +328,15 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('통계'),
+        title: const Text('기록'),
+        backgroundColor: backgroundColor,
+        foregroundColor: mainButtonColor,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            tooltip: '캘린더 보기',
+            onPressed: () => context.push('/app/records/calendar'),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {

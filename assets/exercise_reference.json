@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2025-11-03",
+  "version": "2.0.0",
+  "last_updated": "2025-11-29",
   "exercises": [
     {
       "exercise_id": "001",
@@ -23,92 +23,34 @@
       "key_angles": {
         "left_body_tilt": {
           "name": "좌측 상체 기울기",
-          "points": [
-            "Left Shoulder",
-            "Left Hip",
-            "Left Knee"
-          ],
-          "ideal_mean": 160.0,
-          "ideal_range": [
-            140.0,
-            170.0
-          ],
-          "tolerance": 20.0,
+          "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 15.0,
           "weight": 1.2
         },
         "right_body_tilt": {
           "name": "우측 상체 기울기",
-          "points": [
-            "Right Shoulder",
-            "Right Hip",
-            "Right Knee"
-          ],
-          "ideal_mean": 160.0,
-          "ideal_range": [
-            140.0,
-            170.0
-          ],
-          "tolerance": 20.0,
+          "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 15.0,
           "weight": 1.2
-        },
-        "left_elbow_angle": {
-          "name": "좌측 팔꿈치 각도",
-          "points": [
-            "Left Shoulder",
-            "Left Elbow",
-            "Left Wrist"
-          ],
-          "ideal_mean": 165.0,
-          "ideal_range": [
-            150.0,
-            180.0
-          ],
-          "tolerance": 24.0,
-          "weight": 0.5
-        },
-        "right_elbow_angle": {
-          "name": "우측 팔꿈치 각도",
-          "points": [
-            "Right Shoulder",
-            "Right Elbow",
-            "Right Wrist"
-          ],
-          "ideal_mean": 165.0,
-          "ideal_range": [
-            150.0,
-            180.0
-          ],
-          "tolerance": 24.0,
-          "weight": 0.5
         },
         "left_knee_angle": {
           "name": "좌측 무릎 각도",
-          "points": [
-            "Left Hip",
-            "Left Knee",
-            "Left Ankle"
-          ],
-          "ideal_mean": 173.0,
-          "ideal_range": [
-            165.0,
-            180.0
-          ],
-          "tolerance": 20.0,
+          "points": ["Left Hip", "Left Knee", "Left Ankle"],
+          "ideal_mean": 175.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 15.0,
           "weight": 0.6
         },
         "right_knee_angle": {
           "name": "우측 무릎 각도",
-          "points": [
-            "Right Hip",
-            "Right Knee",
-            "Right Ankle"
-          ],
-          "ideal_mean": 173.0,
-          "ideal_range": [
-            165.0,
-            180.0
-          ],
-          "tolerance": 20.0,
+          "points": ["Right Hip", "Right Knee", "Right Ankle"],
+          "ideal_mean": 175.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 15.0,
           "weight": 0.6
         }
       },
@@ -118,83 +60,235 @@
           "phase_name": "시작 자세",
           "description": "양발을 어깨 너비로 벌리고 서서 상체를 곧게 펴세요",
           "duration_sec": 2.0,
-          "key_checks": [
-            "상체를 자연스럽게 곧게 펴기 (165도 이상)",
-            "좌우 균형 유지 (차이 10도 이내)",
-            "무릎은 자연스럽게 펴기"
-          ]
+          "key_checks": ["상체를 곧게 펴기", "좌우 균형 유지"],
+          "phase_angles": {
+            "left_body_tilt": {
+              "name": "좌측 상체 기울기",
+              "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "right_body_tilt": {
+              "name": "우측 상체 기울기",
+              "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            }
+          }
         },
         {
           "phase_id": 2,
           "phase_name": "좌측 굽히기",
-          "description": "왼쪽 팔을 머리 위로 올리고 좌측으로 천천히 기울이세요",
+          "description": "왼쪽으로 천천히 상체를 기울이세요",
           "duration_sec": 2.5,
-          "key_checks": [
-            "좌측 상체 기울기 140~170도",
-            "우측 상체는 비교적 직선 유지 (165도 이상)",
-            "좌우 기울기 차이 최소 8도 이상"
-          ]
+          "key_checks": ["좌측으로 기울이기", "무릎은 펴고 유지"],
+          "phase_angles": {
+            "left_body_tilt": {
+              "name": "좌측 상체 기울기",
+              "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+              "ideal_mean": 150.0,
+              "ideal_range": [140.0, 160.0],
+              "tolerance": 15.0,
+              "weight": 1.5
+            },
+            "right_body_tilt": {
+              "name": "우측 상체 기울기",
+              "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.0
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            }
+          }
         },
         {
           "phase_id": 3,
           "phase_name": "중앙 복귀",
           "description": "천천히 시작 자세로 돌아오세요",
           "duration_sec": 2.0,
-          "key_checks": [
-            "상체를 자연스럽게 곧게 펴기",
-            "좌우 균형 유지"
-          ]
+          "key_checks": ["상체를 곧게 펴기", "좌우 균형 유지"],
+          "phase_angles": {
+            "left_body_tilt": {
+              "name": "좌측 상체 기울기",
+              "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "right_body_tilt": {
+              "name": "우측 상체 기울기",
+              "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            }
+          }
         },
         {
           "phase_id": 4,
           "phase_name": "우측 굽히기",
-          "description": "오른쪽 팔을 머리 위로 올리고 우측으로 천천히 기울이세요",
+          "description": "오른쪽으로 천천히 상체를 기울이세요",
           "duration_sec": 2.5,
-          "key_checks": [
-            "우측 상체 기울기 140~170도",
-            "좌측 상체는 비교적 직선 유지 (165도 이상)",
-            "좌우 기울기 차이 최소 8도 이상"
-          ]
+          "key_checks": ["우측으로 기울이기", "무릎은 펴고 유지"],
+          "phase_angles": {
+            "left_body_tilt": {
+              "name": "좌측 상체 기울기",
+              "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.0
+            },
+            "right_body_tilt": {
+              "name": "우측 상체 기울기",
+              "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+              "ideal_mean": 150.0,
+              "ideal_range": [140.0, 160.0],
+              "tolerance": 15.0,
+              "weight": 1.5
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            }
+          }
         },
         {
           "phase_id": 5,
           "phase_name": "운동 완료",
-          "description": "마지막으로 시작 자세로 돌아와 운동을 마무리하세요",
+          "description": "시작 자세로 돌아와 운동을 마무리하세요",
           "duration_sec": 2.0,
-          "key_checks": [
-            "시작 자세로 복귀",
-            "호흡 정리"
-          ]
+          "key_checks": ["시작 자세로 복귀", "호흡 정리"],
+          "phase_angles": {
+            "left_body_tilt": {
+              "name": "좌측 상체 기울기",
+              "points": ["Left Shoulder", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "right_body_tilt": {
+              "name": "우측 상체 기울기",
+              "points": ["Right Shoulder", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 1.2
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 175.0,
+              "ideal_range": [165.0, 180.0],
+              "tolerance": 15.0,
+              "weight": 0.6
+            }
+          }
         }
       ],
       "feedback_rules": [
         {
-          "condition": "left_body_tilt > 170",
+          "condition": "left_body_tilt > 175",
           "feedback": "좌측으로 더 기울이세요",
           "severity": "info"
         },
         {
-          "condition": "left_body_tilt < 140",
+          "condition": "left_body_tilt < 135",
           "feedback": "너무 많이 기울였습니다",
           "severity": "warning"
         },
         {
-          "condition": "right_body_tilt > 170",
+          "condition": "right_body_tilt > 175",
           "feedback": "우측으로 더 기울이세요",
           "severity": "info"
         },
         {
-          "condition": "right_body_tilt < 140",
+          "condition": "right_body_tilt < 135",
           "feedback": "너무 많이 기울였습니다",
           "severity": "warning"
         },
         {
-          "condition": "left_knee_angle < 165",
+          "condition": "left_knee_angle < 160",
           "feedback": "왼쪽 무릎을 펴세요",
           "severity": "warning"
         },
         {
-          "condition": "right_knee_angle < 165",
+          "condition": "right_knee_angle < 160",
           "feedback": "오른쪽 무릎을 펴세요",
           "severity": "warning"
         }
@@ -226,62 +320,34 @@
       "key_angles": {
         "left_hip_flexion": {
           "name": "좌측 힙 굴곡",
-          "points": [
-            "Back",
-            "Left Hip",
-            "Left Knee"
-          ],
-          "ideal_mean": 138.9,
-          "ideal_range": [
-            108.9,
-            120.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Back", "Left Hip", "Left Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.5
         },
         "right_hip_flexion": {
           "name": "우측 힙 굴곡",
-          "points": [
-            "Back",
-            "Right Hip",
-            "Right Knee"
-          ],
-          "ideal_mean": 137.6,
-          "ideal_range": [
-            107.6,
-            120.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Back", "Right Hip", "Right Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.5
         },
         "left_knee_angle": {
           "name": "좌측 무릎 각도",
-          "points": [
-            "Left Hip",
-            "Left Knee",
-            "Left Ankle"
-          ],
-          "ideal_mean": 142.9,
-          "ideal_range": [
-            112.9,
-            120.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Left Hip", "Left Knee", "Left Ankle"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.0
         },
         "right_knee_angle": {
           "name": "우측 무릎 각도",
-          "points": [
-            "Right Hip",
-            "Right Knee",
-            "Right Ankle"
-          ],
-          "ideal_mean": 143.2,
-          "ideal_range": [
-            113.2,
-            120.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Right Hip", "Right Knee", "Right Ankle"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.0
         }
       },
@@ -289,60 +355,228 @@
         {
           "phase_id": 1,
           "phase_name": "시작 자세",
-          "description": "양발을 어깨 너비로 벌리고 서세요",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "자연스러운 서기 자세"
-          ]
+          "description": "양발을 어깨 너비로 벌리고 똑바로 서세요",
+          "duration_sec": 1.5,
+          "key_checks": ["자연스럽게 서기", "양쪽 다리 펴기"],
+          "phase_angles": {
+            "left_hip_flexion": {
+              "name": "좌측 힙 굴곡",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_hip_flexion": {
+              "name": "우측 힙 굴곡",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            }
+          }
         },
         {
           "phase_id": 2,
           "phase_name": "왼쪽 무릎 들기",
-          "description": "왼쪽 무릎을 가슴 쪽으로 들어올리세요",
-          "duration_sec": 1.5,
-          "key_checks": [
-            "무릎을 90도까지 굴곡",
-            "균형 유지"
-          ]
+          "description": "왼쪽 무릎을 가슴 쪽으로 높이 들어올리세요",
+          "duration_sec": 2.0,
+          "key_checks": ["왼쪽 무릎 90도 굴곡", "균형 유지"],
+          "phase_angles": {
+            "left_hip_flexion": {
+              "name": "좌측 힙 굴곡",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 100.0,
+              "ideal_range": [80.0, 120.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            },
+            "right_hip_flexion": {
+              "name": "우측 힙 굴곡",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 90.0,
+              "ideal_range": [70.0, 110.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            }
+          }
         },
         {
           "phase_id": 3,
           "phase_name": "왼쪽 내리기",
           "description": "천천히 왼발을 내려놓으세요",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "부드럽게 착지"
-          ]
+          "duration_sec": 1.5,
+          "key_checks": ["부드럽게 착지", "양쪽 다리 펴기"],
+          "phase_angles": {
+            "left_hip_flexion": {
+              "name": "좌측 힙 굴곡",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_hip_flexion": {
+              "name": "우측 힙 굴곡",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            }
+          }
         },
         {
           "phase_id": 4,
           "phase_name": "오른쪽 무릎 들기",
-          "description": "오른쪽 무릎을 가슴 쪽으로 들어올리세요",
-          "duration_sec": 1.5,
-          "key_checks": [
-            "무릎을 90도까지 굴곡",
-            "균형 유지"
-          ]
+          "description": "오른쪽 무릎을 가슴 쪽으로 높이 들어올리세요",
+          "duration_sec": 2.0,
+          "key_checks": ["오른쪽 무릎 90도 굴곡", "균형 유지"],
+          "phase_angles": {
+            "left_hip_flexion": {
+              "name": "좌측 힙 굴곡",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_hip_flexion": {
+              "name": "우측 힙 굴곡",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 100.0,
+              "ideal_range": [80.0, 120.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 90.0,
+              "ideal_range": [70.0, 110.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            }
+          }
         },
         {
           "phase_id": 5,
           "phase_name": "완료",
           "description": "시작 자세로 돌아가세요",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "양발 지면에 고정"
-          ]
+          "duration_sec": 1.5,
+          "key_checks": ["양발 지면에 고정", "자연스럽게 서기"],
+          "phase_angles": {
+            "left_hip_flexion": {
+              "name": "좌측 힙 굴곡",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_hip_flexion": {
+              "name": "우측 힙 굴곡",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.0
+            }
+          }
         }
       ],
       "feedback_rules": [
         {
-          "condition": "left_hip_flexion < 60",
+          "condition": "left_hip_flexion > 140",
           "feedback": "왼쪽 무릎을 더 높이 들어올리세요",
           "severity": "info"
         },
         {
-          "condition": "right_hip_flexion < 60",
+          "condition": "right_hip_flexion > 140",
           "feedback": "오른쪽 무릎을 더 높이 들어올리세요",
+          "severity": "info"
+        },
+        {
+          "condition": "left_knee_angle > 130",
+          "feedback": "왼쪽 무릎을 더 구부리세요",
+          "severity": "info"
+        },
+        {
+          "condition": "right_knee_angle > 130",
+          "feedback": "오른쪽 무릎을 더 구부리세요",
           "severity": "info"
         }
       ],
@@ -373,62 +607,34 @@
       "key_angles": {
         "left_knee_angle": {
           "name": "좌측 무릎 각도",
-          "points": [
-            "Left Hip",
-            "Left Knee",
-            "Left Ankle"
-          ],
-          "ideal_mean": 149.3,
-          "ideal_range": [
-            70.0,
-            110.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Left Hip", "Left Knee", "Left Ankle"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.5
         },
         "right_knee_angle": {
           "name": "우측 무릎 각도",
-          "points": [
-            "Right Hip",
-            "Right Knee",
-            "Right Ankle"
-          ],
-          "ideal_mean": 149.4,
-          "ideal_range": [
-            70.0,
-            110.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Right Hip", "Right Knee", "Right Ankle"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.5
         },
         "left_hip_angle": {
           "name": "좌측 힙 각도",
-          "points": [
-            "Back",
-            "Left Hip",
-            "Left Knee"
-          ],
-          "ideal_mean": 139.7,
-          "ideal_range": [
-            70.0,
-            110.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Back", "Left Hip", "Left Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.2
         },
         "right_hip_angle": {
           "name": "우측 힙 각도",
-          "points": [
-            "Back",
-            "Right Hip",
-            "Right Knee"
-          ],
-          "ideal_mean": 140.6,
-          "ideal_range": [
-            70.0,
-            110.0
-          ],
-          "tolerance": 30.0,
+          "points": ["Back", "Right Hip", "Right Knee"],
+          "ideal_mean": 170.0,
+          "ideal_range": [165.0, 180.0],
+          "tolerance": 20.0,
           "weight": 1.2
         }
       },
@@ -436,66 +642,236 @@
         {
           "phase_id": 1,
           "phase_name": "시작 자세",
-          "description": "양발을 어깨 너비로 벌리고 서세요",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "자연스러운 서기"
-          ]
+          "description": "양발을 어깨 너비로 벌리고 똑바로 서세요",
+          "duration_sec": 1.5,
+          "key_checks": ["자연스럽게 서기", "무릎 펴기"],
+          "phase_angles": {
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "left_hip_angle": {
+              "name": "좌측 힙 각도",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            },
+            "right_hip_angle": {
+              "name": "우측 힙 각도",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            }
+          }
         },
         {
           "phase_id": 2,
           "phase_name": "하강",
-          "description": "엉덩이를 뒤로 빼며 무릎을 구부리세요",
-          "duration_sec": 2.0,
-          "key_checks": [
-            "무릎 90도 굴곡",
-            "등 곧게 유지"
-          ]
+          "description": "엉덩이를 뒤로 빼며 무릎을 천천히 구부리세요",
+          "duration_sec": 2.5,
+          "key_checks": ["무릎 90도 굴곡", "등 곧게 유지"],
+          "phase_angles": {
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "left_hip_angle": {
+              "name": "좌측 힙 각도",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            },
+            "right_hip_angle": {
+              "name": "우측 힙 각도",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            }
+          }
         },
         {
           "phase_id": 3,
           "phase_name": "유지",
-          "description": "최하단에서 1초간 유지하세요",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "자세 유지"
-          ]
+          "description": "최하단에서 자세를 유지하세요",
+          "duration_sec": 1.5,
+          "key_checks": ["자세 유지", "균형 유지"],
+          "phase_angles": {
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "left_hip_angle": {
+              "name": "좌측 힙 각도",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            },
+            "right_hip_angle": {
+              "name": "우측 힙 각도",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 95.0,
+              "ideal_range": [80.0, 110.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            }
+          }
         },
         {
           "phase_id": 4,
           "phase_name": "상승",
-          "description": "천천히 시작 자세로 돌아오세요",
-          "duration_sec": 2.0,
-          "key_checks": [
-            "무릎 펴기"
-          ]
+          "description": "천천히 일어나세요",
+          "duration_sec": 2.5,
+          "key_checks": ["무릎 펴기", "등 곧게 유지"],
+          "phase_angles": {
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 135.0,
+              "ideal_range": [120.0, 150.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 135.0,
+              "ideal_range": [120.0, 150.0],
+              "tolerance": 25.0,
+              "weight": 1.5
+            },
+            "left_hip_angle": {
+              "name": "좌측 힙 각도",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 135.0,
+              "ideal_range": [120.0, 150.0],
+              "tolerance": 25.0,
+              "weight": 1.2
+            },
+            "right_hip_angle": {
+              "name": "우측 힙 각도",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 135.0,
+              "ideal_range": [120.0, 150.0],
+              "tolerance": 25.0,
+              "weight": 1.2
+            }
+          }
         },
         {
           "phase_id": 5,
           "phase_name": "완료",
-          "description": "시작 자세로 복귀",
-          "duration_sec": 1.0,
-          "key_checks": [
-            "완전히 서기"
-          ]
+          "description": "시작 자세로 완전히 돌아오세요",
+          "duration_sec": 1.5,
+          "key_checks": ["완전히 서기", "호흡 정리"],
+          "phase_angles": {
+            "left_knee_angle": {
+              "name": "좌측 무릎 각도",
+              "points": ["Left Hip", "Left Knee", "Left Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "right_knee_angle": {
+              "name": "우측 무릎 각도",
+              "points": ["Right Hip", "Right Knee", "Right Ankle"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.5
+            },
+            "left_hip_angle": {
+              "name": "좌측 힙 각도",
+              "points": ["Back", "Left Hip", "Left Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            },
+            "right_hip_angle": {
+              "name": "우측 힙 각도",
+              "points": ["Back", "Right Hip", "Right Knee"],
+              "ideal_mean": 170.0,
+              "ideal_range": [160.0, 180.0],
+              "tolerance": 20.0,
+              "weight": 1.2
+            }
+          }
         }
       ],
       "feedback_rules": [
         {
           "condition": "left_knee_angle < 70",
-          "feedback": "너무 깊게 앉았습니다",
+          "feedback": "너무 깊게 앉았습니다. 무릎에 무리가 갈 수 있어요",
           "severity": "warning"
         },
         {
           "condition": "right_knee_angle < 70",
-          "feedback": "너무 깊게 앉았습니다",
+          "feedback": "너무 깊게 앉았습니다. 무릎에 무리가 갈 수 있어요",
           "severity": "warning"
+        },
+        {
+          "condition": "left_knee_angle > 130",
+          "feedback": "더 깊이 앉아주세요",
+          "severity": "info"
+        },
+        {
+          "condition": "right_knee_angle > 130",
+          "feedback": "더 깊이 앉아주세요",
+          "severity": "info"
         }
       ],
       "common_mistakes": [
         "무릎이 발끝을 넘어감",
         "등이 구부러짐",
-        "너무 빠른 동작"
+        "너무 빠른 동작",
+        "무릎이 안쪽으로 들어감"
       ]
     }
   ]
