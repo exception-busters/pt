@@ -13,9 +13,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://wkmnnzndtggrlrzjlncn.supabase.co', // Supabase URL 주소
+    url: 'https://hypxerpzvslsipqowdyn.supabase.co', // Supabase URL 주소
     anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbW5uem5kdGdncmxyempsbmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExODU1NDIsImV4cCI6MjA3Njc2MTU0Mn0.bd9pcs-4YDyL98YcKhBzq53u2CONtjUv7NdYEcDA-eU', // Supabase anon key
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cHhlcnB6dnNsc2lwcW93ZHluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxODY0OTgsImV4cCI6MjEwMzc2MjQ5OH0.T-okqbGMacwRxnuLan9HpWIgc018zQzhSZPzJ_QQK-A', // Supabase anon key
   );
   runApp(const ProviderScope(child: PTApp()));
 }
